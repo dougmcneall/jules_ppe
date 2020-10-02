@@ -1,0 +1,253 @@
+---
+title: "explore-JULES-ES-1p0_PPE"
+author: "Doug McNeall"
+date: "9/29/2020"
+output: html_document
+---
+
+### Load helper functions
+```{r, message = FALSE, warning=FALSE}
+
+knitr::opts_chunk$set(fig.path = "figs/", message = FALSE, warnings = FALSE)
+# load some helper functions
+source('explore-JULES-ES-1p0_PPE_functions.R')
+```
+
+### Load packages
+```{r, message = FALSE, warning=FALSE}
+  library(RColorBrewer)
+  library(fields)
+  library(MASS)
+  library(DiceKriging)
+  library(ncdf4)
+  library(ncdf4.helpers)
+  source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/emtools.R")
+  source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/imptools.R")
+  source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/vistools.R")
+
+```
+
+## Preliminaries
+```{r}
+# Some pallete options
+yg = brewer.pal(9, "YlGn")
+ryb = brewer.pal(11, "RdYlBu")
+byr = rev(ryb)
+rb = brewer.pal(11, "RdBu")
+br = rev(rb)
+blues = brewer.pal(9, 'Blues')
+cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+```
+
+
+```{r}
+# data location
+
+ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
+ensmember <- 'P0000/'
+subdir <- 'stats/'
+
+floc <- paste0(ensloc,ensmember,subdir)
+fn <- 'JULES-ES-1p0_P0000_Annual_global.nc'
+
+```
+
+```{r}
+# test file
+nc <- nc_open(paste0(floc,fn))
+
+# What variables are in the file? 
+varlist <- nc.get.variable.list(nc)
+
+```
+
+```{r}
+# for each of the variables in the file, average the last 20 years as the "modern" value,
+# and then place in a matrix
+
+modern_value <- function(nc, variable, ix){
+  # A basic function to read a variable and 
+  # take the mean of the timeseries at locations ix
+  dat <- ncvar_get(nc, variable)
+  out <- mean(dat[ix])
+  out
+}
+#144:164 is the 1993:2013
+modern_value(nc = nc, variable = "npp_nlim_lnd_mean", ix = 144:164)
+
+vec <- sapply(varlist, FUN = modern_value, nc = nc, ix = 144:164)
+
+```
+
+
+```{r}
+# Generate ensemble numbers
+nens = 499
+
+datmat <- matrix(nrow = nens, ncol = length(varlist))
+colnames(datmat) <- varlist
+
+enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
+
+floc <- paste0(ensloc,ensmember,subdir)
+
+for(i in 1:nens){
+  
+  vec <- rep(NA, length(varlist))
+  
+  ensmember <- enslist[i] 
+  
+  fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+  #print(fn)
+  
+  try(nc <- nc_open(paste0(fn)))
+  try(vec <- sapply(varlist, FUN = modern_value, nc = nc, ix = 144:164))
+  datmat[i, ] <- vec
+  nc_close(nc)
+}
+```
+
+
+```{r}
+nlevel0.ix <- which(is.na(datmat[,3]))
+
+# Y is the whole data set
+Y <- datmat
+# Y0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
+Y.level0 <- datmat[-nlevel0.ix, -c(2,30,31)]
+Y.nlevel0 <- datmat[nlevel0.ix, -c(2,30,31)]
+
+```
+
+
+
+```{r}
+years = 1864:2013
+ysec = 60*60*24*365
+#norm.vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
+
+# Load up the data
+lhs_i = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_i/lhs_u-ao732.txt', header = TRUE)
+lhs_ii = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_ii/lhs_u-ao732a.txt', header = TRUE)
+
+toplevel.ix = 1:499
+
+# The raw input data is a latin hypercube
+lhs = rbind(lhs_i, lhs_ii)[toplevel.ix, ]
+lhs.level0 <- lhs[-nlevel0.ix,]
+
+
+X = normalize(lhs)
+colnames(X) = colnames(lhs)
+
+X.level0 <- X[-nlevel0.ix,]
+X.nlevel0 <- X[nlevel0.ix,]
+
+d = ncol(X)
+# lower and higher bound on the normalised matrix for visualisation
+rx = rbind(rep(0,32), rep(1,32))
+```
+
+
+Where did the model fail to run?
+
+```{r, fig.width = 12, fig.height = 12}
+
+#simple way
+pairs(X.nlevel0, xlim = c(0,1), ylim = c(0,1),col = 'red', gap = 0, lower.panel = NULL, pch = 20)
+
+# plot failures over everything else
+X.all <- rbind(X.level0, X.nlevel0)
+colvec <- rep('grey', nrow(X))
+colvec[(nrow(X.level0)+1):nrow(X.all)] <- 'red'
+
+pairs(X.all, xlim = c(0,1), ylim = c(0,1),col = colvec, gap = 0, lower.panel = NULL, pch = 20, cex = 0.5)
+
+```
+
+
+
+```{r, fig.width = 10, fig.height = 10}
+par(mfrow = c(6,6), mar = c(1,1,1,1))
+for(i in 1:d){
+  
+  plot(X[,i], datmat[,6])
+  
+}
+
+```
+
+
+# Basic histograms of the output at Level 0 (places the model ran) 
+```{r, fig.width = 12, fig.height = 12}
+d = ncol(Y.level0)
+
+par(mfrow = c(5,6))
+
+for(i in 1:d){
+  hist(Y.level0[,i], main = colnames(Y.level0)[i], xlab = '', ylab = '', col = 'lightgrey')
+}
+
+
+```
+
+## Test out some emulators
+At the moment, we'll just keep to the things that we know should work.
+We'll use mean NPP as an example
+
+```{r, fig.width = 12, fig.height = 12}
+p <- ncol(X.level0)
+
+y <- Y.level0[,'npp_nlim_lnd_sum']
+
+par(mfrow = c(5,7), mar = c(3,1,3,1))
+for(i in 1:p){
+  
+  plot(X.level0[,i], y, xlab = '', ylab = '', main = colnames(X.level0)[i])
+  
+}
+
+```
+
+
+
+# A DiceKriging emulator
+```{r}
+
+em <- km(~., design = X.level0, response = y)
+plot(em)
+
+```
+
+
+```{r}
+
+ts.glmnet.em <- twoStep.glmnet(X = X.level0, y = y)
+plot(ts.glmnet.em$emulator)
+
+```
+
+
+
+```{r}
+
+
+#test <- twoStep.glmnet(X = X)
+
+#for(i in 1:ncol(Y0)){
+  
+#    em = twoStep.glmnet(X = X0, y = Y0[,i])
+#     global.emlist[[i]] = em
+#pred = predict(em$emulator, newdata = X.unif, type = 'UK')
+#y.unif[,i] = pred$mean
+#}
+
+
+
+```
+
+
+
+
