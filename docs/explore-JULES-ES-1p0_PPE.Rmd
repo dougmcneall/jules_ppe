@@ -6,9 +6,9 @@ output: html_document
 ---
 
 ### Load helper functions
-```{r, message = FALSE, warning=FALSE}
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
 
-knitr::opts_chunk$set(fig.path = "figs/", message = FALSE, warnings = FALSE)
+knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
 # load some helper functions
 source('explore-JULES-ES-1p0_PPE_functions.R')
 ```
@@ -77,12 +77,13 @@ modern_value <- function(nc, variable, ix){
 #144:164 is the 1993:2013
 modern_value(nc = nc, variable = "npp_nlim_lnd_mean", ix = 144:164)
 
+# apply to the test file to check it works
 vec <- sapply(varlist, FUN = modern_value, nc = nc, ix = 144:164)
 
 ```
 
 
-```{r}
+```{r, cache = TRUE, warning = FALSE, message = FALSE, results = FALSE}
 # Generate ensemble numbers
 nens = 499
 
@@ -111,6 +112,7 @@ for(i in 1:nens){
 
 
 ```{r}
+# 
 nlevel0.ix <- which(is.na(datmat[,3]))
 
 # Y is the whole data set
@@ -151,7 +153,9 @@ rx = rbind(rep(0,32), rep(1,32))
 ```
 
 
-Where did the model fail to run?
+## Where did the model fail to run?
+
+There are clear run failure thresholds in the parameters rootd_ft_io and lai_max, and quite strong visual indications that a_wl_io and bio_hum_cn matter.
 
 ```{r, fig.width = 12, fig.height = 12}
 
@@ -167,29 +171,36 @@ pairs(X.all, xlim = c(0,1), ylim = c(0,1),col = colvec, gap = 0, lower.panel = N
 
 ```
 
-
+## Histograms of run failures
 
 ```{r, fig.width = 10, fig.height = 10}
-par(mfrow = c(6,6), mar = c(1,1,1,1))
-for(i in 1:d){
-  
-  plot(X[,i], datmat[,6])
-  
+
+p = ncol(X.level0)
+
+par(mfrow = c(6,6), mar = c(3,2,3,2), fg = 'lightgrey')
+
+for(i in 1:p){
+  hist(X.nlevel0[,i], main = colnames(X.nlevel0)[i], xlab = '', ylab = '', col = 'lightgrey', xlim = c(0,1),
+       breaks = 10)
 }
+
+
 
 ```
 
 
-# Basic histograms of the output at Level 0 (places the model ran) 
+
+
+# Histograms of the output at Level 0 (places the model ran and produced output) 
+
 ```{r, fig.width = 12, fig.height = 12}
 d = ncol(Y.level0)
 
-par(mfrow = c(5,6))
+par(mfrow = c(5,6), fg = 'lightgrey', mar = c(3,2,3,2))
 
 for(i in 1:d){
   hist(Y.level0[,i], main = colnames(Y.level0)[i], xlab = '', ylab = '', col = 'lightgrey')
 }
-
 
 ```
 
@@ -197,26 +208,42 @@ for(i in 1:d){
 At the moment, we'll just keep to the things that we know should work.
 We'll use mean NPP as an example
 
+Andy would like to see timeseries of:
+
+cVeg, cSoil and nbp, npp in GtC and GtC/yr.
+
 ```{r, fig.width = 12, fig.height = 12}
 p <- ncol(X.level0)
 
-y <- Y.level0[,'npp_nlim_lnd_sum']
+y.level0 <- Y.level0[,'npp_nlim_lnd_sum']
 
 par(mfrow = c(5,7), mar = c(3,1,3,1))
 for(i in 1:p){
   
-  plot(X.level0[,i], y, xlab = '', ylab = '', main = colnames(X.level0)[i])
-  
+  plot(X.level0[,i], y.level0, xlab = '', ylab = '', main = colnames(X.level0)[i])
 }
+
+```
+
+## A clear threshold in the F0 parameter.
+It appears that this ensemble is less "clear cut" in having an output that clearly distinguishes between "failed" (or close to it), and "not failed".
+Having said that, having an F0 over a threshold seems to kill the carbon cycle, as before.
+
+```{r}
+
+par(mfrow = c(2,1))
+plot(lhs$f0_io, datmat[, 'npp_nlim_lnd_sum'])
+plot(X.level0[,'f0_io'], Y.level0[, 'npp_nlim_lnd_sum'])
+abline(v = 0.9)
 
 ```
 
 
 
-# A DiceKriging emulator
-```{r}
+# A DiceKriging emulator for npp
+```{r, fig.width = 10, fig.height = 10}
 
-em <- km(~., design = X.level0, response = y)
+em <- km(~., design = X.level0, response = y.level0)
 plot(em)
 
 ```
@@ -224,11 +251,133 @@ plot(em)
 
 ```{r}
 
-ts.glmnet.em <- twoStep.glmnet(X = X.level0, y = y)
+ts.glmnet.em <- twoStep.glmnet(X = X.level0, y = y.level0)
 plot(ts.glmnet.em$emulator)
 
 ```
 
+
+
+# Remove anything with f0 over a threshold.
+```{r}
+level1.ix <- which(X.level0[, 'f0_io'] < 0.9)
+
+X.level1 <- X.level0[level1.ix, ]
+Y.level1 <- Y.level0[level1.ix,]
+
+y.level1 <- Y.level1[, 'npp_nlim_lnd_sum']
+em.level1 <- km(~., design = X.level1,  response = y.level1)
+```
+
+
+```{r, fig.width = 10, fig.height = 10}
+
+plot(X.level1[, 'f0_io'], Y.level1[, 'npp_nlim_lnd_sum'])
+
+plot(em.level1)
+
+```
+
+
+```{r}
+
+ts.glmnet.em.level1 <- twoStep.glmnet(X = X.level1, y = y.level1)
+plot(ts.glmnet.em.level1$emulator )
+
+```
+
+
+```{r}
+
+source('~/brazilCSSP/code/brazil_cssp/per_pft.R' )
+
+    
+loo <- twoStep.sens(X = X.level1, y = y.level1)
+
+```
+
+```{r, fig.width = 10, fig.height = 5}
+par(las = 2, mar = c(9,5,3,1))
+plot(loo, axes = FALSE, xlab = '', ylab = '')
+axis(1, at = 1:p, labels = colnames(X) )
+axis(2)
+```
+```{r, cache = TRUE}
+
+yvec <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum',
+          'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
+          'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
+          'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
+
+oat.var.sensmat <- matrix(NA, nrow = length(yvec), ncol = ncol(X.level1))
+
+for(i in 1:length(yvec)){
+  
+  yname <- yvec[i]
+  y <- Y.level1[, yname]
+  loo <- twoStep.sens(X = X.level1, y = y)
+  oat.var.sensmat[i, ] <- loo 
+}
+```
+
+
+## How good are the emulators for each output?
+```{r}
+
+emlist.twoStep.glmnet <- vector(mode = 'list', length = length(yvec))
+for(i in 1){
+  
+  yname <- yvec[i]
+  y <- Y.level1[, yname]
+  
+  em <- twoStep.glmnet(X = X.level1, y = y)
+  emlist[i] <- em
+}
+
+
+```
+
+
+
+# Heatmaps of sensitivity analysis across a number of variables
+
+```{r, fig.width= 10, fig.height = 6}
+# normalize the sensitivity matrix
+colnames(oat.var.sensmat) <- colnames(X.level1)
+rownames(oat.var.sensmat) <- yvec
+
+#test <- normalize(t(oat.var.sensmat))
+
+#image(test)
+#par()
+heatmap(oat.var.sensmat, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
+heatmap(oat.var.sensmat, mar = c(10,10), scale = 'row')
+
+```
+```{r, fig.width =12, fig.height = 7}
+
+normsens <- normalize(t(oat.var.sensmat))
+
+par(mar = c(10,12,5,1))
+image(normsens, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X.level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(yvec)), labels = yvec, las = 1)
+mtext('One-at-a-time sensitivity, variance across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+```
+
+
+Write a function that analyses the quality of emulators
+```{r}
+
+kmqual <- function(kmobj){
+  leaveOneOut.km(kmobj)
+  
+  
+}
+
+
+```
 
 
 ```{r}
