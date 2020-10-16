@@ -1,7 +1,7 @@
 ---
 title: "explore-JULES-ES-1p0_PPE"
 author: "Doug McNeall"
-date: "9/29/2020"
+date: "2020-10-16"
 output: html_document
 ---
 
@@ -241,7 +241,7 @@ abline(v = 0.9)
 
 
 # A DiceKriging emulator for npp
-```{r, fig.width = 10, fig.height = 10}
+```{r, fig.width = 10, fig.height = 10, results = 'hide'}
 
 em <- km(~., design = X.level0, response = y.level0)
 plot(em)
@@ -322,18 +322,96 @@ for(i in 1:length(yvec)){
 
 
 ## How good are the emulators for each output?
-```{r}
+The emulators appear to be at least capturing the broad response for all of the output variables, even if there are different
 
+```{r, fig.width = 12, fig.height = 6, cache = TRUE}
 emlist.twoStep.glmnet <- vector(mode = 'list', length = length(yvec))
-for(i in 1){
+for(i in 1:length(yvec)){
   
   yname <- yvec[i]
   y <- Y.level1[, yname]
   
   em <- twoStep.glmnet(X = X.level1, y = y)
-  emlist[i] <- em
+  emlist.twoStep.glmnet[[i]] <- em
+}
+```
+
+
+```{r}
+loolist.twoStep.glmnet <- vector(mode = 'list', length = length(yvec))
+
+for(i in 1:length(yvec)){
+  
+  loo <- leaveOneOut.km(model = emlist.twoStep.glmnet[[i]]$emulator, type = 'UK', trend.reestim = TRUE)
+  
+  loolist.twoStep.glmnet[[i]] <- loo
+
+}
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,0.1,0.1))
+for(i in 1:length(loolist.twoStep.glmnet )){
+  
+  y <- Y.level1[, yvec[i]]
+  loo <- loolist.twoStep.glmnet[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y.level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+
 }
 
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2)    
+
+```
+
+## Compare the previous (twostep algorithm) with straight km output
+```{r, fig.width = 12, fig.height = 6, cache = TRUE, results = 'hide'}
+emlist.km <- vector(mode = 'list', length = length(yvec))
+#for(i in 1:length(yvec)){
+for(i in 1:length(yvec)){
+  yname <- yvec[i]
+  y <- Y.level1[, yname]
+    
+  em <- km(~., design = X.level1, response = y)
+  emlist.km[[i]] <- em
+}
+```
+
+
+
+```{r}
+loolist.km <- vector(mode = 'list', length = length(yvec))
+
+for(i in 1:length(yvec)){
+  
+  loo <- leaveOneOut.km(model = emlist.km[[i]], type = 'UK', trend.reestim = TRUE)
+  
+  loolist.km[[i]] <- loo
+
+}
+```
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,0.1,0.1))
+for(i in 1:length(loolist.km)){
+  
+  y <- Y.level1[, yvec[i]]
+  loo <- loolist.km[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y.level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
 
 ```
 
@@ -376,6 +454,170 @@ kmqual <- function(kmobj){
   
 }
 
+
+```
+
+
+# Constraint
+```{r, fig.width = 8, fig.height = 8}
+ynames.const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
+yunits.const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
+Y.const.level1 <- Y.level1[, ynames.const]
+
+scalevec <- c(1e12/ysec, 1e12/ysec, 1e12, 1e12)
+Y.const.level1.scaled <- sweep(Y.const.level1,2, STATS = scalevec, FUN = '/' )
+
+
+level2.ix = which(Y.const.level1.scaled[,'nbp_lnd_sum'] > -10 &
+                    Y.const.level1.scaled[,'npp_nlim_lnd_sum'] > 35 &  Y.const.level1.scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y.const.level1.scaled[,'cSoil_lnd_sum'] > 750 & Y.const.level1.scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y.const.level1.scaled[,'cVeg_lnd_sum'] > 300 & Y.const.level1.scaled[,'cVeg_lnd_sum'] < 800
+  )
+```
+
+
+
+
+
+```{r, fig.width = 10, fig.height = 7}
+
+# Histogram of level 1 constraints
+hcol = 'darkgrey'
+lcol = 'black'
+par(mfrow = c(2,2), fg = 'darkgrey', las = 1)
+
+
+
+hist(Y.const.level1.scaled[,'nbp_lnd_sum'], col = hcol, main = 'NBP', xlab = 'GtC/year')
+polygon(x = c(-10, 100, 100, -10), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+hist(Y.const.level1.scaled[,'cSoil_lnd_sum'], col = hcol, main = 'Soil Carbon', xlab = 'GtC')
+polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+
+hist(Y.const.level1.scaled[,'cVeg_lnd_sum'], col = hcol, main = 'Vegetation Carbon', xlab = 'GtC')
+polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+       border =  makeTransparent('tomato2'))
+hist(Y.const.level1.scaled[,'npp_nlim_lnd_sum'], col = hcol , main = 'NPP', xlab = 'GtC/year')
+polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2')
+)
+
+```
+
+
+## Ensemble members that comply with constraints in NPP, NBP, soil and vegetation carbon.
+
+```{r, fig.width = 12, fig.height = 12}
+
+X.const <- X.level1[ level2.ix , ]
+
+pairs(X.const, xlim = c(0,1), gap = 0, pch = 20, lower.panel = NULL)
+
+
+```
+
+## Build an emulator for each output that we have constraints for, and find the input space where those constraints are met.
+
+```{r, cache = TRUE}
+
+mins <- apply(X.level1,2,FUN = min)
+maxes <- apply(X.level1,2,FUN = max)
+
+nsamp.unif = 100000  
+X.unif = samp.unif(nsamp.unif, mins = mins, maxes = maxes)
+
+Y.unif = matrix(nrow = nsamp.unif, ncol = ncol(Y.const.level1.scaled))
+
+colnames(Y.unif) = colnames(Y.const.level1.scaled)
+  
+emlist.const <- vector(mode = 'list', length = ncol(Y.const.level1.scaled))
+
+# Build an emulator for each output individually
+for(i in 1:ncol(Y.unif)){
+  em <- twoStep.glmnet(X = X.level1, y = Y.const.level1.scaled[,i])
+  emlist.const[[i]] <- em
+  pred = predict(em$emulator, newdata = X.unif, type = 'UK')
+  Y.unif[,i] <- pred$mean
+}
+
+
+# Find the inputs where the mean of the emulated output is 
+# within the tolerable limits set by the modeller.
+
+level2.unif.kept.ix = which(Y.unif[,'nbp_lnd_sum'] > -10 &
+                    Y.unif[,'npp_nlim_lnd_sum'] > 35 &  Y.unif[,'npp_nlim_lnd_sum'] < 80 &
+                    Y.unif[,'cSoil_lnd_sum'] > 750 & Y.unif[,'cSoil_lnd_sum'] < 3000 &
+                  Y.unif[,'cVeg_lnd_sum'] > 300 & Y.unif[,'cVeg_lnd_sum'] < 800
+  )
+
+
+X.kept = X.unif[level2.unif.kept.ix , ]
+
+# we've removed 80% of our prior input space
+(nrow(X.kept) / nsamp.unif) * 100
+
+ix.rejected = setdiff(1:nsamp.unif, level2.unif.kept.ix)
+X.rejected = X.unif[ix.rejected, ]
+
+
+
+```
+
+
+
+## Pairs plot of input space that is Not Ruled Out Yet when basic constraints are applied to annual data.
+
+```{r emulator_pairs, fig.width = 10, fig.height = 10, warning = FALSE, message = FALSE}
+
+par(oma = c(0,0,0,3), bg = 'white')
+pairs(X.kept,
+      labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc.up,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc.col = blues)
+
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = blues,
+           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+           horizontal = TRUE
+)
+
+legend('left', legend = paste(1:d, colnames(lhs)), cex = 0.9, bty = 'n')
+
+```
+
+# Marginal histograms of space that is Not Ruled Out Yet when basic constraints are applied.
+
+```{r, fig.width = 12, fig.height = 12}
+
+par(mfrow = c(8,4), fg = 'grey', mar = c(3,2,2,1))
+
+for(i in 1:ncol(X.unif)){
+  
+  hist(X.kept[,i], col = 'grey', main = colnames(X.unif)[i], xlim = c(0,1),axes = FALSE, xlab = '', ylab = '')
+  axis(1)
+  
+}
+
+
+
+```
+
+
+```{r}
+
+par(mfrow = c(2,2))
+for(i in 1:ncol(Y.const.level1.scaled)){
+hist(Y.const.level1.scaled[ ,i], main = colnames(Y.const.level1.scaled)[i], xlab = yunits.const[i])
+}
 
 ```
 
