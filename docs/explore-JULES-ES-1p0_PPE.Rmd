@@ -1,7 +1,7 @@
 ---
 title: "explore-JULES-ES-1p0_PPE"
 author: "Doug McNeall"
-date: "2020-10-16"
+date: "2020-10-19"
 output: html_document
 ---
 
@@ -83,30 +83,36 @@ vec <- sapply(varlist, FUN = modern_value, nc = nc, ix = 144:164)
 ```
 
 
-```{r, cache = TRUE, warning = FALSE, message = FALSE, results = FALSE}
+```{r, warning = FALSE, message = FALSE, results = FALSE}
 # Generate ensemble numbers
-nens = 499
 
-datmat <- matrix(nrow = nens, ncol = length(varlist))
-colnames(datmat) <- varlist
-
-enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
-
-floc <- paste0(ensloc,ensmember,subdir)
-
-for(i in 1:nens){
+if (file.exists("ensemble.rdata")) {
+  load("ensemble.rdata")
+} else {
   
-  vec <- rep(NA, length(varlist))
+  nens = 499
+  datmat <- matrix(nrow = nens, ncol = length(varlist))
+  colnames(datmat) <- varlist
   
-  ensmember <- enslist[i] 
+  enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
+  floc <- paste0(ensloc,ensmember,subdir)
   
-  fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
-  #print(fn)
+  for(i in 1:nens){
+    
+    vec <- rep(NA, length(varlist))
+    
+    ensmember <- enslist[i] 
+    
+    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    #print(fn)
+    
+    try(nc <- nc_open(paste0(fn)))
+    try(vec <- sapply(varlist, FUN = modern_value, nc = nc, ix = 144:164))
+    datmat[i, ] <- vec
+    nc_close(nc)
+  }
   
-  try(nc <- nc_open(paste0(fn)))
-  try(vec <- sapply(varlist, FUN = modern_value, nc = nc, ix = 144:164))
-  datmat[i, ] <- vec
-  nc_close(nc)
+  save(nens, datmat,enslist,floc, file ="ensemble.rdata")
 }
 ```
 
@@ -287,70 +293,102 @@ plot(ts.glmnet.em.level1$emulator )
 ```
 
 
+
 ```{r}
 
 source('~/brazilCSSP/code/brazil_cssp/per_pft.R' )
 
-    
-loo <- twoStep.sens(X = X.level1, y = y.level1)
-
-```
-
-```{r, fig.width = 10, fig.height = 5}
-par(las = 2, mar = c(9,5,3,1))
-plot(loo, axes = FALSE, xlab = '', ylab = '')
-axis(1, at = 1:p, labels = colnames(X) )
-axis(2)
-```
-```{r, cache = TRUE}
-
-yvec <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum',
-          'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
-          'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
-          'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
-
-oat.var.sensmat <- matrix(NA, nrow = length(yvec), ncol = ncol(X.level1))
-
-for(i in 1:length(yvec)){
+if (file.exists("oaat.rdata")) {
+  load("oaat.rdata")
+} else {
   
-  yname <- yvec[i]
-  y <- Y.level1[, yname]
-  loo <- twoStep.sens(X = X.level1, y = y)
-  oat.var.sensmat[i, ] <- loo 
+  yvec <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum',
+            'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
+            'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
+            'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
+  
+  oat.var.sensmat <- matrix(NA, nrow = length(yvec), ncol = ncol(X.level1))
+  
+  for(i in 1:length(yvec)){
+    
+    yname <- yvec[i]
+    y <- Y.level1[, yname]
+    loo <- twoStep.sens(X = X.level1, y = y)
+    oat.var.sensmat[i, ] <- loo 
+  }
+  
+  save(yvec, oat.var.sensmat, file = "oaat.rdata")
+  
 }
+```
+
+
+# Heatmaps of sensitivity analysis across a number of variables
+
+```{r, fig.width= 10, fig.height = 6}
+# normalize the sensitivity matrix
+colnames(oat.var.sensmat) <- colnames(X.level1)
+rownames(oat.var.sensmat) <- yvec
+
+#test <- normalize(t(oat.var.sensmat))
+
+#image(test)
+#par()
+heatmap(oat.var.sensmat, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
+heatmap(oat.var.sensmat, mar = c(10,10), scale = 'row')
+
+```
+
+```{r, fig.width =12, fig.height = 7}
+
+normsens <- normalize(t(oat.var.sensmat))
+
+par(mar = c(10,12,5,1))
+image(normsens, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X.level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(yvec)), labels = yvec, las = 1)
+mtext('One-at-a-time sensitivity, variance across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
 ```
 
 
 ## How good are the emulators for each output?
-The emulators appear to be at least capturing the broad response for all of the output variables, even if there are different
+The emulators appear to be at least capturing the broad response for all of the output variables.
 
-```{r, fig.width = 12, fig.height = 6, cache = TRUE}
-emlist.twoStep.glmnet <- vector(mode = 'list', length = length(yvec))
-for(i in 1:length(yvec)){
+```{r, fig.width = 12, fig.height = 6}
+# Twostep glmnet emulators
+
+if (file.exists("ts_emulators.rdata")) {
+  load("ts_emulators.rdata")
+} else {
   
-  yname <- yvec[i]
-  y <- Y.level1[, yname]
+  emlist.twoStep.glmnet <- vector(mode = 'list', length = length(yvec))
+  for(i in 1:length(yvec)){
+    
+    yname <- yvec[i]
+    y <- Y.level1[, yname]
+    
+    em <- twoStep.glmnet(X = X.level1, y = y)
+    emlist.twoStep.glmnet[[i]] <- em
+  }
   
-  em <- twoStep.glmnet(X = X.level1, y = y)
-  emlist.twoStep.glmnet[[i]] <- em
+  loolist.twoStep.glmnet <- vector(mode = 'list', length = length(yvec))
+  
+  for(i in 1:length(yvec)){
+    
+    loo <- leaveOneOut.km(model = emlist.twoStep.glmnet[[i]]$emulator, type = 'UK', trend.reestim = TRUE)
+    loolist.twoStep.glmnet[[i]] <- loo
+  }
+  
+  save(emlist.twoStep.glmnet, loolist.twoStep.glmnet, file = "ts_emulators.rdata")
 }
-```
 
-
-```{r}
-loolist.twoStep.glmnet <- vector(mode = 'list', length = length(yvec))
-
-for(i in 1:length(yvec)){
-  
-  loo <- leaveOneOut.km(model = emlist.twoStep.glmnet[[i]]$emulator, type = 'UK', trend.reestim = TRUE)
-  
-  loolist.twoStep.glmnet[[i]] <- loo
-
-}
 ```
 
 
 ```{r, fig.width = 12, fig.height = 12}
+# plot the glmnet emulators
+
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,0.1,0.1))
 for(i in 1:length(loolist.twoStep.glmnet )){
   
@@ -370,30 +408,33 @@ mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2)
 ```
 
 ## Compare the previous (twostep algorithm) with straight km output
-```{r, fig.width = 12, fig.height = 6, cache = TRUE, results = 'hide'}
-emlist.km <- vector(mode = 'list', length = length(yvec))
-#for(i in 1:length(yvec)){
-for(i in 1:length(yvec)){
-  yname <- yvec[i]
-  y <- Y.level1[, yname]
+```{r, fig.width = 12, fig.height = 6, results = 'hide'}
+
+if (file.exists("km_emulators.rdata")) {
+  load("km_emulators.rdata")
+} else {
+  
+  emlist.km <- vector(mode = 'list', length = length(yvec))
+  #for(i in 1:length(yvec)){
+  for(i in 1:length(yvec)){
+    yname <- yvec[i]
+    y <- Y.level1[, yname]
     
-  em <- km(~., design = X.level1, response = y)
-  emlist.km[[i]] <- em
-}
-```
-
-
-
-```{r}
-loolist.km <- vector(mode = 'list', length = length(yvec))
-
-for(i in 1:length(yvec)){
+    em <- km(~., design = X.level1, response = y)
+    emlist.km[[i]] <- em
+  }
   
-  loo <- leaveOneOut.km(model = emlist.km[[i]], type = 'UK', trend.reestim = TRUE)
+  loolist.km <- vector(mode = 'list', length = length(yvec))
   
-  loolist.km[[i]] <- loo
-
+  for(i in 1:length(yvec)){
+    
+    loo <- leaveOneOut.km(model = emlist.km[[i]], type = 'UK', trend.reestim = TRUE)
+    loolist.km[[i]] <- loo
+  }
+  
+  save(emlist.km,loolist.km, file = "km_emulators.rdata")
 }
+
 ```
 
 ```{r, fig.width = 12, fig.height = 12}
@@ -416,49 +457,7 @@ mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2)
 ```
 
 
-
-# Heatmaps of sensitivity analysis across a number of variables
-
-```{r, fig.width= 10, fig.height = 6}
-# normalize the sensitivity matrix
-colnames(oat.var.sensmat) <- colnames(X.level1)
-rownames(oat.var.sensmat) <- yvec
-
-#test <- normalize(t(oat.var.sensmat))
-
-#image(test)
-#par()
-heatmap(oat.var.sensmat, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
-heatmap(oat.var.sensmat, mar = c(10,10), scale = 'row')
-
-```
-```{r, fig.width =12, fig.height = 7}
-
-normsens <- normalize(t(oat.var.sensmat))
-
-par(mar = c(10,12,5,1))
-image(normsens, axes = FALSE, col = blues)
-axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X.level1), las = 2)
-axis(2, at = seq(from = 0, to = 1, length.out = length(yvec)), labels = yvec, las = 1)
-mtext('One-at-a-time sensitivity, variance across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
-
-```
-
-
-Write a function that analyses the quality of emulators
-```{r}
-
-kmqual <- function(kmobj){
-  leaveOneOut.km(kmobj)
-  
-  
-}
-
-
-```
-
-
-# Constraint
+# Constrain input space with a small number of observations
 ```{r, fig.width = 8, fig.height = 8}
 ynames.const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
 yunits.const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
@@ -474,9 +473,6 @@ level2.ix = which(Y.const.level1.scaled[,'nbp_lnd_sum'] > -10 &
                   Y.const.level1.scaled[,'cVeg_lnd_sum'] > 300 & Y.const.level1.scaled[,'cVeg_lnd_sum'] < 800
   )
 ```
-
-
-
 
 
 ```{r, fig.width = 10, fig.height = 7}
@@ -523,26 +519,35 @@ pairs(X.const, xlim = c(0,1), gap = 0, pch = 20, lower.panel = NULL)
 
 ## Build an emulator for each output that we have constraints for, and find the input space where those constraints are met.
 
-```{r, cache = TRUE}
+```{r}
 
-mins <- apply(X.level1,2,FUN = min)
-maxes <- apply(X.level1,2,FUN = max)
-
-nsamp.unif = 100000  
-X.unif = samp.unif(nsamp.unif, mins = mins, maxes = maxes)
-
-Y.unif = matrix(nrow = nsamp.unif, ncol = ncol(Y.const.level1.scaled))
-
-colnames(Y.unif) = colnames(Y.const.level1.scaled)
+if (file.exists("constraints.rdata")) {
+  load("constraints.rdata")
+} else {
   
-emlist.const <- vector(mode = 'list', length = ncol(Y.const.level1.scaled))
-
-# Build an emulator for each output individually
-for(i in 1:ncol(Y.unif)){
-  em <- twoStep.glmnet(X = X.level1, y = Y.const.level1.scaled[,i])
-  emlist.const[[i]] <- em
-  pred = predict(em$emulator, newdata = X.unif, type = 'UK')
-  Y.unif[,i] <- pred$mean
+  
+  mins <- apply(X.level1,2,FUN = min)
+  maxes <- apply(X.level1,2,FUN = max)
+  
+  nsamp.unif = 100000  
+  X.unif = samp.unif(nsamp.unif, mins = mins, maxes = maxes)
+  
+  Y.unif = matrix(nrow = nsamp.unif, ncol = ncol(Y.const.level1.scaled))
+  
+  colnames(Y.unif) = colnames(Y.const.level1.scaled)
+  
+  emlist.const <- vector(mode = 'list', length = ncol(Y.const.level1.scaled))
+  
+  # Build an emulator for each output individually
+  for(i in 1:ncol(Y.unif)){
+    em <- twoStep.glmnet(X = X.level1, y = Y.const.level1.scaled[,i])
+    emlist.const[[i]] <- em
+    pred = predict(em$emulator, newdata = X.unif, type = 'UK')
+    Y.unif[,i] <- pred$mean
+  }
+  
+  save(emlist.const, X.unif, nsamp.unif, Y.unif, mins, maxes, file = "constraints.rdata")
+  
 }
 
 
@@ -567,7 +572,6 @@ X.rejected = X.unif[ix.rejected, ]
 
 
 ```
-
 
 
 ## Pairs plot of input space that is Not Ruled Out Yet when basic constraints are applied to annual data.
@@ -610,6 +614,76 @@ for(i in 1:ncol(X.unif)){
 
 
 ```
+
+
+
+## Monte Carlo Filtering for sensitivity analysis.
+Monte Carlo filtering (MCF) gives another form of sensitivity metric. MCF splits the input sample into two parts - those that do and do not meet some threshold, for example, and then examines the differences of the resulting parameter distributions. A useful guide to MCF can be found in [Pianosi et al (2016)]<https://www.sciencedirect.com/science/article/pii/S1364815216300287>
+
+We use the emulated input samples that are ruled out and NROY with the initial constraint.
+
+```{r}
+
+# ---------------------------------------------------------------------------------
+# Monte carlo filtering for sensitivity analysis
+# ---------------------------------------------------------------------------------
+
+# Uniform sample from across parameter space
+# Split the sample into 'behavioural' (NROY) and 'Non behavioural (Ruled Out)
+# Build cdfs of the marginal distributions in each case
+# Perform a KS test to see if the smaples are drawn from different distributions
+# The KS statistic is an indicator of the importance of the parameter in splitting the
+# samples.
+
+# "Not in" function
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+mcf = function(X, nroy.ix){
+
+  ## Monte Carlo Filtering function
+  ## X   ............... Complete sample from input space
+  ## nroy.ix ........... index of cases of X which are NROY (Not Ruled Out Yet), or 'behavioural'.
+
+  ## produces ks statistic for each column of the input matrix X
+  ## A larger ks statistic means that input is more important for
+  ## determining if a sample is NROY or not
+
+  X.nroy = X[nroy.ix, ]
+
+  ref = 1:nrow(X)
+  ro.ix = which(ref %!in% nroy.ix)
+  X.ro = X[ro.ix, ]
+
+  kss = rep(NA, length = ncol(X))
+  for(i in 1:ncol(X)){
+
+    ks = ks.test(X.ro[,i], X.nroy[,i])
+    kss[i] = ks$statistic
+
+  }
+
+  out = kss
+  out
+}
+
+mcf.level2 = mcf(X.unif,level2.unif.kept.ix)
+
+```
+
+```{r, fig.width=12, fig.height=6}
+
+
+mcf.level2.sort <- sort(mcf.level2, decreasing = TRUE, index.return = TRUE )
+
+par(mar = c(10,5,3,2))
+plot(mcf.level2.sort$x, axes = FALSE, xlab = '', ylab = 'MCF score', pch = 19)
+segments(x0 = 1:p, y0 = 0, x1 = 1:p, y1 = mcf.level2.sort$x)
+axis(1, at  = 1:p, labels = colnames(X.level1)[mcf.level2.sort$ix], las = 2)
+axis(2, las = 1)
+mtext('Monte Carlo Filtering sensitivity (ordered)', side = 3, adj = 0, line = 1, cex = 1.5)
+
+```
+
 
 
 ```{r}
