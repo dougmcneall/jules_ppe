@@ -240,7 +240,7 @@ ensTShist <- function(x, dat,grid = TRUE,colvec,histcol, mainvec,...){
   #  legend('topleft', legvec,
   #         fill = colvec,
   #         text.col = colvec,
-  #         bg = 'white',
+  #         bg = 'white',   
   #         border = par()$fg,
   #         cex = 1.5
   #  )

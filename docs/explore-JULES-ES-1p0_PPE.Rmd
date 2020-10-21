@@ -1,20 +1,25 @@
 ---
 title: "explore-JULES-ES-1p0_PPE"
 author: "Doug McNeall"
-date: "2020-10-19"
+date: "2020-10-21"
 output: html_document
 ---
 
-### Load helper functions
+# Sensitivity analysis and constraint of the parameter space of Earth System configuration of JULES.
+Uses global mean from 1994-2013 of several carbon-cycle outputs to rule out parts of input space. 
+
 ```{r, echo = FALSE, message = FALSE, warning=FALSE}
+# Load helper functions
 
 knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
 # load some helper functions
+source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
 source('explore-JULES-ES-1p0_PPE_functions.R')
 ```
 
-### Load packages
 ```{r, message = FALSE, warning=FALSE}
+# Load packages
+
   library(RColorBrewer)
   library(fields)
   library(MASS)
@@ -24,11 +29,10 @@ source('explore-JULES-ES-1p0_PPE_functions.R')
   source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/emtools.R")
   source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/imptools.R")
   source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/vistools.R")
-
 ```
 
-## Preliminaries
 ```{r}
+# Preliminaries
 # Some pallete options
 yg = brewer.pal(9, "YlGn")
 ryb = brewer.pal(11, "RdYlBu")
@@ -37,8 +41,6 @@ rb = brewer.pal(11, "RdBu")
 br = rev(rb)
 blues = brewer.pal(9, 'Blues')
 cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-
-
 ```
 
 
@@ -52,9 +54,6 @@ subdir <- 'stats/'
 floc <- paste0(ensloc,ensmember,subdir)
 fn <- 'JULES-ES-1p0_P0000_Annual_global.nc'
 
-```
-
-```{r}
 # test file
 nc <- nc_open(paste0(floc,fn))
 
@@ -63,7 +62,7 @@ varlist <- nc.get.variable.list(nc)
 
 ```
 
-```{r}
+```{r, results = 'hide'}
 # for each of the variables in the file, average the last 20 years as the "modern" value,
 # and then place in a matrix
 
@@ -84,7 +83,7 @@ vec <- sapply(varlist, FUN = modern_value, nc = nc, ix = 144:164)
 
 
 ```{r, warning = FALSE, message = FALSE, results = FALSE}
-# Generate ensemble numbers
+# Generate ensemble numbers, mean of the last 20 years of the timeseries (1994-2013)
 
 if (file.exists("ensemble.rdata")) {
   load("ensemble.rdata")
@@ -116,25 +115,25 @@ if (file.exists("ensemble.rdata")) {
 }
 ```
 
-
 ```{r}
-# 
+# Initial clean of data set, removing variables that don't change, and removing NAs (models that didn't run)
+
 nlevel0.ix <- which(is.na(datmat[,3]))
 
 # Y is the whole data set
 Y <- datmat
-# Y0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
+# Y.level0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
 Y.level0 <- datmat[-nlevel0.ix, -c(2,30,31)]
 Y.nlevel0 <- datmat[nlevel0.ix, -c(2,30,31)]
 
 ```
 
 
-
 ```{r}
+# load the original design and input space, normalize to [0-1]
+
 years = 1864:2013
 ysec = 60*60*24*365
-#norm.vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
 
 # Load up the data
 lhs_i = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_i/lhs_u-ao732.txt', header = TRUE)
@@ -145,7 +144,6 @@ toplevel.ix = 1:499
 # The raw input data is a latin hypercube
 lhs = rbind(lhs_i, lhs_ii)[toplevel.ix, ]
 lhs.level0 <- lhs[-nlevel0.ix,]
-
 
 X = normalize(lhs)
 colnames(X) = colnames(lhs)
@@ -166,18 +164,27 @@ There are clear run failure thresholds in the parameters rootd_ft_io and lai_max
 ```{r, fig.width = 12, fig.height = 12}
 
 #simple way
-pairs(X.nlevel0, xlim = c(0,1), ylim = c(0,1),col = 'red', gap = 0, lower.panel = NULL, pch = 20)
+par(oma = c(10,10,0,0))
+#par(xpd = TRUE)
+pairs(X.nlevel0, 
+      xlim = c(0,1), ylim = c(0,1),
+      col = 'red', 
+      gap = 0,
+      pch = 20,
+      lower.panel = NULL)
+
+#legend('bottomright', legend = paste(1:d, colnames(lhs)), bty = 'n')
+legend('left', col = 'red', pch = 20, legend = 'test')
 
 # plot failures over everything else
-X.all <- rbind(X.level0, X.nlevel0)
-colvec <- rep('grey', nrow(X))
-colvec[(nrow(X.level0)+1):nrow(X.all)] <- 'red'
-
-pairs(X.all, xlim = c(0,1), ylim = c(0,1),col = colvec, gap = 0, lower.panel = NULL, pch = 20, cex = 0.5)
+#X.all <- rbind(X.level0, X.nlevel0)
+#colvec <- rep('grey', nrow(X))
+#colvec[(nrow(X.level0)+1):nrow(X.all)] <- 'red'
+#pairs(X.all, xlim = c(0,1), ylim = c(0,1),col = colvec, gap = 0, lower.panel = NULL, pch = 20, cex = 0.5)
 
 ```
 
-## Histograms of run failures
+## Marginal histograms of run failures
 
 ```{r, fig.width = 10, fig.height = 10}
 
@@ -189,8 +196,6 @@ for(i in 1:p){
   hist(X.nlevel0[,i], main = colnames(X.nlevel0)[i], xlab = '', ylab = '', col = 'lightgrey', xlim = c(0,1),
        breaks = 10)
 }
-
-
 
 ```
 
@@ -215,8 +220,10 @@ At the moment, we'll just keep to the things that we know should work.
 We'll use mean NPP as an example
 
 Andy would like to see timeseries of:
-
 cVeg, cSoil and nbp, npp in GtC and GtC/yr.
+
+
+First, how does NPP respond to each parameter? NAs are removed, but zero values are still included.
 
 ```{r, fig.width = 12, fig.height = 12}
 p <- ncol(X.level0)
@@ -225,7 +232,6 @@ y.level0 <- Y.level0[,'npp_nlim_lnd_sum']
 
 par(mfrow = c(5,7), mar = c(3,1,3,1))
 for(i in 1:p){
-  
   plot(X.level0[,i], y.level0, xlab = '', ylab = '', main = colnames(X.level0)[i])
 }
 
@@ -233,29 +239,33 @@ for(i in 1:p){
 
 ## A clear threshold in the F0 parameter.
 It appears that this ensemble is less "clear cut" in having an output that clearly distinguishes between "failed" (or close to it), and "not failed".
-Having said that, having an F0 over a threshold seems to kill the carbon cycle, as before.
 
-```{r}
+Having said that, having an F0 over a threshold seems to kill the carbon cycle, as before. Here, we've set a threshold of 0.9 (on the normalised scale) for F0, and we remove members of the ensemble with a larger F0 than that when we build emulators.
+
+```{r, fig.width = 6, fig.height = 8}
 
 par(mfrow = c(2,1))
-plot(lhs$f0_io, datmat[, 'npp_nlim_lnd_sum'])
-plot(X.level0[,'f0_io'], Y.level0[, 'npp_nlim_lnd_sum'])
+plot(lhs$f0_io, datmat[, 'npp_nlim_lnd_sum'], main = 'Multiplication factor', xlab = 'f0_io', ylab = 'NPP sum')
+plot(X.level0[,'f0_io'], Y.level0[, 'npp_nlim_lnd_sum'], xlab = 'f0_io', main = 'Normalized', ylab = 'NPP sum')
 abline(v = 0.9)
 
 ```
 
 
 
-# A DiceKriging emulator for npp
-```{r, fig.width = 10, fig.height = 10, results = 'hide'}
+# A DiceKriging emulator for NPP
+
+This emulator is a straight kriging modfel (km) trained with the level 0 data - this includes "zero carbon cycle" but not NAs. The leave-one-out cross validation plot clearly indicates that the emulator over-predicts the carbon cycle when it is very low. This might mean that when constraining, more of the input space is retained than strictly justified. It does suggest that such a constraint is conservative (i.e., it is unlikely that a candidate will be rejected without justifiaction.)
+```{r, fig.width = 7, fig.height = 9, results = 'hide'}
 
 em <- km(~., design = X.level0, response = y.level0)
 plot(em)
 
 ```
 
+This next emulator uses an input dimension reduction technique (glmnet), shrinking regression coefficients of the more unimportant input variables towards zero, before building a kriging emulator with the retained inputs. This doesn't (on the face of it) deal much better with the zero-output ensemble members.
 
-```{r}
+```{r, fig.width = 7, fig.height = 9}
 
 ts.glmnet.em <- twoStep.glmnet(X = X.level0, y = y.level0)
 plot(ts.glmnet.em$emulator)
@@ -264,7 +274,8 @@ plot(ts.glmnet.em$emulator)
 
 
 
-# Remove anything with f0 over a threshold.
+# Remove anything with f0 over a threshold (level 1 constraint) .
+The level 1 constraint removes any input with F0 greater than 0.9 (normalised), which removes many of the zero-carbon-cycle members up front. There are 424 ensmble members remaining.
 ```{r}
 level1.ix <- which(X.level0[, 'f0_io'] < 0.9)
 
@@ -272,31 +283,36 @@ X.level1 <- X.level0[level1.ix, ]
 Y.level1 <- Y.level0[level1.ix,]
 
 y.level1 <- Y.level1[, 'npp_nlim_lnd_sum']
+```
+
+
+```{r, fig.width = 7, fig.height = 7, results = 'hide'}
 em.level1 <- km(~., design = X.level1,  response = y.level1)
+
+plot(X.level1[, 'f0_io'], Y.level1[, 'npp_nlim_lnd_sum'], xlab = 'f0_io (normalised)', ylab = 'NPP')
 ```
 
+Plot the regular km emulator.
 
-```{r, fig.width = 10, fig.height = 10}
-
-plot(X.level1[, 'f0_io'], Y.level1[, 'npp_nlim_lnd_sum'])
-
+```{r, fig.width = 7, fig.height = 7}
 plot(em.level1)
-
 ```
 
+Plot the "twostep" glmnet/km emulator for the level 1 constraint.
 
 ```{r}
-
 ts.glmnet.em.level1 <- twoStep.glmnet(X = X.level1, y = y.level1)
+```
+
+
+```{r, fig.width = 7, fig.height = 9}
 plot(ts.glmnet.em.level1$emulator )
 
 ```
 
 
-
+## A one-at-a-time sensitivity analysis of the "sum" output 
 ```{r}
-
-source('~/brazilCSSP/code/brazil_cssp/per_pft.R' )
 
 if (file.exists("oaat.rdata")) {
   load("oaat.rdata")
@@ -323,7 +339,7 @@ if (file.exists("oaat.rdata")) {
 ```
 
 
-# Heatmaps of sensitivity analysis across a number of variables
+## Heatmaps of one-at-a-time sensitivity analysis across a number of variables
 
 ```{r, fig.width= 10, fig.height = 6}
 # normalize the sensitivity matrix
@@ -354,6 +370,57 @@ mtext('One-at-a-time sensitivity, variance across level 1 ensemble', side = 3, a
 
 ## How good are the emulators for each output?
 The emulators appear to be at least capturing the broad response for all of the output variables.
+
+First, plot the straight kriging emulators
+```{r, fig.width = 12, fig.height = 6, results = 'hide'}
+
+if (file.exists("km_emulators.rdata")) {
+  load("km_emulators.rdata")
+} else {
+  
+  emlist.km <- vector(mode = 'list', length = length(yvec))
+  #for(i in 1:length(yvec)){
+  for(i in 1:length(yvec)){
+    yname <- yvec[i]
+    y <- Y.level1[, yname]
+    
+    em <- km(~., design = X.level1, response = y)
+    emlist.km[[i]] <- em
+  }
+  
+  loolist.km <- vector(mode = 'list', length = length(yvec))
+  
+  for(i in 1:length(yvec)){
+    
+    loo <- leaveOneOut.km(model = emlist.km[[i]], type = 'UK', trend.reestim = TRUE)
+    loolist.km[[i]] <- loo
+  }
+  
+  save(emlist.km,loolist.km, file = "km_emulators.rdata")
+}
+
+```
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,0.1,0.1))
+for(i in 1:length(loolist.km)){
+  
+  y <- Y.level1[, yvec[i]]
+  loo <- loolist.km[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y.level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+
+```
+
+Next, plot the twostep glmnet/km emulators
 
 ```{r, fig.width = 12, fig.height = 6}
 # Twostep glmnet emulators
@@ -407,57 +474,11 @@ mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2)
 
 ```
 
-## Compare the previous (twostep algorithm) with straight km output
-```{r, fig.width = 12, fig.height = 6, results = 'hide'}
-
-if (file.exists("km_emulators.rdata")) {
-  load("km_emulators.rdata")
-} else {
-  
-  emlist.km <- vector(mode = 'list', length = length(yvec))
-  #for(i in 1:length(yvec)){
-  for(i in 1:length(yvec)){
-    yname <- yvec[i]
-    y <- Y.level1[, yname]
-    
-    em <- km(~., design = X.level1, response = y)
-    emlist.km[[i]] <- em
-  }
-  
-  loolist.km <- vector(mode = 'list', length = length(yvec))
-  
-  for(i in 1:length(yvec)){
-    
-    loo <- leaveOneOut.km(model = emlist.km[[i]], type = 'UK', trend.reestim = TRUE)
-    loolist.km[[i]] <- loo
-  }
-  
-  save(emlist.km,loolist.km, file = "km_emulators.rdata")
-}
-
-```
-
-```{r, fig.width = 12, fig.height = 12}
-par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,0.1,0.1))
-for(i in 1:length(loolist.km)){
-  
-  y <- Y.level1[, yvec[i]]
-  loo <- loolist.km[[i]]
-  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
-  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y.level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
-       pch = 19)
-  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
-  abline(0,1)
-
-}
-
-mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
-mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
-
-```
 
 
 # Constrain input space with a small number of observations
+
+We use thresholds of tolerance from Andy on 'nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum' as basic initial constraints on the input space.
 ```{r, fig.width = 8, fig.height = 8}
 ynames.const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
 yunits.const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
@@ -511,13 +532,11 @@ polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
 ```{r, fig.width = 12, fig.height = 12}
 
 X.const <- X.level1[ level2.ix , ]
-
-pairs(X.const, xlim = c(0,1), gap = 0, pch = 20, lower.panel = NULL)
-
+pairs(X.const, xlim = c(0,1), ylim = c(0,1), gap = 0, pch = 20, lower.panel = NULL)
 
 ```
 
-## Build an emulator for each output that we have constraints for, and find the input space where those constraints are met.
+## Build a two-step glmnet/km emulator for each output that we have constraints for, and find the input space where those constraints are met.
 
 ```{r}
 
@@ -564,11 +583,10 @@ level2.unif.kept.ix = which(Y.unif[,'nbp_lnd_sum'] > -10 &
 X.kept = X.unif[level2.unif.kept.ix , ]
 
 # we've removed 80% of our prior input space
-(nrow(X.kept) / nsamp.unif) * 100
+print(paste0('NROY space proportion (%) = ',(nrow(X.kept) / nsamp.unif) * 100))
 
 ix.rejected = setdiff(1:nsamp.unif, level2.unif.kept.ix)
 X.rejected = X.unif[ix.rejected, ]
-
 
 
 ```
@@ -617,12 +635,12 @@ for(i in 1:ncol(X.unif)){
 
 
 
-## Monte Carlo Filtering for sensitivity analysis.
+# Monte Carlo Filtering for sensitivity analysis.
 Monte Carlo filtering (MCF) gives another form of sensitivity metric. MCF splits the input sample into two parts - those that do and do not meet some threshold, for example, and then examines the differences of the resulting parameter distributions. A useful guide to MCF can be found in [Pianosi et al (2016)]<https://www.sciencedirect.com/science/article/pii/S1364815216300287>
 
 We use the emulated input samples that are ruled out and NROY with the initial constraint.
 
-```{r}
+```{r, message = FALSE, results = 'hide', warning = FALSE}
 
 # ---------------------------------------------------------------------------------
 # Monte carlo filtering for sensitivity analysis
@@ -685,33 +703,6 @@ mtext('Monte Carlo Filtering sensitivity (ordered)', side = 3, adj = 0, line = 1
 ```
 
 
-
-```{r}
-
-par(mfrow = c(2,2))
-for(i in 1:ncol(Y.const.level1.scaled)){
-hist(Y.const.level1.scaled[ ,i], main = colnames(Y.const.level1.scaled)[i], xlab = yunits.const[i])
-}
-
-```
-
-
-```{r}
-
-
-#test <- twoStep.glmnet(X = X)
-
-#for(i in 1:ncol(Y0)){
-  
-#    em = twoStep.glmnet(X = X0, y = Y0[,i])
-#     global.emlist[[i]] = em
-#pred = predict(em$emulator, newdata = X.unif, type = 'UK')
-#y.unif[,i] = pred$mean
-#}
-
-
-
-```
 
 
 
