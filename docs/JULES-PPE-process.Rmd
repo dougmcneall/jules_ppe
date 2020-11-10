@@ -1,0 +1,64 @@
+---
+title: "JULES PPE process"
+author: "Doug McNeall"
+date: "11/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+This document outlines the process to create a production Uncertainty Quantification (UQ) pipeline for the land surface model JULES, using perturbed parameter ensembles (PPEs).
+
+## Create a Process overview
+
+The aim of the UQ process is usually multifold:
+
+1. To calibrate the model - to constrain input parameters by comparing model output to reality. 
+
+2. Then, to use plausible values of those input parameters to run simulations of the future, and make projections of the range of behavior of the system. This is uncertainty analysis.
+
+3. To identify which input parameters are important for processes in the model, and to quantify the effect of changing them on the model's output. This is sensitivity analysis.
+
+4. To use information from the above to identify errors, biases or deficiencies in the model, and give guidence on how to correct them.
+
+The specifics of the UQ process are often constrained by a number of things. These questions give us a better idea about how to proceed.
+
+1. What are the targets of the UQ process? Are you interested in climate impacts? Are you looking for a global overview, or for regional or local effects? What will the domain of the model run be?
+
+2. What is the computational resource? Can you run large ensembles of the model? For a standard PPE, a good rule of thumb is that you should have the resources to run at least 10 ensemble members for each free parameter. It is a good idea to have an extra 20% of runs on top of that for verifying any emulator you build.
+
+3. What are the data sources you have for comparing the model to reality? Are they univariate (e.g. global mean NPP)?, or high dimensional (e.g. gridded fields through time?) Do they come with credible uncertainty estimates?
+
+4. What parameters are uncertain? Do you have a good idea what they might be from theory, from measurements, or other sources? Do you have prior distributions or a good idea of ranges for these parameters?
+
+5. Is the model deterministic, or deoes it have a stochastic element? (Does it always produce exactly the same output when run at the same inputs?) If it's stochastic, can you afford to run multiple runs at each parameter set?
+
+6. What are the complications in running the model (each model has its own set of complications). Does the model need a long spinup? are there high dimensional but uncertain initial conditions? Does a major part of the model's uncertainty in behaviour come from the fact that it is coupled to another model component?
+
+## Proposed Uncertainty Quantification process for JULES
+
+### 1. Elicit uncertain imputs
+
+### 2. Create design
+
+### 3. Run corresponding ensemble
+
+### 4. Build emulators
+
+### 5. Compare historical output with historical data
+
+### 6. Exclude implausible runs
+
+### 7. Augment design and run, rebuild emulators
+
+### 8. Sensitivity analysis
+
+### 9. Error identification and bias correction
+
+### 10. Run future simulations
+
+### 11. Calibrated uncertainty analysis and projection
+

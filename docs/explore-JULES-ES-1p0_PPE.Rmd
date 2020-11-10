@@ -187,7 +187,7 @@ legend('left', col = 'red', pch = 20, legend = 'test')
 ## Marginal histograms of run failures
 
 ```{r, fig.width = 10, fig.height = 10}
-
+  
 p = ncol(X.level0)
 
 par(mfrow = c(6,6), mar = c(3,2,3,2), fg = 'lightgrey')
