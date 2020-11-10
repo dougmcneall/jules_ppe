@@ -12,6 +12,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This document outlines the process to create a production Uncertainty Quantification (UQ) pipeline for the land surface model JULES, using perturbed parameter ensembles (PPEs).
 
+You can see some preparatory/exploratory work on two large JULES PPEs here:
+
+[Visualising a large perturbed parameter ensemble of the land surface model JULES](https://dougmcneall.github.io/brazil_cssp/es_ppe_ii_viz.html)
+
+[Constraining the input space of an Earth system configuration of JULES](https://dougmcneall.github.io/jules_ppe/explore-JULES-ES-1p0_PPE.html)
+
+
+
 ## Create a Process overview
 
 The aim of the UQ process is usually multifold:
