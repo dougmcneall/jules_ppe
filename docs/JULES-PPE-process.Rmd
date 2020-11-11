@@ -50,23 +50,66 @@ The specifics of the UQ process are often constrained by a number of things. The
 
 ### 1. Elicit uncertain imputs
 
+The easiest inputs deal with are those that are important constants in the model, that may have some analogue in the real world (parameters). In many cases the modeller may have some information about "good" values of the input parameters, perhaps from observation, or from knowledge of previous versions of the model. The statistician should work with the modeller to find initial ranges, or distributions for these parameters, with the aim of testing the extreme outer limits. This is for two reasons - first the model will often work (and may even work better) with a parameter setting beyond what the modeller is prepared to consider, and second, the initial design should push to the limits of parameter space so that any emulator built later is not forced to extraoplate. Uncertainties get very large in extrapolation.
+
 ### 2. Create design
+
+A good "all-rounder" design for building emulators is a maximin Latin hypercube. This has the desired effect of spreading design points out quite well, and is easy to generate. A simple way is to generate a large number of latin hypercubes, and simply choose the one with the largest minimum distance between points.
+
+The benefit of building an emulator is that it's an efficient use of model runs. You can do, for example, a sensitivity analysis and then an uncertainty analysis with the same set of runs. Or, you could see the effect of using different input distributions on model output.
+
+To build an emulator, a good rule of thumb is that you have 10 runs per input parameter, plus another 20% of runs held back to verify the emulator. This often sets limits on the number of parameters chosen to perturb.
 
 ### 3. Run corresponding ensemble
 
+It's easy to create a design, but often harder to write the code that then embeds the chosen parameters into the model, runs the ensemble, and then collects the results up afterwards. Harder for me, anyway.
+
 ### 4. Build emulators
+
+An emulator could be any statistical of machine learning process that is trained on the relationship between a set of inputs and outputs, and predicts  outputs at untried inputs. A simple regression often works well, but I tend to use Gaussian process emulators. They are flexible, efficient, and give good uncertainty information. There are a number of alternatives for GP regression, including DiceKriging in R, or MO_GP in python.
 
 ### 5. Compare historical output with historical data
 
+Often the aim of an analysis is a full "calibration" of the model. The process is: comparing simulator output with observations of the system, inferring full probability distributions for the inputs, with the principal that inputs that produce more realistic outputs have a higher probability, and propogating that input uncertainty through to simulator outputs, often in the future. This can be challenging, particularly when the model has discrepancies (i.e. all the time).
+
+A good first step is to do "history matching" on the model, where the aim is to discard regions of input space where the model performs particularly poorly. When done in an iterative fashion, this has the potential to massively reduce the input parameter space under consideration. After history matching, it is still possible (in fact easier) to do a full calibration.
+
 ### 6. Exclude implausible runs
+
+History matching compares simulator output with observations of the real system, and gives each corresponding input set an Implausibility score, I. This score is high where there is a large difference bewteen the simulator and reality, but is reduced where uncertainty about the output, about the observation, or about the model discrepancy is high. Typically, an input that has a higher implausibility score than a chosen threshold (often 3), is rejected as implausible. Inputs that remain are referred to as "not ruled out yet" (NROY), acknowledging that they may still be ruled out if we learn more about the model (e.g. we build better emulators), or about the system (e.g. we get new/better/less uncertain observations).
+
+A set of inputs has as many implausibility scores as comparisons to data, and the scores can be quite different. Often, the maximum implausibility score is used to rule out an input, regardless of its score in other comparisons. It is possible to use a multivariate implausibility score, but this involves choices. Differences in implauibility scores between outputs can highlight undiagnosed discrepancies in a model, or might give you clues as to what the model developers prioritised.
 
 ### 7. Augment design and run, rebuild emulators
 
+In a multi-wave history matching process, a design is often augmented with additional runs at locactions that are NROY. This tends to improve the performance of the emulator in these regions, and can sometimes lead to NROY inputs being ruled out as uncertainty diminishes and the best estimate of the emulator updates.
+
+It can be hard to generate good designs, or good potential candidates in the small-and-interesting NROY spaces that are left after a history matching exercise, and research is ongoing.
+
 ### 8. Sensitivity analysis
+
+Sensitivity analysis (SA) involves quantifying the importance of input parameters for changing simulator outputs. There are various techniques, some focused on relatively small perturbations from a default set of parameters (local SA), and some treating the system more as a black box, and considering the output across a wide set of perturbations to plausible limits of parameters (global SA). It's important to consider that global SA might overestimate the importance of parameters, where initial estimates of parameters are set too wide. (Sensitivity to a parameter might be less, when a sensible uncertainty distribution of an input is deduced) 
 
 ### 9. Error identification and bias correction
 
+Sometimes, comparing different model outputs against observations suggest that completely different parts of input space are "good". This might happen when there is an undiagnosed discrepancy, or bias in a model. Highlighting these cases can suggest parts of the model that the model developer could focus on to make the model more coherent.
+
 ### 10. Run future simulations
 
+Once a number of history matching waves are carried out, it's time to run ensemble members to project the future. Generally, these should be to build an emulator, rather than sampling a posterior input distribution. The input distribution can be applied later, using an emulator. However, at the moment it is unclear (to me) how to decide thelimits of the input ranges of these runs in an efficient way. For example, it's good to interpolate with an emulator, but you want good coverage of the most likely range of the input distribution. How do you balance these objectives?
+
 ### 11. Calibrated uncertainty analysis and projection
+
+Once you have enough runs to build an adequate emulator, you can sample from the NROY input space, or you can perform a full Bayesian calibration and sample from the posterior input distributions.
+
+## Resources
+
+[Setting up your simulator](https://people.maths.bris.ac.uk/~mazjcr/SUYSdocument.pdf) A technical but useful document on setting up complex and computationally expensive comuter models to do UQ by Jonty Rougier.
+
+[Bayesian History Matching of Complex Infectious Disease Models Using Emulation: A Tutorial and a Case Study on HIV in Uganda](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003968) A good tutorial on History matching.
+
+
+
+
+
 
