@@ -702,6 +702,15 @@ mtext('Monte Carlo Filtering sensitivity (ordered)', side = 3, adj = 0, line = 1
 
 ```
 
+## Implausibility scores
+Can we back out implausibility scores from our expert's hard limits on simulation of the system?
+Assume that limits are I ~ 3, with zero emulator (model)uncertainty?
+
+
+
+
+
+
 
 
 

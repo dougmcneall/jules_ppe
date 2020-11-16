@@ -374,8 +374,8 @@ summary {
 <p>You can see some preparatory/exploratory work on two large JULES PPEs here:</p>
 <p><a href="https://dougmcneall.github.io/brazil_cssp/es_ppe_ii_viz.html">Visualising a large perturbed parameter ensemble of the land surface model JULES</a></p>
 <p><a href="https://dougmcneall.github.io/jules_ppe/explore-JULES-ES-1p0_PPE.html">Constraining the input space of an Earth system configuration of JULES</a></p>
-<div id="create-a-process-overview" class="section level2">
-<h2>Create a Process overview</h2>
+<div id="process-overview" class="section level2">
+<h2>Process overview</h2>
 <p>The aim of the UQ process is usually multifold:</p>
 <ol style="list-style-type: decimal">
 <li><p>To calibrate the model - to constrain input parameters by comparing model output to reality.</p></li>
@@ -383,6 +383,9 @@ summary {
 <li><p>To identify which input parameters are important for processes in the model, and to quantify the effect of changing them on the model’s output. This is sensitivity analysis.</p></li>
 <li><p>To use information from the above to identify errors, biases or deficiencies in the model, and give guidence on how to correct them.</p></li>
 </ol>
+</div>
+<div id="preliminary-questions" class="section level2">
+<h2>Preliminary questions</h2>
 <p>The specifics of the UQ process are often constrained by a number of things. These questions give us a better idea about how to proceed.</p>
 <ol style="list-style-type: decimal">
 <li><p>What are the targets of the UQ process? Are you interested in climate impacts? Are you looking for a global overview, or for regional or local effects? What will the domain of the model run be?</p></li>
@@ -447,6 +450,8 @@ summary {
 </div>
 <div id="resources" class="section level2">
 <h2>Resources</h2>
+<p>The primary resource for building a JULES UQ workflow is the R package <a href="https://github.com/dougmcneall/julesR">julesR</a>. You can install this package in R using devtools::install_github(’dougmcneall/julesR).</p>
+<p>At the moment, julesR is very much in development. Currently, you can use it to write an ensemble design, as explained in <a href="https://github.com/dougmcneall/julesR/blob/main/vignettes/write-jules-ensemble-design.Rmd">this vignette</a></p>
 <p><a href="https://people.maths.bris.ac.uk/~mazjcr/SUYSdocument.pdf">Setting up your simulator</a> A technical but useful document on setting up complex and computationally expensive comuter models to do UQ by Jonty Rougier.</p>
 <p><a href="https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003968">Bayesian History Matching of Complex Infectious Disease Models Using Emulation: A Tutorial and a Case Study on HIV in Uganda</a> A good tutorial on History matching.</p>
 </div>
