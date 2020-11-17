@@ -106,14 +106,14 @@ Once you have enough runs to build an adequate emulator, you can sample from the
 
 ## Resources
 
-The primary resource for building a JULES UQ workflow is the R package [julesR](https://github.com/dougmcneall/julesR). You can install this package in R using devtools::install_github('dougmcneall/julesR).
+The primary resource for building a JULES UQ workflow is the R package [julesR](https://github.com/dougmcneall/julesR). You can install this package in R using devtools::install_github('dougmcneall/julesR').
 
-At the moment, julesR is very much in development. Currently, you can use it to write an ensemble design, as explained in [this vignette](https://github.com/dougmcneall/julesR/blob/main/vignettes/write-jules-ensemble-design.Rmd)
+At the moment, julesR is very much in development. Currently, you can use it to write an ensemble design, as explained in [this vignette](https://dougmcneall.github.io/jules_ppe/write-jules-ensemble-design.html). Eventually, we'll have vignettes for a number of UQ processes using julesR, [emtools](https://github.com/dougmcneall/emtools) (tools for working with emulators) and [imptools](https://github.com/dougmcneall/imptools) (tools for working with implausibility).
 
 [Setting up your simulator](https://people.maths.bris.ac.uk/~mazjcr/SUYSdocument.pdf) A technical but useful document on setting up complex and computationally expensive comuter models to do UQ by Jonty Rougier.
 
 [Bayesian History Matching of Complex Infectious Disease Models Using Emulation: A Tutorial and a Case Study on HIV in Uganda](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003968) A good tutorial on History matching.
-
+  
 
 
 
