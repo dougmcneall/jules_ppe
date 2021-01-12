@@ -90,7 +90,9 @@ It can be hard to generate good designs, or good potential candidates in the sma
 
 ### 8. Sensitivity analysis
 
-Sensitivity analysis (SA) involves quantifying the importance of input parameters for changing simulator outputs. There are various techniques, some focused on relatively small perturbations from a default set of parameters (local SA), and some treating the system more as a black box, and considering the output across a wide set of perturbations to plausible limits of parameters (global SA). It's important to consider that global SA might overestimate the importance of parameters, where initial estimates of parameters are set too wide. (Sensitivity to a parameter might be less, when a sensible uncertainty distribution of an input is deduced) 
+Sensitivity analysis (SA) involves quantifying the importance of input parameters for changing simulator outputs. There are various techniques, some focused on relatively small perturbations from a default set of parameters (local SA), and some treating the system more as a black box, and considering the output across a wide set of perturbations to plausible limits of parameters (global SA). It's important to consider that global SA might overestimate the importance of parameters, where initial estimates of parameters are set too wide. (Sensitivity to a parameter might be less, when a sensible uncertainty distribution of an input is deduced).
+
+One useful way to combine sensitivity analysis and constraint might be to use sensitivity analysis to eliminate inactive inputs early on in the history matching process. A danger might be that you eliminate an input that becomes more important as parameter ranges are shrunk to something sensible.
 
 ### 9. Error identification and bias correction
 
@@ -108,7 +110,7 @@ Once you have enough runs to build an adequate emulator, you can sample from the
 
 The primary resource for building a JULES UQ workflow is the R package [julesR](https://github.com/dougmcneall/julesR). You can install this package in R using devtools::install_github('dougmcneall/julesR').
   
-At the moment, julesR is very much in development. Currently, you can use it to write an ensemble design, as explained in [this vignette](https://dougmcneall.github.io/jules_ppe/write-jules-ensemble-design.html). Eventually, we'll have vignettes for a number of UQ processes using julesR, [emtools](https://github.com/dougmcneall/emtools) (tools for working with emulators) and [imptools](https://github.com/dougmcneall/imptools) (tools for working with implausibility).
+At the moment, julesR is very much in development. Currently, you can use it to write an ensemble design, as explained in [this vignette](https://dougmcneall.github.io/jules_ppe/write-jules-ensemble-design.html). You can also augment an ensemble design with new design points from area of parameter space that are Not Ruled out Yet, as explained in [this vignette](https://dougmcneall.github.io/jules_ppe/augment-jules-ensemble-design.html). Eventually, we'll have vignettes for a number of UQ processes using julesR, [emtools](https://github.com/dougmcneall/emtools) (tools for working with emulators) and [imptools](https://github.com/dougmcneall/imptools) (tools for working with implausibility).
 
 [Setting up your simulator](https://people.maths.bris.ac.uk/~mazjcr/SUYSdocument.pdf) A technical but useful document on setting up complex and computationally expensive comuter models to do UQ by Jonty Rougier.
 
