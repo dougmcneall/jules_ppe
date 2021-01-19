@@ -1,0 +1,227 @@
+---
+title: "constrain-JULES-ES-1p0.Rmd"
+author: "Doug McNeall"
+date: "1/19/2021"
+output: html_document
+---
+
+# Sensitivity analysis and constraint of the parameter space of Earth System configuration of JULES.
+Update of explore-JULES-ES-1p0.Rmd that uses the new packages and functions
+
+
+Andy thinks there might be mileage in analysing the atmospheric growth, which is here.
+/home/h01/hadaw/Research/ES_PPE/Oct20
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+# Load helper functions
+
+knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
+# load some helper functions
+source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
+source('explore-JULES-ES-1p0_PPE_functions.R')
+```
+
+```{r, message = FALSE, warning=FALSE}
+# Load packages
+
+  library(RColorBrewer)
+  library(fields)
+  library(MASS)
+  library(DiceKriging)
+  library(ncdf4)
+  library(ncdf4.helpers)
+
+  library(emtools)
+  library(imptools)
+  library(viztools)
+
+  #source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/emtools.R")
+  #source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/imptools.R")
+  #source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/vistools.R")
+```
+
+
+```{r}
+# Preliminaries
+# Some pallete options
+yg = brewer.pal(9, "YlGn")
+ryb = brewer.pal(11, "RdYlBu")
+byr = rev(ryb)
+rb = brewer.pal(11, "RdBu")
+br = rev(rb)
+blues = brewer.pal(9, 'Blues')
+cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+```{r}
+# data location
+
+ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
+ensmember <- 'P0000/'
+subdir <- 'stats/'
+
+floc <- paste0(ensloc,ensmember,subdir)
+fn <- 'JULES-ES-1p0_P0000_Annual_global.nc'
+
+# test file
+nc <- nc_open(paste0(floc,fn))
+
+# What variables are in the file? 
+varlist <- nc.get.variable.list(nc)
+
+```
+
+## Extract a time series of a annual, globally aggregated variable
+```{r}
+
+extractTimeseries <- function(nc, variable){
+    dat <- ncvar_get(nc, variable)
+    out <- dat
+    out
+}
+
+makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:2013){
+  
+  # nens is number of ensemble members
+  # nts length of timeseries
+  # cn is colnames()
+  datmat <- matrix(NA, nrow = nens, ncol = nts)
+  colnames(datmat) <- cn
+  
+  enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
+  floc <- paste0(ensloc,ensmember,subdir)
+  
+  for(i in 1:nens){
+    
+    vec <- rep(NA,nts)
+    
+    ensmember <- enslist[i] 
+    
+    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+ 
+    
+    try(nc <- nc_open(paste0(fn)))
+    try(dat <- extractTimeseries(nc, variable))
+    
+    datmat[i, ] <- dat
+    nc_close(nc)
+  }
+  datmat
+}
+
+```
+
+# Test with NPP and plot
+```{r}
+npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum")
+
+ylim = range(c(npp_ens[,1], npp_ens[,164]))
+matplot(t(npp_ens), type = 'l', ylim = ylim)
+
+```
+
+```{r, results = 'hide'}
+# for each of the variables in the file, average the last 20 years as the "modern" value,
+# and then place in a matrix
+
+modernValue <- function(nc, variable, ix){
+  # A basic function to read a variable and 
+  # take the mean of the timeseries at locations ix
+  dat <- ncvar_get(nc, variable)
+  out <- mean(dat[ix])
+  out
+}
+#144:164 is the 1993:2013
+modernValue(nc = nc, variable = "npp_nlim_lnd_mean", ix = 144:164)
+
+# apply to the test file to check it works
+vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164)
+
+```
+
+```{r, warning = FALSE, message = FALSE, results = FALSE}
+# Generate ensemble numbers, mean of the last 20 years of the timeseries (1994-2013)
+
+if (file.exists("ensemble.rdata")) {
+  load("ensemble.rdata")
+} else {
+  
+  nens = 499
+  datmat <- matrix(nrow = nens, ncol = length(varlist))
+  colnames(datmat) <- varlist
+  
+  enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
+  floc <- paste0(ensloc,ensmember,subdir)
+  
+  for(i in 1:nens){
+    
+    vec <- rep(NA, length(varlist))
+    
+    ensmember <- enslist[i] 
+    
+    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    #print(fn)
+    
+    try(nc <- nc_open(paste0(fn)))
+    try(vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164))
+    datmat[i, ] <- vec
+    nc_close(nc)
+  }
+  
+  save(nens, datmat,enslist,floc, file ="ensemble.rdata")
+}
+```
+
+
+## Calculate an ensemble of anomalies for all variables
+For each ensemble member and each variable, calculate the change from the 20 years at the start of the run, to the twenty years at the end of the run.
+
+
+```{r}
+tsAnomaly <- function(nc, variable, startix = 1:20, endix = 144:164){
+
+  # A basic function to read a variable and calculate the anomaly at the end of the run
+  dat <- ncvar_get(nc, variable)
+  endMean <- mean(dat[endix])
+  startMean <- mean(dat[startix])
+  out <- endMean - startMean
+  out
+}
+
+tsAnomaly(nc = nc, variable = "npp_nlim_lnd_mean")
+```
+
+```{r, warning = FALSE, message = FALSE, results = FALSE}
+# Generate ensemble  mean of the last 20 years of the timeseries (1994-2013)
+
+if (file.exists("anomaly_ensemble.rdata")) {
+  load("anomaly_ensemble.rdata")
+} else {
+  
+  nens = 499
+  datmat <- matrix(nrow = nens, ncol = length(varlist))
+  colnames(datmat) <- varlist
+  
+  enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
+  floc <- paste0(ensloc,ensmember,subdir)
+  
+  for(i in 1:nens){
+    
+    vec <- rep(NA, length(varlist))
+    
+    ensmember <- enslist[i] 
+    
+    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    #print(fn)
+    
+    try(nc <- nc_open(paste0(fn)))
+    try(vec <- sapply(varlist, FUN = tsAnomaly, nc = nc))
+    datmat[i, ] <- vec
+    nc_close(nc)
+  }
+  
+  save(nens, datmat,enslist,floc, file ="anomaly_ensemble.rdata")
+}
+```
+
+
