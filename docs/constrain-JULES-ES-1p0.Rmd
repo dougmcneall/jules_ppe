@@ -199,8 +199,8 @@ if (file.exists("anomaly_ensemble.rdata")) {
 } else {
   
   nens = 499
-  datmat <- matrix(nrow = nens, ncol = length(varlist))
-  colnames(datmat) <- varlist
+  datmatAnom <- matrix(nrow = nens, ncol = length(varlist))
+  colnames(datmatAnom) <- varlist
   
   enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
   floc <- paste0(ensloc,ensmember,subdir)
@@ -216,12 +216,667 @@ if (file.exists("anomaly_ensemble.rdata")) {
     
     try(nc <- nc_open(paste0(fn)))
     try(vec <- sapply(varlist, FUN = tsAnomaly, nc = nc))
-    datmat[i, ] <- vec
+    datmatAnom[i, ] <- vec
     nc_close(nc)
   }
   
-  save(nens, datmat,enslist,floc, file ="anomaly_ensemble.rdata")
+  save(nens, datmatAnom, enslist,floc, file ="anomaly_ensemble.rdata")
 }
 ```
 
+## Probability of run failure
+Could be an interesting project - logit transformation for probability of run failure?Some other ML like SVM?
+
+
+## Clean data sets
+```{r}
+# Initial clean of data set, removing variables that don't change, and removing NAs (models that didn't run)
+
+Y_nlevel0_ix <- which(is.na(datmat[,'year']))
+
+YAnom_nlevel0_ix <- which(is.na(datmatAnom[,'year']))
+
+# This should be true to proceed, or we'll have to start excluding the combined set.
+identical(Y_nlevel0_ix, YAnom_nlevel0_ix)
+
+# Y is the whole data set
+Y <- datmat
+# Y_level0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
+Y_level0 <- datmat[-Y_nlevel0_ix, -c(2,30,31)]
+Y_nlevel0 <- datmat[Y_nlevel0_ix, -c(2, 30, 31)]
+
+
+# Y is the whole data set
+YAnom <- datmatAnom
+# Y.level0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
+YAnom_level0 <- datmatAnom[-YAnom_nlevel0_ix, -c(2,30,31)]
+YAnom_nlevel0 <- datmatAnom[YAnom_nlevel0_ix, -c(2,30,31)]
+
+```
+
+```{r}
+# load the original design and input space, normalize to [0-1]
+
+years = 1864:2013
+ysec = 60*60*24*365
+
+# Load up the data
+lhs_i = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_i/lhs_u-ao732.txt', header = TRUE)
+lhs_ii = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_ii/lhs_u-ao732a.txt', header = TRUE)
+
+toplevel_ix = 1:499
+
+# The raw input data is a latin hypercube
+lhs = rbind(lhs_i, lhs_ii)[toplevel_ix, ]
+lhs_level0 <- lhs[-Y_nlevel0_ix,]
+
+X = normalize(lhs)
+colnames(X) = colnames(lhs)
+
+X_level0 <- X[-Y_nlevel0_ix,]
+X_nlevel0 <- X[Y_nlevel0_ix,]
+
+d = ncol(X)
+# lower and higher bound on the normalised matrix for visualisation
+rx = rbind(rep(0,32), rep(1,32))
+```
+
+
+## Where did the model fail to run?
+
+There are clear run failure thresholds in the parameters rootd_ft_io and lai_max, and quite strong visual indications that a_wl_io and bio_hum_cn matter.
+
+```{r, fig.width = 12, fig.height = 12}
+
+#simple way
+par(oma = c(10,10,0,0))
+#par(xpd = TRUE)
+pairs(X_nlevel0, 
+      xlim = c(0,1), ylim = c(0,1),
+      col = 'red', 
+      gap = 0,
+      pch = 20,
+      lower.panel = NULL)
+
+#legend('bottomright', legend = paste(1:d, colnames(lhs)), bty = 'n')
+legend('left', col = 'red', pch = 20, legend = 'test')
+
+# plot failures over everything else
+#X.all <- rbind(X.level0, X.nlevel0)
+#colvec <- rep('grey', nrow(X))
+#colvec[(nrow(X.level0)+1):nrow(X.all)] <- 'red'
+#pairs(X.all, xlim = c(0,1), ylim = c(0,1),col = colvec, gap = 0, lower.panel = NULL, pch = 20, cex = 0.5)
+
+```
+
+
+
+## Test out some emulators
+At the moment, we'll just keep to the things that we know should work.
+We'll use mean NPP as an example
+
+Andy would like to see timeseries of:
+cVeg, cSoil and nbp, npp in GtC and GtC/yr.
+
+
+First, how does NPP respond to each parameter? NAs are removed, but zero values are still included.
+
+```{r, fig.width = 12, fig.height = 12}
+p <- ncol(X_level0)
+
+y_level0 <- Y_level0[,'npp_nlim_lnd_sum']
+
+par(mfrow = c(5,7), mar = c(3,1,3,1))
+for(i in 1:p){
+  plot(X_level0[,i], y_level0, xlab = '', ylab = '', main = colnames(X_level0)[i])
+}
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+
+
+yanom_level0 <- YAnom_level0[,'npp_nlim_lnd_sum']
+
+par(mfrow = c(5,7), mar = c(3,1,3,1))
+for(i in 1:p){
+  plot(X_level0[,i], yanom_level0, xlab = '', ylab = '', main = colnames(X_level0)[i])
+}
+
+```
+
+
+## Relationship between modern value and change since 1850.
+```{r, fig.width = 12, fig.height = 8}
+
+par(mfrow = c(4,7), mar = c(3,1,3,1), oma = c(4,5,1,1))
+
+pdash <- ncol(Y_level0)
+
+for(i in 1:pdash){
+  
+  y_level0 <- Y_level0[,i]
+  yanom_level0 <- YAnom_level0[,i]
+  
+  plot(y_level0, yanom_level0, xlab = '', ylab = '', main = colnames(Y_level0)[i])
+}
+
+mtext(text = 'Absolute', side = 1, line = 2, outer = TRUE, cex = 2)
+mtext(text = 'Change', side = 2, line = 2, outer = TRUE, cex = 2)
+
+
+```
+
+
+
+## A clear threshold in the F0 parameter.
+It appears that this ensemble is less "clear cut" in having an output that clearly distinguishes between "failed" (or close to it), and "not failed".
+
+Having said that, having an F0 over a threshold seems to kill the carbon cycle, as before. Here, we've set a threshold of 0.9 (on the normalised scale) for F0, and we remove members of the ensemble with a larger F0 than that when we build emulators.
+
+```{r, fig.width = 6, fig.height = 8}
+
+par(mfrow = c(2,1))
+plot(lhs$f0_io, datmat[, 'npp_nlim_lnd_sum'], main = 'Multiplication factor', xlab = 'f0_io', ylab = 'NPP sum')
+plot(X_level0[,'f0_io'], Y_level0[, 'npp_nlim_lnd_sum'], xlab = 'f0_io', main = 'Normalized', ylab = 'NPP sum')
+abline(v = 0.9)
+
+```
+
+
+# Remove anything with f0 over a threshold (level 1 constraint) .
+The level 1 constraint removes any input with F0 greater than 0.9 (normalised), which removes many of the zero-carbon-cycle members up front. There are 424 ensmble members remaining.
+
+This does constraint sequentially, which may not be a good idea. 
+```{r}
+level1_ix <- which(X_level0[, 'f0_io'] < 0.9)
+
+X_level1 <- X_level0[level1_ix, ]
+Y_level1 <- Y_level0[level1_ix,]
+
+YAnom_level1 <- YAnom_level0[level1_ix, ]
+
+y_level1 <- Y_level1[, 'npp_nlim_lnd_sum']
+```
+
+
+```{r, fig.width = 7, fig.height = 7, results = 'hide'}
+em_level1 <- km(~., design = X_level1,  response = y_level1)
+
+plot(X_level1[, 'f0_io'], Y_level1[, 'npp_nlim_lnd_sum'], xlab = 'f0_io (normalised)', ylab = 'NPP')
+```
+
+
+Plot the regular km emulator.
+
+```{r, fig.width = 7, fig.height = 7}
+plot(em_level1)
+```
+
+## Constrain first and then do sensitivity analysis?
+The problem with doing constraint first is that you end up with a non-hypercube shaped input space (corners have been knocked off by constraint), which is not ideal. We might therefore want different sensitivity measures for pre- and post-constrained ensemble.
+
+
+```{r}
+
+#sensvar needs to go into emtools with oaat_design
+sensvar <- function(oaat_pred, n, d){
+  # Calculate variance as a global sensitivity meansure
+  out = rep(NA,d)
+  for(i in 1:d){
+    ix = seq(from = ((i*n) - (n-1)), to =  (i*n), by = 1)
+    out[i] = var(oaat_pred$mean[ix])
+  }
+  out
+}
+
+
+```
+
+
+```{r}
+twoStep_glmnet <- function(X, y, nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, seed=NULL, trace=FALSE, maxit=100,
+                          REPORT=10, factr=1e7, pgtol=0.0, parinit=NULL, popsize=100){
+  # Use lasso to reduce input dimension of emulator before
+  # building.
+  control_list = list(trace=trace, maxit=maxit, REPORT=REPORT, factr=factr, pgtol=pgtol, pop.size=popsize)
+  xvars = colnames(X)
+  data = data.frame(response=y, x=X)
+  colnames(data) <- c("response", xvars)
+  nval = length(y)
+  
+  # fit a lasso by cross validation
+  library(glmnet)
+  fit_glmnet_cv = cv.glmnet(x=X,y=y)
+  
+  # The labels of the retained coefficients are here
+  # (retains intercept at index zero)
+  coef_i = (coef(fit_glmnet_cv, s = "lambda.1se"))@i
+  labs = labels(coef(fit_glmnet_cv, s = "lambda.1se"))[[1]]
+  labs = labs[-1] # remove intercept
+  glmnet_retained = labs[coef_i]
+  
+  start_form = as.formula(paste("~ ", paste(glmnet_retained , collapse= "+")))
+  m = km(start_form, design=X, response=y, nugget=nugget, parinit=parinit,
+         nugget.estim=nuggetEstim, noise.var=noiseVar, control=control_list)
+  
+  return(list(x=X, y=y, nugget=nugget, nuggetEstim=nuggetEstim,
+              noiseVar=noiseVar, emulator=m, seed=seed, coefs=m@covariance@range.val,
+              trends=m@trend.coef, meanTerms=all.vars(start_form), fit_glmnet_cv=fit_glmnet_cv))
+}
+```
+
+
+```{r}
+
+twoStep_sens <- function(X, y, n=21, predtype = 'UK', nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, seed=NULL, trace=FALSE, maxit=100,
+                        REPORT=10, factr=1e7, pgtol=0.0, parinit=NULL, popsize=100){
+  # Sensitivity analysis with twoStep emulator. 
+  # Calculates the variance of the output varied one at a time across each input.
+  d = ncol(X)
+  X_norm <- normalize(X)
+  X_oaat <- oaat_design(X_norm, n, med = TRUE)
+  colnames(X_oaat) = colnames(X)
+  
+  twoStep_em = twoStep_glmnet(X=X, y=y, nugget=nugget, nuggetEstim=nuggetEstim, noiseVar=noiseVar,
+                              seed=seed, trace=trace, maxit=maxit,
+                              REPORT=REPORT, factr=factr, pgtol=pgtol,
+                              parinit=parinit, popsize=popsize)
+  
+  oaat_pred = predict(twoStep_em$emulator, newdata = X_oaat, type = predtype)
+  
+  sens = sensvar(oaat_pred = oaat_pred, n=n, d=d)
+  out = sens
+  out
+}
+```
+
+
+```{r}
+
+oat_test <- twoStep_sens(X = X_level1, y = y_level1)
+
+```
+
+
+```{r}
+y_names_sum <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum',
+            'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
+            'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
+            'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
+
+
+
+oat_var_sensmat_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1[, yname]
+  oat <- twoStep_sens(X = X_level1, y = y)
+  oat_var_sensmat_Y[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_Y, file = "oaat_Y.rdata")
+```
+
+## Initial sensitivity Matrix
+It looks as though bwl_io is very influential across a number of variables, even though it didn't appear that interesting in the parginal plots. Why is that?
+
+```{r, fig.width= 10, fig.height = 6}
+# normalize the sensitivity matrix
+colnames(oat_var_sensmat_Y) <- colnames(X_level1)
+rownames(oat_var_sensmat_Y) <- y_names_sum
+
+#test <- normalize(t(oat.var.sensmat))
+
+#image(test)
+#par()
+heatmap(oat_var_sensmat_Y, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
+heatmap(oat_var_sensmat_Y, mar = c(10,10), scale = 'row')
+
+```
+
+
+```{r, fig.width =12, fig.height = 7}
+
+normsens_Y <- normalize(t(oat_var_sensmat_Y))
+
+par(mar = c(12,12,5,2))
+image(normsens_Y, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+```
+
+
+
+## Re-examine bwl_io
+A closer look at bwl_io now that the impact of f0_io has been removed shows a large number of "zero" NPP when bwl_io is at low values, which could well be the source of apparent sensitivity.
+
+Take only higher values of bwl_io for the next round of constraints.
+
+```{r, fig.width = 12, fig.height = 12}
+
+p <- ncol(X_level1)
+
+y_level1 <- Y_level1[,'npp_nlim_lnd_sum']
+
+par(mfrow = c(5,7), mar = c(3,1,3,1))
+for(i in 1:p){
+  plot(X_level1[,i], y_level1, xlab = '', ylab = '', main = colnames(X_level1)[i])
+}
+
+```
+
+
+```{r}
+# This fails for "cVeg_lnd_sum"
+# The result will be that some of the columns are repeated.
+
+oat_var_sensmat_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- YAnom_level1[, yname]
+  try(oat <- twoStep_sens(X = X_level1, y = y))
+  oat_var_sensmat_YAnom[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_YAnom, file = "oaat_YAnom.rdata")
+
+```
+
+
+
+```{r, fig.width= 10, fig.height = 6}
+# normalize the sensitivity matrix
+colnames(oat_var_sensmat_YAnom) <- colnames(X_level1)
+rownames(oat_var_sensmat_YAnom) <- y_names_sum
+
+#test <- normalize(t(oat.var.sensmat))
+
+#image(test)
+#par()
+heatmap(oat_var_sensmat_YAnom, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
+heatmap(oat_var_sensmat_YAnom, mar = c(10,6), scale = 'row')
+
+```
+
+
+```{r, fig.width =12, fig.height = 7}
+
+normsens_YAnom <- normalize(t(oat_var_sensmat_YAnom))
+
+par(mar = c(12,12,5,2))
+image(normsens_YAnom, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+```
+
+
+## Plot both sensitivity matrices on top of one another.
+It looks as though both the absolute value and the change over time are controlled by the same parameters.
+```{r, fig.width =12, fig.height = 12}
+
+
+par(mfrow = c(2,1), mar = c(12,12,5,2))
+
+
+image(normsens_Y, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+
+image(normsens_YAnom, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+
+
+
+```
+
+
+
+## How good are the emulators for each output?
+The emulators appear to be at least capturing the broad response for all of the output variables.
+
+First, plot the straight kriging emulators
+
+```{r, fig.width = 12, fig.height = 6, results = 'hide'}
+
+if (file.exists("km_emulators_Y.rdata")) {
+  load("km_emulators_Y.rdata")
+} else {
+  
+  emlist_km_Y <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    yname <- y_names_sum[i]
+    y <- Y_level1[, yname]
+    
+    em <- km(~., design = X_level1, response = y)
+    emlist_km_Y[[i]] <- em
+  }
+  
+  loolist_km_Y <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    loo <- leaveOneOut.km(model = emlist_km_Y[[i]], type = 'UK', trend.reestim = TRUE)
+    loolist_km_Y[[i]] <- loo
+  }
+  
+  save(emlist_km_Y,loolist_km_Y, file = "km_emulators_Y.rdata")
+}
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y)){
+  
+  y <- Y_level1[, y_names_sum[i]]
+  loo <- loolist_km_Y[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y_level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Modern Value (Y)', side = 3, line = 0, outer = TRUE, cex = 2) 
+
+```
+
+```{r, fig.width = 12, fig.height = 6, results = 'hide'}
+
+if (file.exists("km_emulators_YAnom.rdata")) {
+  load("km_emulators_YAnom.rdata")
+} else {
+  
+  emlist_km_YAnom <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    yname <- y_names_sum[i]
+    y <- YAnom_level1[, yname]
+    
+    em <- km(~., design = X_level1, response = y)
+    emlist_km_YAnom[[i]] <- em
+  }
+  
+  loolist_km_YAnom <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    loo <- leaveOneOut.km(model = emlist_km_YAnom[[i]], type = 'UK', trend.reestim = TRUE)
+    loolist_km_YAnom[[i]] <- loo
+  }
+  
+  save(emlist_km_YAnom,loolist_km_YAnom, file = "km_emulators_YAnom.rdata")
+}
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_YAnom)){
+  
+  y <- YAnom_level1[, y_names_sum[i]]
+  loo <- loolist_km_YAnom[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(YAnom_level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Change over time (YAnom)', side = 3, line = 1, outer = TRUE, cex = 2) 
+
+```
+
+Next, plot the twostep glmnet/km emulators
+
+```{r, fig.width = 12, fig.height = 6}
+# Twostep glmnet emulators
+
+if (file.exists("ts_emulators_Y.rdata")) {
+  load("ts_emulators_Y.rdata")
+} else {
+  
+  emlist_twoStep_glmnet_Y <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    yname <- y_names_sum[i]
+    y <- Y_level1[, yname]
+    
+    em <- twoStep_glmnet(X = X_level1, y = y)
+    emlist_twoStep_glmnet_Y[[i]] <- em
+  }
+  
+  loolist_twoStep_glmnet_Y <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    loo <- leaveOneOut.km(model = emlist_twoStep_glmnet_Y[[i]]$emulator, type = 'UK', trend.reestim = TRUE)
+    loolist_twoStep_glmnet_Y[[i]] <- loo
+  }
+  
+  save(emlist_twoStep_glmnet_Y, loolist_twoStep_glmnet_Y, file = "ts_emulators_Y.rdata")
+
+}
+
+
+```
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_twoStep_glmnet_Y)){
+  
+  y <- Y_level1[, y_names_sum[i]]
+  loo <- loolist_twoStep_glmnet_Y[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y_level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Modern Value (Y)', side = 3, line = 0, outer = TRUE, cex = 2) 
+
+```
+```{r, fig.width = 12, fig.height = 6}
+# Twostep glmnet emulators
+
+#if (file.exists("ts_emulators_YAnom.rdata")) {
+#  load("ts_emulators_YAnom.rdata")
+#} else {
+  
+  emlist_twoStep_glmnet_YAnom <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    yname <- y_names_sum[i]
+    y <- YAnom_level1[, yname]
+    
+    em <- twoStep_glmnet(X = X_level1, y = y)
+    emlist_twoStep_glmnet_YAnom[[i]] <- em
+  }
+  
+  loolist_twoStep_glmnet_YAnom <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    loo <- leaveOneOut.km(model = emlist_twoStep_glmnet_YAnom[[i]]$emulator, type = 'UK', trend.reestim = TRUE)
+    loolist_twoStep_glmnet_YAnom[[i]] <- loo
+  }
+  
+  save(emlist_twoStep_glmnet_YAnom, loolist_twoStep_glmnet_YAnom, file = "ts_emulators_YAnom.rdata")
+
+#
+  }
+
+
+```
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_twoStep_glmnet_YAnom)){
+  
+  y <- YAnom_level1[, y_names_sum[i]]
+  loo <- loolist_twoStep_glmnet_YAnom[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y_level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Historical Change (YAnom)', side = 3, line = 0, outer = TRUE, cex = 2) 
+
+```
+
+```{r}
+
+# Write an emulator wrapper
+
+# Write a leave-one-out wrapper
+
+# Create a list of emulator fits, for both km and twoStep methods.
+# Use mclapply to build the lists
+# use code from HDE package
+# Make sure errors are handled adequately.
+
+
+
+
+
+
+
+
+
+```
 

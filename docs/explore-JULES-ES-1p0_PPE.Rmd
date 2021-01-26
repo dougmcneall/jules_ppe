@@ -292,11 +292,11 @@ em.level1 <- km(~., design = X.level1,  response = y.level1)
 plot(X.level1[, 'f0_io'], Y.level1[, 'npp_nlim_lnd_sum'], xlab = 'f0_io (normalised)', ylab = 'NPP')
 ```
 
-Plot the regular km emulator.
-
-```{r, fig.width = 7, fig.height = 7}
-plot(em.level1)
-```
+  Plot the regular km emulator.
+  
+  ```{r, fig.width = 7, fig.height = 7}
+  plot(em.level1)
+  ```
 
 Plot the "twostep" glmnet/km emulator for the level 1 constraint.
 
@@ -309,6 +309,8 @@ ts.glmnet.em.level1 <- twoStep.glmnet(X = X.level1, y = y.level1)
 plot(ts.glmnet.em.level1$emulator )
 
 ```
+
+
 
 
 ## A one-at-a-time sensitivity analysis of the "sum" output 
