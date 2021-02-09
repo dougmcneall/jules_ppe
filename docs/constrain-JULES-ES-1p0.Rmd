@@ -13,7 +13,7 @@ Andy thinks there might be mileage in analysing the atmospheric growth, which is
 
 At the moment, this vignette is hampered by the fact that emulators are failing on a few of the outputs which represent change over the historical perid. The emulator is fine for predicting absolute values in the modern period.
 
-```{r, echo = FALSE, message = FALSE, warning=FALSE}
+```{r, echo = TRUE, message = FALSE, warning=FALSE}
 # Load helper functions
 
 knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
@@ -25,20 +25,21 @@ source('explore-JULES-ES-1p0_PPE_functions.R')
 ```{r, message = FALSE, warning=FALSE}
 # Load packages
 
-  library(RColorBrewer)
-  library(fields)
-  library(MASS)
-  library(DiceKriging)
-  library(ncdf4)
-  library(ncdf4.helpers)
+library(RColorBrewer)
+library(fields)
+library(MASS)
+library(DiceKriging)
+library(ncdf4)
+library(ncdf4.helpers)
 
-  library(emtools)
-  library(imptools)
-  library(viztools)
+library(foreach)
 
-  #source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/emtools.R")
-  #source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/imptools.R")
-  #source("https://raw.githubusercontent.com/dougmcneall/packages-git/master/vistools.R")
+library(emtools)
+library(imptools)
+library(viztools)
+library(julesR)
+
+
 ```
 
 
@@ -52,10 +53,13 @@ rb = brewer.pal(11, "RdBu")
 br = rev(rb)
 blues = brewer.pal(9, 'Blues')
 cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+years <- 1850:2013
 ```
 
+
+## Jules output data location
 ```{r}
-# data location
 
 ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
 ensmember <- 'P0000/'
@@ -72,7 +76,7 @@ varlist <- nc.get.variable.list(nc)
 
 ```
 
-## Extract a time series of a annual, globally aggregated variable
+## Extract a time series of an annual, globally aggregated variable
 ```{r}
 
 extractTimeseries <- function(nc, variable){
@@ -112,15 +116,21 @@ makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:20
 
 ```
 
-# Test with NPP and plot
-```{r}
-npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum")
+# Test with the global sum of NPP and plot the timeseries
 
-ylim = range(c(npp_ens[,1], npp_ens[,164]))
-matplot(t(npp_ens), type = 'l', ylim = ylim)
+```{r, message = FALSE, warning = FALSE }
+npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum")
 
 ```
 
+
+```{r, fig.width = 10, fig.height =8}
+ylim = range(c(npp_ens[,1], npp_ens[,164]))
+matplot(years, t(npp_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NPP sum')
+
+```
+
+## Function to extract the "modern value" direct from the file (last 20 years of the timeseries)
 ```{r, results = 'hide'}
 # for each of the variables in the file, average the last 20 years as the "modern" value,
 # and then place in a matrix
@@ -139,6 +149,8 @@ modernValue(nc = nc, variable = "npp_nlim_lnd_mean", ix = 144:164)
 vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164)
 
 ```
+
+## Loop to extract the "modern value" of a number of model outputs
 
 ```{r, warning = FALSE, message = FALSE, results = FALSE}
 # Generate ensemble numbers, mean of the last 20 years of the timeseries (1994-2013)
@@ -176,7 +188,6 @@ if (file.exists("ensemble.rdata")) {
 
 ## Calculate an ensemble of anomalies for all variables
 For each ensemble member and each variable, calculate the change from the 20 years at the start of the run, to the twenty years at the end of the run.
-
 
 ```{r}
 tsAnomaly <- function(nc, variable, startix = 1:20, endix = 144:164){
@@ -226,7 +237,7 @@ if (file.exists("anomaly_ensemble.rdata")) {
 ```
 
 ## Probability of run failure
-Could be an interesting project - logit transformation for probability of run failure?Some other ML like SVM?
+Could be an interesting project - logit transformation for probability of run failure? Some other ML like SVM?
 
 
 ## Clean data sets
@@ -312,25 +323,23 @@ legend('left', col = 'red', pch = 20, legend = 'test')
 
 
 
-## Test out some emulators
-At the moment, we'll just keep to the things that we know should work.
-We'll use mean NPP as an example
+## Build some Gaussian Process emulators
 
 Andy would like to see timeseries of:
 cVeg, cSoil and nbp, npp in GtC and GtC/yr.
 
-
-First, how does NPP respond to each parameter? NAs are removed, but zero values are still included.
+First, use mean NPP as an example. How does NPP respond to each parameter? NAs are removed, but zero values are still included.
 
 ```{r, fig.width = 12, fig.height = 12}
 p <- ncol(X_level0)
 
 y_level0 <- Y_level0[,'npp_nlim_lnd_sum']
 
-par(mfrow = c(5,7), mar = c(3,1,3,1))
+par(mfrow = c(5,7), mar = c(3,1,3,1), oma = c(1,1,5,1))
 for(i in 1:p){
   plot(X_level0[,i], y_level0, xlab = '', ylab = '', main = colnames(X_level0)[i])
 }
+mtext('NPP', outer = TRUE, side = 3, cex = 2, line = 2)
 
 ```
 
@@ -340,15 +349,18 @@ for(i in 1:p){
 
 yanom_level0 <- YAnom_level0[,'npp_nlim_lnd_sum']
 
-par(mfrow = c(5,7), mar = c(3,1,3,1))
+par(mfrow = c(5,7), mar = c(3,1,3,1), oma = c(1,1,5,1))
 for(i in 1:p){
   plot(X_level0[,i], yanom_level0, xlab = '', ylab = '', main = colnames(X_level0)[i])
 }
+mtext('NPP change over time', outer = TRUE, side = 3, cex = 2, line = 2)
 
 ```
 
 
 ## Relationship between modern value and change since 1850.
+
+Some outputs (e.g fLuc, fHarvest) have an almost perfect 1:1 relationship between modern value and change, some  (nbp, npp, treeFrac) quite or moderately strong, and some (csoil, cveg) very weak or non-existant.
 ```{r, fig.width = 12, fig.height = 8}
 
 par(mfrow = c(4,7), mar = c(3,1,3,1), oma = c(4,5,1,1))
@@ -363,9 +375,8 @@ for(i in 1:pdash){
   plot(y_level0, yanom_level0, xlab = '', ylab = '', main = colnames(Y_level0)[i])
 }
 
-mtext(text = 'Absolute', side = 1, line = 2, outer = TRUE, cex = 2)
+mtext(text = 'Modern value', side = 1, line = 2, outer = TRUE, cex = 2)
 mtext(text = 'Change', side = 2, line = 2, outer = TRUE, cex = 2)
-
 
 ```
 
@@ -402,14 +413,17 @@ y_level1 <- Y_level1[, 'npp_nlim_lnd_sum']
 ```
 
 
-```{r, fig.width = 7, fig.height = 7, results = 'hide'}
+```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
 em_level1 <- km(~., design = X_level1,  response = y_level1)
+```
 
+
+```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
 plot(X_level1[, 'f0_io'], Y_level1[, 'npp_nlim_lnd_sum'], xlab = 'f0_io (normalised)', ylab = 'NPP')
 ```
 
 
-Plot the regular km emulator.
+ # Plot the regular km emulator. Doesn't look great.
 
 ```{r, fig.width = 7, fig.height = 7}
 plot(em_level1)
@@ -494,9 +508,16 @@ twoStep_sens <- function(X, y, n=21, predtype = 'UK', nugget=NULL, nuggetEstim=F
 ```
 
 
-```{r}
+```{r, warning=FALSE, message = FALSE}
 
+if (file.exists("oat_twostep.rdata")) {
+  load("oat_twostep.rdata")
+} else {
 oat_test <- twoStep_sens(X = X_level1, y = y_level1)
+
+
+save(oat_test, file = "oat_twostep.rdata")
+}
 
 ```
 
@@ -509,6 +530,12 @@ y_names_sum <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_s
 
 
 
+
+if (file.exists("oaat_Y.rdata")) {
+  load("oaat_Y.rdata")
+} else {
+  
+  
 oat_var_sensmat_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1))
 
 for(i in 1:length(y_names_sum)){
@@ -520,6 +547,7 @@ for(i in 1:length(y_names_sum)){
 }
 
 save(y_names_sum, oat_var_sensmat_Y, file = "oaat_Y.rdata")
+}
 ```
 
 ## Initial sensitivity Matrix
@@ -577,6 +605,10 @@ for(i in 1:p){
 # This fails for "cVeg_lnd_sum"
 # The result will be that some of the columns are repeated.
 
+if (file.exists("oaat_YAnom.rdata")) {
+  load("oaat_YAnom.rdata")
+} else {
+
 oat_var_sensmat_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1))
 
 for(i in 1:length(y_names_sum)){
@@ -589,6 +621,7 @@ for(i in 1:length(y_names_sum)){
 
 save(y_names_sum, oat_var_sensmat_YAnom, file = "oaat_YAnom.rdata")
 
+}
 ```
 
 
@@ -624,10 +657,7 @@ mtext('One-at-a-time sensitivity, variance of historical change across level 1 e
 ## Plot both sensitivity matrices on top of one another.
 It looks as though both the absolute value and the change over time are controlled by the same parameters.
 ```{r, fig.width =12, fig.height = 12}
-
-
 par(mfrow = c(2,1), mar = c(12,12,5,2))
-
 
 image(normsens_Y, axes = FALSE, col = blues)
 axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
@@ -641,10 +671,7 @@ axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y
 mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
 
 
-
-
 ```
-
 
 
 ## How good are the emulators for each output?
@@ -732,6 +759,8 @@ if (file.exists("km_emulators_YAnom.rdata")) {
 ```
 
 
+# km emulators for change in variables over time
+
 ```{r, fig.width = 12, fig.height = 12}
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_YAnom)){
@@ -787,6 +816,8 @@ if (file.exists("ts_emulators_Y.rdata")) {
 
 ```
 
+## TwoStep emulator performance for modern values
+
 ```{r, fig.width = 12, fig.height = 12}
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_twoStep_glmnet_Y)){
@@ -806,59 +837,9 @@ mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2)
 mtext('Modern Value (Y)', side = 3, line = 0, outer = TRUE, cex = 2) 
 
 ```
-```{r, fig.width = 12, fig.height = 6, include = FALSE}
-# Twostep glmnet emulators
-
-#if (file.exists("ts_emulators_YAnom.rdata")) {
-#  load("ts_emulators_YAnom.rdata")
-#} else {
-  
-  emlist_twoStep_glmnet_YAnom <- vector(mode = 'list', length = length(y_names_sum))
-  
-  for(i in 1:length(y_names_sum)){
-    
-    yname <- y_names_sum[i]
-    y <- YAnom_level1[, yname]
-    
-    em <- twoStep_glmnet(X = X_level1, y = y)
-    emlist_twoStep_glmnet_YAnom[[i]] <- em
-  }
-  
-  loolist_twoStep_glmnet_YAnom <- vector(mode = 'list', length = length(y_names_sum))
-  
-  for(i in 1:length(y_names_sum)){
-    
-    loo <- leaveOneOut.km(model = emlist_twoStep_glmnet_YAnom[[i]]$emulator, type = 'UK', trend.reestim = TRUE)
-    loolist_twoStep_glmnet_YAnom[[i]] <- loo
-  }
-  
-  save(emlist_twoStep_glmnet_YAnom, loolist_twoStep_glmnet_YAnom, file = "ts_emulators_YAnom.rdata")
-
-#
-  }
 
 
-```
 
-```{r, fig.width = 12, fig.height = 12, include = FALSE}
-par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
-for(i in 1:length(loolist_twoStep_glmnet_YAnom)){
-  
-  y <- YAnom_level1[, y_names_sum[i]]
-  loo <- loolist_twoStep_glmnet_YAnom[[i]]
-  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
-  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y_level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
-       pch = 19)
-  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
-  abline(0,1)
-
-}
-
-mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
-mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
-mtext('Historical Change (YAnom)', side = 3, line = 0, outer = TRUE, cex = 2) 
-
-```
 
 ```{r}
 
@@ -928,7 +909,7 @@ direct_twoStep_glmnet_parallel <- function(X, Y, ...){
 ```
 
 
-## Setup history matching limits
+# History matching and generation of new ensemble members
 
 ```{r}
 # In order to use the history matching code, we'll need to specify targets -
@@ -944,7 +925,6 @@ direct_twoStep_glmnet_parallel <- function(X, Y, ...){
 #gpp.target = 75
 
 #Y.target = c(cs_gb.target, cv.target, npp_n_gb.target, runoff.target, nbp.target)
-
 
 ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
 yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
@@ -1133,7 +1113,7 @@ direct_twoStep_glmnet <- function(X, Y, ...){
 ```{r}
 # Test parallel processing against a foreach processing (and maybe mclapply?)
 
-system.time(testloop_par <- direct_twoStep_glmnet_parallel(X=X_level1, Y_level1))
+#system.time(testloop_par <- direct_twoStep_glmnet_parallel(X=X_level1, Y_level1))
 
 
 
@@ -1163,14 +1143,14 @@ emList <- function(X, Y){
 ```{r}
 
 
-test <- emlist(X_level1, Y_level1)
+#test <- emlist(X_level1, Y_level1)
 
 
 ```
 
 ```{r}
 
-mclapply(X = test, FUN = km)
+#mclapply(X = test, FUN = km)
 
 
 ```
