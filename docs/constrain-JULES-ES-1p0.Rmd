@@ -10,13 +10,16 @@ Update of explore-JULES-ES-1p0.Rmd that uses the new packages and functions
 
 Andy thinks there might be mileage in analysing the atmospheric growth, which is here.
 /home/h01/hadaw/Research/ES_PPE/Oct20
-
+  
 At the moment, this vignette is hampered by the fact that emulators are failing on a few of the outputs which represent change over the historical perid. The emulator is fine for predicting absolute values in the modern period.
+
+Andy would like to see timeseries of:
+cVeg, cSoil and nbp, npp in GtC and GtC/yr.
 
 ```{r, echo = TRUE, message = FALSE, warning=FALSE}
 # Load helper functions
 
-knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
+knitr::opts_chunk$set(fig.path = "figs/", echo = TRUE, message = FALSE, warnings = FALSE)
 # load some helper functions
 source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
 source('explore-JULES-ES-1p0_PPE_functions.R')
@@ -54,6 +57,7 @@ br = rev(rb)
 blues = brewer.pal(9, 'Blues')
 cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
+ysec = 60*60*24*365
 years <- 1850:2013
 ```
 
@@ -118,17 +122,40 @@ makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:20
 
 # Test with the global sum of NPP and plot the timeseries
 
-```{r, message = FALSE, warning = FALSE }
-npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum")
+```{r include=FALSE }
+
+#ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
+#yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
+#Y_const_level1 <- Y_level1[, ynames_const]
+
+
+npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
+cSoil_ens <-  makeTimeseriesEnsemble(variable = "cSoil_lnd_sum") / 1e12
+cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
 
 ```
 
 
-```{r, fig.width = 10, fig.height =8}
+```{r, fig.width = 8, fig.height = 8}
+
+par(mfrow= c(2,2))
+
+ylim = range(c(nbp_ens[,1], nbp_ens[,164]))
+matplot(years, t(nbp_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NBP sum', main = 'NBP')
+
 ylim = range(c(npp_ens[,1], npp_ens[,164]))
-matplot(years, t(npp_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NPP sum')
+matplot(years, t(npp_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NPP sum', main = 'NPP')
+
+ylim = range(c(cSoil_ens[,1], cSoil_ens[,164]))
+matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Soil carbon sum', main = 'Soil Carbon')
+
+ylim = range(c(cVeg_ens[,1], cVeg_ens[,164]))
+matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Veg carbon sum', main = 'Vegetation Carbon')
+
 
 ```
+
 
 ## Function to extract the "modern value" direct from the file (last 20 years of the timeseries)
 ```{r, results = 'hide'}
@@ -269,8 +296,7 @@ YAnom_nlevel0 <- datmatAnom[YAnom_nlevel0_ix, -c(2,30,31)]
 ```{r}
 # load the original design and input space, normalize to [0-1]
 
-years = 1864:2013
-ysec = 60*60*24*365
+
 
 # Load up the data
 lhs_i = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_i/lhs_u-ao732.txt', header = TRUE)
@@ -325,8 +351,7 @@ legend('left', col = 'red', pch = 20, legend = 'test')
 
 ## Build some Gaussian Process emulators
 
-Andy would like to see timeseries of:
-cVeg, cSoil and nbp, npp in GtC and GtC/yr.
+
 
 First, use mean NPP as an example. How does NPP respond to each parameter? NAs are removed, but zero values are still included.
 
