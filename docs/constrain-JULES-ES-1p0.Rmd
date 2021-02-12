@@ -625,6 +625,100 @@ for(i in 1:p){
 
 ```
 
+# Remove ensemble members with low b_wl and see if the sensitivity analyses change and the emulators get better.
+
+```{r}
+level1a_ix <- which(X_level0[, 'f0_io'] < 0.9 & X_level0[, 'b_wl_io'] > 0.15 )
+
+X_level1a <- X_level0[level1a_ix, ]
+Y_level1a <- Y_level0[level1a_ix,]
+
+YAnom_level1a <- YAnom_level0[level1a_ix, ]
+
+y_level1a <- Y_level1a[, 'npp_nlim_lnd_sum']
+
+```
+
+
+```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
+em_level1a <- km(~., design = X_level1a,  response = y_level1a)
+```
+
+
+ # Plot the regular km emulator.
+
+```{r, fig.width = 7, fig.height = 7}
+plot(em_level1a)
+
+
+```
+
+
+```{r}
+if (file.exists("oaat_level1a_Y.rdata")) {
+  load("oaat_level1a_Y.rdata")
+} else {
+  
+  
+oat_var_sensmat_level1a_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1a[, yname]
+  oat <- twoStep_sens(X = X_level1a, y = y)
+  oat_var_sensmat_level1a_Y[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_level1a_Y, file = "oaat_level1a_Y.rdata")
+}
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+
+p <- ncol(X_level1a)
+
+y_level1a <- Y_level1a[,'npp_nlim_lnd_sum']
+
+par(mfrow = c(5,7), mar = c(3,1,3,1))
+for(i in 1:p){
+  plot(X_level1a[,i], y_level1a, xlab = '', ylab = '', main = colnames(X_level1a)[i], xlim = c(0,1))
+}
+
+```
+
+## With b_wl truncated, we can clearly see the sensitivities change.
+
+```{r, fig.width= 10, fig.height = 6}
+# normalize the sensitivity matrix
+colnames(oat_var_sensmat_level1a_Y) <- colnames(X_level1a)
+rownames(oat_var_sensmat_level1a_Y) <- y_names_sum
+
+#test <- normalize(t(oat.var.sensmat))
+
+#image(test)
+#par()
+heatmap(oat_var_sensmat_level1a_Y, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
+heatmap(oat_var_sensmat_level1a_Y, mar = c(10,10), scale = 'row')
+
+```
+
+
+```{r, fig.width =12, fig.height = 7}
+
+normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
+
+par(mar = c(12,12,5,2))
+image(normsens_level1a_Y, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1a), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance across level 1a ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+```
+
+
 
 ```{r}
 # This fails for "cVeg_lnd_sum"
@@ -953,14 +1047,11 @@ direct_twoStep_glmnet_parallel <- function(X, Y, ...){
 
 ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
 yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
-Y_const_level1 <- Y_level1[, ynames_const]
+Y_const_level1a <- Y_level1a[, ynames_const]
 
 scalevec <- c(1e12/ysec, 1e12/ysec, 1e12, 1e12)
-Y_const_level1_scaled <- sweep(Y_const_level1,2, STATS = scalevec, FUN = '/' )
+Y_const_level1a_scaled <- sweep(Y_const_level1a, 2, STATS = scalevec, FUN = '/' )
 
-
-years = 1861:2014
-ysec = 60*60*24*365
 # This is a "normalisation vector", for making the output numbers more manageable.
 #cs_gb       cv    gpp_gb        nbp npp_n_gb    runoff
 norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
@@ -977,18 +1068,18 @@ Y_target = (Y_upper - abs(Y_lower)) / 2 # abs() to fix the problem with negative
 # standard deviation is derived from the limits and the central target
 # (this distance is assumed to be 3 standard deviations.
 Y_sd = (Y_upper - Y_target) / 3
-names(Y_sd) = colnames(Y_const_level1_scaled)
+names(Y_sd) = colnames(Y_const_level1a_scaled)
 
 
-p = ncol(Y_const_level1_scaled)
+p = ncol(Y_const_level1a_scaled)
 
 obs_sd_list = as.list(rep(0.01,p))
 disc_list =  as.list(rep(0,p)) 
 disc_sd_list =  as.list(Y_sd/2)
 thres = 3
 
-mins_aug = apply(X_level1, 2, FUN = min)
-maxes_aug =apply(X_level1, 2, FUN = max)
+mins_aug = apply(X_level1a, 2, FUN = min)
+maxes_aug =apply(X_level1a, 2, FUN = max)
 
 # convert Y_target for ingestion into function
 Y_target = matrix(Y_target, nrow = 1)
@@ -1005,8 +1096,8 @@ The function addNroyDesignPoints builds an emulator for each model output in Y. 
 # This function adds n.aug potential design points, and finds their implausibility
 # score in X.nroy
 
-wave1 = addNroyDesignPoints(X = X_level1, 
-                            Y = Y_const_level1_scaled, 
+wave1 = addNroyDesignPoints(X = X_level1a, 
+                            Y = Y_const_level1a_scaled, 
                             Y_target = Y_target,
                             n_aug = 10000, 
                             mins_aug = mins_aug,
