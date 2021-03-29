@@ -1,12 +1,20 @@
 ---
-title: "constrain-JULES-ES-1p0.Rmd"
+title: "Sensitivity analysis and constraint of the parameter space of Earth System configuration of JULES"
 author: "Doug McNeall"
-date: "1/19/2021"
-output: html_document
+date: "24/03/2021"
+output: 
+    html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 3
+        number_sections: true
 ---
 
-# Sensitivity analysis and constraint of the parameter space of Earth System configuration of JULES.
+# Introduction
 Update of explore-JULES-ES-1p0.Rmd that uses the new packages and functions
+
+We build and test gaussian process emulators, perform a sensitivity analyis, and constrain the input space of Jules.
+
 
 Andy thinks there might be mileage in analysing the atmospheric growth, which is here.
 /home/h01/hadaw/Research/ES_PPE/Oct20
@@ -15,6 +23,9 @@ At the moment, this vignette is hampered by the fact that emulators are failing 
 
 Andy would like to see timeseries of:
 cVeg, cSoil and nbp, npp in GtC and GtC/yr.
+
+## Preliminaries
+Load libraries, functions and data.
 
 ```{r, echo = TRUE, message = FALSE, warning=FALSE}
 # Load helper functions
@@ -32,6 +43,7 @@ library(RColorBrewer)
 library(fields)
 library(MASS)
 library(DiceKriging)
+library(DiceEval)
 library(ncdf4)
 library(ncdf4.helpers)
 
@@ -47,7 +59,6 @@ library(julesR)
 
 
 ```{r}
-# Preliminaries
 # Some pallete options
 yg = brewer.pal(9, "YlGn")
 ryb = brewer.pal(11, "RdYlBu")
@@ -62,7 +73,7 @@ years <- 1850:2013
 ```
 
 
-## Jules output data location
+### Jules output data location
 ```{r}
 
 ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
@@ -120,14 +131,14 @@ makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:20
 
 ```
 
-# Test with the global sum of NPP and plot the timeseries
+
+## Plot timeseries of aggregated global timeseries 
 
 ```{r include=FALSE }
 
 #ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
 #yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
 #Y_const_level1 <- Y_level1[, ynames_const]
-
 
 npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
 nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
@@ -137,7 +148,7 @@ cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
 ```
 
 
-```{r, fig.width = 8, fig.height = 8}
+```{r plot-carbon-cycle-timeseries, fig.width = 8, fig.height = 8}
 
 par(mfrow= c(2,2))
 
@@ -153,12 +164,38 @@ matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal,
 ylim = range(c(cVeg_ens[,1], cVeg_ens[,164]))
 matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Veg carbon sum', main = 'Vegetation Carbon')
 
+```
+```{r}
+
+npp_ens_anom <- anomalizeTSmatrix(npp_ens, 1:20)
+nbp_ens_anom <- anomalizeTSmatrix(nbp_ens, 1:20)
+cSoil_ens_anom <- anomalizeTSmatrix(cSoil_ens, 1:20)
+cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
+
+```
+
+```{r plot-carbon-cycle-anomaly-timeseries, fig.width = 8, fig.height = 8}
+
+par(mfrow= c(2,2))
+
+ylim = range(c(nbp_ens_anom[,1], nbp_ens_anom[,164]))
+matplot(years, t(nbp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NBP sum Anomaly', main = 'NBP Anomaly')
+
+ylim = range(c(npp_ens_anom[,1], npp_ens_anom[,164]))
+matplot(years, t(npp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NPP sum Anomaly', main = 'NPP Anomaly')
+
+ylim = range(c(cSoil_ens_anom[,1], cSoil_ens_anom[,164]))
+matplot(years, t(cSoil_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Soil carbon sum anomaly', main = 'Soil Carbon Anomaly')
+
+ylim = range(c(cVeg_ens_anom[,1], cVeg_ens_anom[,164]))
+matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Veg carbon sum anomaly', main = 'Vegetation Carbon Anomaly')
+
 
 ```
 
 
 ## Function to extract the "modern value" direct from the file (last 20 years of the timeseries)
-```{r, results = 'hide'}
+```{r extract-modern-value-function, results = 'hide'}
 # for each of the variables in the file, average the last 20 years as the "modern" value,
 # and then place in a matrix
 
@@ -179,7 +216,7 @@ vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164)
 
 ## Loop to extract the "modern value" of a number of model outputs
 
-```{r, warning = FALSE, message = FALSE, results = FALSE}
+```{r load-ensemble, warning = FALSE, message = FALSE, results = FALSE}
 # Generate ensemble numbers, mean of the last 20 years of the timeseries (1994-2013)
 
 if (file.exists("ensemble.rdata")) {
@@ -230,7 +267,7 @@ tsAnomaly <- function(nc, variable, startix = 1:20, endix = 144:164){
 tsAnomaly(nc = nc, variable = "npp_nlim_lnd_mean")
 ```
 
-```{r, warning = FALSE, message = FALSE, results = FALSE}
+```{r load-anomaly-ensemble, warning = FALSE, message = FALSE, results = FALSE}
 # Generate ensemble  mean of the last 20 years of the timeseries (1994-2013)
 
 if (file.exists("anomaly_ensemble.rdata")) {
@@ -263,13 +300,10 @@ if (file.exists("anomaly_ensemble.rdata")) {
 }
 ```
 
-## Probability of run failure
-Could be an interesting project - logit transformation for probability of run failure? Some other ML like SVM?
 
-
-## Clean data sets
-```{r}
-# Initial clean of data set, removing variables that don't change, and removing NAs (models that didn't run)
+## Clean data sets to "level 0"
+Initial clean of data set, removing variables that don't change, and removing NAs (models that didn't run).
+```{r level-0-output}
 
 Y_nlevel0_ix <- which(is.na(datmat[,'year']))
 
@@ -293,10 +327,8 @@ YAnom_nlevel0 <- datmatAnom[YAnom_nlevel0_ix, -c(2,30,31)]
 
 ```
 
-```{r}
+```{r level-0-input}
 # load the original design and input space, normalize to [0-1]
-
-
 
 # Load up the data
 lhs_i = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_i/lhs_u-ao732.txt', header = TRUE)
@@ -321,10 +353,11 @@ rx = rbind(rep(0,32), rep(1,32))
 
 
 ## Where did the model fail to run?
+("probability of run failure" Could be an interesting project - logit transformation for probability of run failure? Some other ML like SVM?
 
 There are clear run failure thresholds in the parameters rootd_ft_io and lai_max, and quite strong visual indications that a_wl_io and bio_hum_cn matter.
 
-```{r, fig.width = 12, fig.height = 12}
+```{r run-failure-pairs, fig.width = 12, fig.height = 12}
 
 #simple way
 par(oma = c(10,10,0,0))
@@ -349,13 +382,13 @@ legend('left', col = 'red', pch = 20, legend = 'test')
 
 
 
-## Build some Gaussian Process emulators
+## Testing Gaussian Process emulators
 
 
-
+### NPP as a test
 First, use mean NPP as an example. How does NPP respond to each parameter? NAs are removed, but zero values are still included.
 
-```{r, fig.width = 12, fig.height = 12}
+```{r plot-npp-modern, fig.width = 12, fig.height = 12}
 p <- ncol(X_level0)
 
 y_level0 <- Y_level0[,'npp_nlim_lnd_sum']
@@ -369,8 +402,7 @@ mtext('NPP', outer = TRUE, side = 3, cex = 2, line = 2)
 ```
 
 
-```{r, fig.width = 12, fig.height = 12}
-
+```{r plot-npp-change, fig.width = 12, fig.height = 12}
 
 yanom_level0 <- YAnom_level0[,'npp_nlim_lnd_sum']
 
@@ -383,10 +415,10 @@ mtext('NPP change over time', outer = TRUE, side = 3, cex = 2, line = 2)
 ```
 
 
-## Relationship between modern value and change since 1850.
+## Relationship between modern NPP and change since 1850.
 
 Some outputs (e.g fLuc, fHarvest) have an almost perfect 1:1 relationship between modern value and change, some  (nbp, npp, treeFrac) quite or moderately strong, and some (csoil, cveg) very weak or non-existant.
-```{r, fig.width = 12, fig.height = 8}
+```{r npp-modern-vs-change, fig.width = 12, fig.height = 8}
 
 par(mfrow = c(4,7), mar = c(3,1,3,1), oma = c(4,5,1,1))
 
@@ -407,7 +439,7 @@ mtext(text = 'Change', side = 2, line = 2, outer = TRUE, cex = 2)
 
 
 
-## A clear threshold in the F0 parameter.
+## A clear threshold in the F0 parameter for NPP
 It appears that this ensemble is less "clear cut" in having an output that clearly distinguishes between "failed" (or close to it), and "not failed".
 
 Having said that, having an F0 over a threshold seems to kill the carbon cycle, as before. Here, we've set a threshold of 0.9 (on the normalised scale) for F0, and we remove members of the ensemble with a larger F0 than that when we build emulators.
@@ -422,7 +454,7 @@ abline(v = 0.9)
 ```
 
 
-# Remove anything with f0 over a threshold (level 1 constraint) .
+## Level 1 constraint - remove ensemble members with F0 above threshold
 The level 1 constraint removes any input with F0 greater than 0.9 (normalised), which removes many of the zero-carbon-cycle members up front. There are 424 ensmble members remaining.
 
 This does constraint sequentially, which may not be a good idea. 
@@ -430,29 +462,116 @@ This does constraint sequentially, which may not be a good idea.
 level1_ix <- which(X_level0[, 'f0_io'] < 0.9)
 
 X_level1 <- X_level0[level1_ix, ]
-Y_level1 <- Y_level0[level1_ix,]
+Y_level1 <- Y_level0[level1_ix, ]
 
 YAnom_level1 <- YAnom_level0[level1_ix, ]
 
 y_level1 <- Y_level1[, 'npp_nlim_lnd_sum']
 ```
 
+### Comparison of level 0 and level 1 emulators for NPP (modern value)
 
 ```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
-em_level1 <- km(~., design = X_level1,  response = y_level1)
-```
-
-
-```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
-plot(X_level1[, 'f0_io'], Y_level1[, 'npp_nlim_lnd_sum'], xlab = 'f0_io (normalised)', ylab = 'NPP')
+em_npp_level0 <- km(~., design = X_level0,  response = y_level0)
+em_npp_level1 <- km(~., design = X_level1,  response = y_level1)
 ```
 
 
  # Plot the regular km emulator. Doesn't look great.
 
-```{r, fig.width = 7, fig.height = 7}
-plot(em_level1)
+```{r plot-em-npp-level0, fig.width = 7, fig.height = 7}
+plot(em_npp_level0)
 ```
+
+```{r plot-em-npp-level1, fig.width = 7, fig.height = 7}
+plot(em_npp_level1)
+```
+
+
+### Leave-one-out summaries of NPP emulators
+```{r}
+
+loo_npp_level0 <- leaveOneOut.km(em_npp_level0, type = 'UK', trend.reestim = TRUE)
+loo_npp_level1 <- leaveOneOut.km(em_npp_level1, type = 'UK', trend.reestim = TRUE)
+
+RMSE ( loo_npp_level0$mean, y_level0)
+RMSE ( loo_npp_level1$mean, y_level1)
+
+
+# How about MAE over the range
+prop_mae <- function(Y, Ypred){
+  # mean absolute error as a proportion of the range of output
+  
+  absdiff <- abs(diff(range(Y)))
+  
+  mae <- MAE(Y, Ypred)
+  
+  propmae <- (mae / absdiff) * 100
+  
+  propmae
+  
+}
+
+prop_mae(y_level0, loo_npp_level0$mean)
+
+prop_mae(y_level1, loo_npp_level1$mean)
+
+
+
+
+
+
+```
+
+```{r}
+
+# Given a km model, produce some error statistics
+
+kmLooStats <- function(km, type = 'UK'){
+  
+  loo <- leaveOneOut.km(km, type = type, trend.reestim = TRUE)
+  mae <- MAE(Y = km@y, Ypred = loo$mean)
+  rmse <- RMSE(Y = km@y, Ypred = loo$mean)
+  
+  maxerr <- max(loo$mean)
+  
+  absdiff <- abs(diff(range(km@y)))
+  pmae <- (mae / absdiff) * 100
+  
+  return(list(loo = loo, mae = mae, pmae = pmae, maxerr = maxerr))
+  
+}
+
+```
+
+```{r}
+
+errstats_npp_level0 <- kmLooStats(km = em_npp_level0)
+errstats_npp_level1 <- kmLooStats(km = em_npp_level1)
+
+# proportional mean absolute error
+errstats_npp_level0$pmae
+errstats_npp_level1$pmae
+
+
+```
+
+
+
+
+
+```{r}
+# DiceEval is useful but slow/awkward
+
+# DE_em_npp_level0 <- modelFit(X = X_level0, Y = y_level0, type = 'Kriging', formula = ~. )
+# DE_em_npp_level1 <- modelFit(X = X_level1, Y = y_level1, type = 'Kriging', formula = ~. )
+
+# npp_em_cv_level0 <- crossValidation(DE_em_npp_level0, 5)
+# npp_em_cv_level1  <- crossValidation(DE_em_npp_level1, 5)
+
+```
+
+
 
 ## Constrain first and then do sensitivity analysis?
 The problem with doing constraint first is that you end up with a non-hypercube shaped input space (corners have been knocked off by constraint), which is not ideal. We might therefore want different sensitivity measures for pre- and post-constrained ensemble.
@@ -827,6 +946,20 @@ if (file.exists("km_emulators_Y.rdata")) {
 
 ```
 
+```{r}
+
+
+loostats_km_Y <- vector(mode = 'list', length = length(y_names_sum))
+
+for(i in 1:length(emlist_km_Y)){
+  
+  loostats <- kmLooStats(emlist_km_Y[[i]])
+  loostats_km_Y[[i]] <- loostats
+  print(loostats$pmae)
+}
+
+```
+
 
 ```{r, fig.width = 12, fig.height = 12}
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -835,10 +968,11 @@ for(i in 1:length(loolist_km_Y)){
   y <- Y_level1[, y_names_sum[i]]
   loo <- loolist_km_Y[[i]]
   ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
-  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y_level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+  plot(y, loo$mean, xlab = '', ylab = '', main = y_names_sum[i] , ylim = ylim, col = makeTransparent('black', 70),
        pch = 19)
   segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
   abline(0,1)
+  legend('bottomright',legend = paste('mae =',round(loostats_km_Y[[i]]$pmae,2),'%') , bty = 'n')
 
 }
 
@@ -887,10 +1021,11 @@ for(i in 1:length(loolist_km_YAnom)){
   y <- YAnom_level1[, y_names_sum[i]]
   loo <- loolist_km_YAnom[[i]]
   ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
-  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(YAnom_level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+  plot(y, loo$mean, xlab = '', ylab = '', main = y_names_sum[i] , ylim = ylim, col = makeTransparent('black', 70),
        pch = 19)
   segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
   abline(0,1)
+  
 
 }
 
@@ -928,12 +1063,31 @@ if (file.exists("ts_emulators_Y.rdata")) {
     loolist_twoStep_glmnet_Y[[i]] <- loo
   }
   
+  
+  
   save(emlist_twoStep_glmnet_Y, loolist_twoStep_glmnet_Y, file = "ts_emulators_Y.rdata")
 
 }
 
 
 ```
+
+```{r}
+# Can get numerical performance using
+
+loostats_twoStep_glmnet_Y <- vector(mode = 'list', length = length(y_names_sum))
+
+for(i in 1:length(emlist_twoStep_glmnet_Y)){
+  
+  loostats <- kmLooStats(emlist_twoStep_glmnet_Y[[i]]$emulator)
+  loostats_twoStep_glmnet_Y[[i]] <- loostats
+  print(loostats$pmae)
+}
+
+
+```
+
+
 
 ## TwoStep emulator performance for modern values
 
@@ -944,10 +1098,11 @@ for(i in 1:length(loolist_twoStep_glmnet_Y)){
   y <- Y_level1[, y_names_sum[i]]
   loo <- loolist_twoStep_glmnet_Y[[i]]
   ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
-  plot(y, loo$mean, xlab = '', ylab = '', main = colnames(Y_level1)[i] , ylim = ylim, col = makeTransparent('black', 70),
+  plot(y, loo$mean, xlab = '', ylab = '', main = y_names_sum[i] , ylim = ylim, col = makeTransparent('black', 70),
        pch = 19)
   segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
   abline(0,1)
+  legend('bottomright',legend = paste('mae =',round(loostats_twoStep_glmnet_Y[[i]]$pmae,2),'%') , bty = 'n')
 
 }
 
@@ -957,6 +1112,29 @@ mtext('Modern Value (Y)', side = 3, line = 0, outer = TRUE, cex = 2)
 
 ```
 
+# Compare Leave-one-out statistics for the two types of emulator
+
+We use the leave-one-out Mean Absolute Error, expressed as a percentage of the range of the output across the ensemble. We find that the twostep emulatorisn't significantly more accurate, and is indeed *less* accurate for tree fraction.
+
+```{r, fig.width = 8, fig.height = 7}
+
+
+km_pmae <- sapply(loostats_km_Y, '[[', 'pmae')
+ts_pmae <- sapply(loostats_twoStep_glmnet_Y, '[[', 'pmae')
+
+par(mar = c(12,4,2,1), las =1 )
+plot(1:length(y_names_sum), km_pmae,
+     ylim = c(0,15), pch = 19,
+     axes = FALSE, xlab = '', 
+     ylab = 'LOO MAE (% of range)',
+     cex = 1.2)
+points(1:length(y_names_sum),ts_pmae , col= 'red', pch = 19, cex = 1.2)
+legend('topleft', c('km emulator', 'twoStep emulator'), pch = 19, col = c('black', 'red'), pt.cex = 1.2)
+axis (2)
+par(las = 2)
+axis(1, at = 1:length(y_names_sum), labels = y_names_sum)
+
+```
 
 
 
