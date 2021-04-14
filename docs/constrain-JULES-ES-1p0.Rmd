@@ -1207,19 +1207,20 @@ direct_twoStep_glmnet_parallel <- function(X, Y, ...){
 
 
 # History matching and generation of new ensemble members
+To use History Matching, we need to specify targets for various model outputs. We treat these targets as "observations" with an uncertainty where a model run marked as "implausible" (beyond 3sd) matches the hard boundaries previously identified by A. Wiltshire as being desirable.
+
+Choose the centre of the (implied) uniform distribution.
+ cs_gb.target = (3000 - 750) / 2 =  1125
+ cv.target = (800 - 300) / 2 = 250
+ npp_n_gb.target = (80 - 35) / 2 = 22.5
+
+ nbp.target = 0
+ (gpp.target = 75)
+ (runoff.target = 1)
+ 
+(to do: visualise implausibility of design and loo emulated values of design as histogram) 
 
 ```{r}
-# In order to use the history matching code, we'll need to specify targets -
-# specifically "observations" with uncertainty that approximately match our
-# "hard boundaries" from the existing constraints.
-
-# Initial guess just choose the centre of the (implied) uniform distribution.
-#cs_gb.target = (3000 - 750) / 2
-#cv.target = (800 - 300) / 2
-#npp_n_gb.target = (80 - 35) / 2
-#runoff.target = 1
-#nbp.target = 0
-#gpp.target = 75
 
 #Y.target = c(cs_gb.target, cv.target, npp_n_gb.target, runoff.target, nbp.target)
 
@@ -1238,14 +1239,14 @@ norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
 Y_lower <- c(-10, 35, 750, 300)
 Y_upper <- c(10, 80, 3000, 800)
 
-# I'm going to set it so that +3sd aligns approximately with the original limits
-# given by Andy Wiltshire.
-Y_target = (Y_upper - abs(Y_lower)) / 2 # abs() to fix the problem with negative numbers
+# I'm going to set it so that + 4sd aligns approximately with the original limits
+# given by Andy Wiltshire. This gives room for uncertainty from the emulator
+Y_target = Y_upper - (abs(Y_upper - (Y_lower)) / 2 )# abs() to fix the problem with negative numbers
 
 
 # standard deviation is derived from the limits and the central target
-# (this distance is assumed to be 3 standard deviations.
-Y_sd = (Y_upper - Y_target) / 3
+# (this distance is assumed to be 4 standard deviations.
+Y_sd = (Y_upper - Y_target) / 4
 names(Y_sd) = colnames(Y_const_level1a_scaled)
 
 
@@ -1253,7 +1254,7 @@ p = ncol(Y_const_level1a_scaled)
 
 obs_sd_list = as.list(rep(0.01,p))
 disc_list =  as.list(rep(0,p)) 
-disc_sd_list =  as.list(Y_sd/2)
+disc_sd_list =  as.list(Y_sd)
 thres = 3
 
 mins_aug = apply(X_level1a, 2, FUN = min)
@@ -1261,6 +1262,40 @@ maxes_aug =apply(X_level1a, 2, FUN = max)
 
 # convert Y_target for ingestion into function
 Y_target = matrix(Y_target, nrow = 1)
+
+```
+
+
+## visualise the constraints
+```{r}
+
+# Histogram of level 1 constraints
+hcol = 'darkgrey'
+lcol = 'black'
+par(mfrow = c(2,2), fg = 'darkgrey', las = 1)
+
+
+
+hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], col = hcol, main = 'NBP', xlab = 'GtC/year')
+polygon(x = c(-10, 100, 100, -10), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+
+hist(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'], col = hcol , main = 'NPP', xlab = 'GtC/year')
+polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+
+
+        hist(Y_const_level1a_scaled[,'cSoil_lnd_sum'], col = hcol, main = 'Soil Carbon', xlab = 'GtC')
+polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+
+hist(Y_const_level1a_scaled[,'cVeg_lnd_sum'], col = hcol, main = 'Vegetation Carbon', xlab = 'GtC')
+polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+       border =  makeTransparent('tomato2'))
 
 ```
 
@@ -1277,16 +1312,18 @@ The function addNroyDesignPoints builds an emulator for each model output in Y. 
 wave1 = addNroyDesignPoints(X = X_level1a, 
                             Y = Y_const_level1a_scaled, 
                             Y_target = Y_target,
-                            n_aug = 10000, 
+                            n_aug = 50000, 
                             mins_aug = mins_aug,
                             maxes_aug = maxes_aug,
                             thres = 3,
                             disc_list=disc_list,
                             disc_sd_list = disc_sd_list,
                             obs_sd_list = obs_sd_list,
-                            n_app = 50,
-                            nreps = 100)
+                            n_app = 500,
+                            nreps = 500)
 ```
+
+
 
 
 ## Write the augmented design
@@ -1361,7 +1398,197 @@ legend('bottom',
 ```
 
 
+Visualise the predicted outputs at the NROY points of the old design, and the new suggested design.
+```{r}
+Y_mm_list <- vector(mode ='list', length = length(wave1$fit_list))
 
+for(i in 1:length(wave1$fit_list)){
+
+y_mm <- predict(object=wave1$fit_list[[i]], newdata = wave1$X_mm, type = 'UK')
+
+Y_mm_list[[i]] <- y_mm
+
+}
+```
+
+## Visualising the emulated outputs at the proposed new design points.
+
+Interestingly, these aren't perfectly within the original hard boundaries set by Andy, even though I've set those boundaries to be the +- 4 standard deviation threholds in the History Match. I suggest this is because there is model discrepancy, and that there is considerable wriggle room induced from emulator uncertainty.
+
+In particular, it appears that vegetation carbon is difficult to keep high, and that many NROY proposed members have a fairly low vegetation carbon. This might need a discrepancy term, or adjusting in some other way. It certainly needs exploring, and a OAAT plot might give clues as to the parameters to choose.
+
+```{r, fig.width = 10, fig.height = 10}
+# Histogram of level 1 constraints
+hcol = 'darkgrey'
+lcol = 'black'
+par(mfrow = c(2,2), fg = 'darkgrey', las = 1)
+
+discsd <- c(disc_sd_list, recursive = TRUE)
+
+hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], col = hcol, main = 'NBP', xlab = 'GtC/year')
+hist(Y_mm_list[[1]]$mean, add = TRUE, col = 'black')
+polygon(x = c(-10, 100, 100, -10), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[1], col = 'black')
+rug(c(Y_target[1] + 3*discsd[1],Y_target[1] - 3*discsd[1]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'], col = hcol , main = 'NPP', xlab = 'GtC/year')
+hist(Y_mm_list[[2]]$mean, add = TRUE, col = 'black')
+polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[2], col = 'black')
+rug(c(Y_target[2] + 3*discsd[2],Y_target[2] - 3*discsd[2]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'cSoil_lnd_sum'], col = hcol, main = 'Soil Carbon', xlab = 'GtC')
+hist(Y_mm_list[[3]]$mean, add = TRUE, col = 'black')
+polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[3], col = 'black')
+rug(c(Y_target[3] + 3*discsd[3],Y_target[3] - 3*discsd[3]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'cVeg_lnd_sum'], col = hcol, main = 'Vegetation Carbon', xlab = 'GtC')
+hist(Y_mm_list[[4]]$mean, add = TRUE, col = 'black')
+polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+       border =  makeTransparent('tomato2'))
+rug(Y_target[4], col = 'black')
+rug(c(Y_target[4] + 3*discsd[4],Y_target[4] - 3*discsd[4]) , col = 'red')
+  
+```
+
+
+
+How good are the four emulators that we've built? Are there biases? (there's no real evidence of this)
+```{r, fig.width = 8, fig.height = 8}
+
+par(mfrow = c(2,2))
+
+for(i in 1:4){
+  
+hist(wave1$pred_list[[i]]$mean, main = colnames(Y_const_level1a_scaled)[i])
+  
+}
+
+
+```
+
+## One-at-a-time sensitivity analysis for understanding model response
+It's obviously hard to maintain a high vegetation carbon in particular. What parameter values might you choose to do this, and what might be the trade-offs you have to make?
+
+
+```{r}
+
+X_oaat_level1a <- oaat_design(X_level1a, n=21, med = TRUE)
+colnames(X_oaat_level1a) = colnames(X)
+
+y_oaat <- predict.km(wave1$fit_list[[4]], newdata = X_oaat_level1a, type = 'UK')
+
+```
+
+
+```{r}
+
+oaatLinePlot <- function(X_oaat, y_oaat_mean, y_oaat_sd,
+                         n_oaat, nr, nc, linecol = 'black', shadecol = 'grey', ...){
+  
+
+col.transp <- adjustcolor(shadecol, alpha = 0.5)
+par(mfrow = c(6,6), oma = c(0.1,0.1,3,0.1), mar = c(2,2,3,1))
+
+  for(i in 1:ncol(X_oaat)){
+    
+  ix <- seq(from = ((i*n_oaat) - (n_oaat-1)), to =  (i*n_oaat), by = 1)
+  
+  plot(X_oaat[ix,i], y_oaat_mean[ix], 
+       xlim = c(0,1), ylim = range(c(y_oaat_mean+(2*y_oaat_sd), y_oaat_mean-(2*y_oaat_sd))) ,
+       xlab = colnames(X_oaat)[i],
+       type= 'n',
+       bty = 'n', ...)
+  
+     polygon(x = c(X_oaat[ix, i], rev(X_oaat[ix, i])),
+            y = c(y_oaat_mean[ix] - (2*y_oaat$sd[ix]), rev(y_oaat_mean[ix] + (2*y_oaat_sd[ix]))),
+            col = col.transp, border = col.transp)
+     
+  lines(X_oaat[ix,i], y_oaat_mean[ix], xlim = c(0,1), lty = 'solid', col = linecol)
+  mtext(colnames(X_oaat)[i], side = 3, line = 0.5)
+  
+  }
+
+mtext('One-at-a-time sensitivity', side = 3, outer = TRUE, cex = 1.5)
+  
+}
+
+
+
+```
+
+First, what parameters affect vegetation carbon and how? How sure are we about that?
+
+```{r, fig.width = 8, fig.height = 10}
+
+
+oaatLinePlot(X_oaat = X_oaat_level1a, y_oaat_mean = y_oaat$mean, y_oaat_sd = y_oaat$sd, 
+             n_oaat = 21,nr = 6, nc = 6) 
+
+
+```
+
+
+
+```{r}
+
+Y_oaat_const_level1a_scaled <- matrix(ncol = ncol(Y_const_level1a_scaled), nrow = nrow(X_oaat_level1a))
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+
+  y_oaat <- predict.km(wave1$fit_list[[i]], newdata = X_oaat_level1a, type = 'UK')
+  Y_oaat_const_level1a_scaled[,i] <- y_oaat$mean
+}
+
+```
+
+
+```{r}
+oaatLinePlotMulti <- function(X_oaat, Y_oaat, n_oaat, nr, nc, ...){
+  
+  par(mfrow = c(nr,nc), oma = c(0.1,0.1,3,0.1), mar = c(2,2,3,1))
+  
+  for(i in 1:ncol(X_oaat)){
+    ix <- seq(from = ((i*n_oaat) - (n_oaat-1)), to =  (i*n_oaat), by = 1)
+    
+    plot(X_oaat[ix,i], Y_oaat[ix,1], 
+         xlim = c(0,1), ylim = c(0,1),
+         xlab = colnames(X_oaat)[i],
+         type= 'n',
+         bty = 'n')
+    
+    for(j in 1:ncol(Y_oaat)){
+      lines(X_oaat_level1a[ix,i], Y_oaat[ix, j], lty = 'solid', col = j, ...)
+       mtext(colnames(X_oaat_level1a)[i], side = 3, line = 0.5)
+      
+    }
+    
+  }
+  
+}
+
+```
+What might be the trade-offs for a high (or accurate) vegetation carbon? are they acceptable? Plot the oaat sensitivity of the other 3 outputs we're calibrating on. 
+
+```{r, fig.width=10, fig.height = 10}
+Y_oaat_const_level1a_scaled_norm <- normalize(Y_oaat_const_level1a_scaled)
+
+oaatLinePlotMulti(X_oaat = X_oaat_level1a, Y_oaat = Y_oaat_const_level1a_scaled_norm ,  n_oaat = 21, nr = 6, nc = 6,
+                  lwd = 2)
+
+reset()
+legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = c(1,2,3,4), lty = 'solid', lwd = 2, horiz = TRUE)
+
+
+```
 
 
 ```{r}
@@ -1395,6 +1622,11 @@ direct_twoStep_glmnet <- function(X, Y, ...){
 
 
 ```
+
+
+
+
+
 
 ```{r}
 
