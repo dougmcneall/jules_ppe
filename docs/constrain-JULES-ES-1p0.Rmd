@@ -1489,41 +1489,7 @@ y_oaat <- predict.km(wave1$fit_list[[4]], newdata = X_oaat_level1a, type = 'UK')
 ```
 
 
-```{r}
 
-oaatLinePlot <- function(X_oaat, y_oaat_mean, y_oaat_sd,
-                         n_oaat, nr, nc, linecol = 'black', shadecol = 'grey', ...){
-  
-
-col.transp <- adjustcolor(shadecol, alpha = 0.5)
-par(mfrow = c(6,6), oma = c(0.1,0.1,3,0.1), mar = c(2,2,3,1))
-
-  for(i in 1:ncol(X_oaat)){
-    
-  ix <- seq(from = ((i*n_oaat) - (n_oaat-1)), to =  (i*n_oaat), by = 1)
-  
-  plot(X_oaat[ix,i], y_oaat_mean[ix], 
-       xlim = c(0,1), ylim = range(c(y_oaat_mean+(2*y_oaat_sd), y_oaat_mean-(2*y_oaat_sd))) ,
-       xlab = colnames(X_oaat)[i],
-       type= 'n',
-       bty = 'n', ...)
-  
-     polygon(x = c(X_oaat[ix, i], rev(X_oaat[ix, i])),
-            y = c(y_oaat_mean[ix] - (2*y_oaat$sd[ix]), rev(y_oaat_mean[ix] + (2*y_oaat_sd[ix]))),
-            col = col.transp, border = col.transp)
-     
-  lines(X_oaat[ix,i], y_oaat_mean[ix], xlim = c(0,1), lty = 'solid', col = linecol)
-  mtext(colnames(X_oaat)[i], side = 3, line = 0.5)
-  
-  }
-
-mtext('One-at-a-time sensitivity', side = 3, outer = TRUE, cex = 1.5)
-  
-}
-
-
-
-```
 
 First, what parameters affect vegetation carbon and how? How sure are we about that?
 
@@ -1551,31 +1517,9 @@ for(i in 1:ncol(Y_const_level1a_scaled)){
 ```
 
 
-```{r}
-oaatLinePlotMulti <- function(X_oaat, Y_oaat, n_oaat, nr, nc, ...){
-  
-  par(mfrow = c(nr,nc), oma = c(0.1,0.1,3,0.1), mar = c(2,2,3,1))
-  
-  for(i in 1:ncol(X_oaat)){
-    ix <- seq(from = ((i*n_oaat) - (n_oaat-1)), to =  (i*n_oaat), by = 1)
-    
-    plot(X_oaat[ix,i], Y_oaat[ix,1], 
-         xlim = c(0,1), ylim = c(0,1),
-         xlab = colnames(X_oaat)[i],
-         type= 'n',
-         bty = 'n')
-    
-    for(j in 1:ncol(Y_oaat)){
-      lines(X_oaat_level1a[ix,i], Y_oaat[ix, j], lty = 'solid', col = j, ...)
-       mtext(colnames(X_oaat_level1a)[i], side = 3, line = 0.5)
-      
-    }
-    
-  }
-  
-}
 
-```
+
+
 What might be the trade-offs for a high (or accurate) vegetation carbon? are they acceptable? Plot the oaat sensitivity of the other 3 outputs we're calibrating on. 
 
 ```{r, fig.width=10, fig.height = 10}
@@ -1589,6 +1533,75 @@ legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = c(1,2,3,4), lty = 'solid',
 
 
 ```
+
+
+What do the emulators make of the design points which actually make Andy's "hard boundary" criteria?
+If we leave them out, do they still place the output within the hard boundaries?
+
+```{r}
+
+aw_boundary_ix = which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10 &
+                    Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
+  )
+
+
+
+X_aw_boundary = X_level1a[aw_boundary_ix, ]
+Y_aw_boundary = Y_const_level1a_scaled[aw_boundary_ix, ]
+
+```
+
+
+Do a leave-one-out cross validation of points inside the hard boundaries using the wave1 fits.
+```{r}
+# quickest to find the loo predictions at the right indices
+
+
+```
+
+```{r}
+
+loo_mean_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+loo_sd_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+  
+  for(i in 1:ncol(Y_const_level1a_scaled)){
+
+loo <- leaveOneOut.km(wave1$fit_list[[i]],type = 'UK', trend.reestim = TRUE )
+  loo_mean_Y_level1a[,i] <- loo$mean
+  loo_sd_Y_level1a[,i] <- loo$sd
+}
+
+```
+
+We see in the leave-one-out analysis that the emulator is consistently under-predicting the vegetation carbon (though the uncertainty estimate often covers the actual value).This suggests (1) that there isn't really a huge problem with a model discrepancy (or at least that isn't the only problem), and (2) the history matching is working as it should, and taking into account a not-great emulator.
+
+```{r, fig.width = 8, fig.height = 8}
+
+par(mfrow = c(2,2))
+
+for(i in 1:ncol(loo_mean_Y_level1a)){
+  
+  rn <- range(c(loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) ))
+  
+  
+  
+  plot(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_Y_level1a[aw_boundary_ix,i], ylim = rn, main = colnames(Y_const_level1a_scaled)[i], xlab = 'actual', ylab = 'predicted')
+  
+  segments(x0 = Y_const_level1a_scaled[aw_boundary_ix, i], y0 = loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i])  , x1 = Y_const_level1a_scaled[aw_boundary_ix, i] , y1 = loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , col = makeTransparent('black', 70))
+  abline(0,1)
+  
+}
+
+
+```
+
+
+
+
+
+
 
 
 ```{r}
