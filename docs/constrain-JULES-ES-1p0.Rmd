@@ -1517,9 +1517,6 @@ for(i in 1:ncol(Y_const_level1a_scaled)){
 ```
 
 
-
-
-
 What might be the trade-offs for a high (or accurate) vegetation carbon? are they acceptable? Plot the oaat sensitivity of the other 3 outputs we're calibrating on. 
 
 ```{r, fig.width=10, fig.height = 10}
@@ -1553,7 +1550,7 @@ Y_aw_boundary = Y_const_level1a_scaled[aw_boundary_ix, ]
 
 ```
 
-
+## Check the emulators that produce the new design
 Do a leave-one-out cross validation of points inside the hard boundaries using the wave1 fits.
 ```{r}
 # quickest to find the loo predictions at the right indices
@@ -1597,12 +1594,216 @@ for(i in 1:ncol(loo_mean_Y_level1a)){
 
 ```
 
+## Compare the straight km with a two-step emulator
+Is a two-step emulator any better at emulating those crucial points which fall within aw's hard boundaries? First, create a list of emulator fits.
+
+```{r}
+
+fitlist_Y_const_level1a_scaled <- vector(mode = 'list', length = ncol(Y_const_level1a_scaled))
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+  
+  y <- Y_const_level1a_scaled[,i]
+  fit <- twoStep_glmnet(X = X_level1a, y)
+  fitlist_Y_const_level1a_scaled[[i]] <- fit
+
+}
+
+
+```
+
+```{r}
+loo_mean_glmnet_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+loo_sd_glmnet_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+  
+  for(i in 1:ncol(Y_const_level1a_scaled)){
+
+loo <- leaveOneOut.km(fitlist_Y_const_level1a_scaled[[i]]$emulator,type = 'UK', trend.reestim = TRUE )
+  loo_mean_glmnet_Y_level1a[,i] <- loo$mean
+  loo_sd_glmnet_Y_level1a[,i] <- loo$sd
+}
+
+```
+
+It doesn't appear that the two-step emulator (here plotted in red) is doing any better than the regular emulator.
+```{r, fig.width = 8, fig.height = 8}
+par(mfrow = c(2,2))
+
+for(i in 1:ncol(loo_mean_Y_level1a)){
+  
+  rn <- range(c(loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) ))
+  
+  
+  
+  plot(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_Y_level1a[aw_boundary_ix,i], ylim = rn, main = colnames(Y_const_level1a_scaled)[i], xlab = 'actual', ylab = 'predicted')
+  
+  points(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_glmnet_Y_level1a[aw_boundary_ix,i], col = 'red')
+  
+  
+  segments(x0 = Y_const_level1a_scaled[aw_boundary_ix, i], y0 = loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i])  , x1 = Y_const_level1a_scaled[aw_boundary_ix, i] , y1 = loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , col = makeTransparent('black', 70))
+  abline(0,1)
+  
+}
+```
 
 
 
 
+# Exploring new constraints
+Input from Eddy Robertson:
+
+"We can assume that the majority of vegetation carbon is stored in tree trunks so, the carbon density of trees is approximately (cVeg_lnd_mean / treeFrac_lnd_mean). Although I suppose it's possible that in the PPE the shrubs have become tree-like, so it might be interesting to plot cVeg_lnd_mean versus  (shrubFrac_lnd_mean + treeFrac_lnd_mean) as well. The first question is whether cVeg_lnd_mean increases linearly with treeFrac_lnd_mean. Then if this turned out to be interesting, we could produce a treeCVeg_lnd_mean output."
+
+```{r, fig.width = 7, fig.height = 7}
+
+#pdf(file = 'vegC_density.pdf', width = 6, height = 6)
+plot(Y_level0[,'treeFrac_lnd_mean'],Y_level0[,'cVeg_lnd_mean'], main = "Vegetation (tree) carbon density, Level0",
+     xlab = 'treeFrac_lnd_mean', ylab  = 'cVeg_lnd_mean' )
+
+#dev.off()
+
+```
+
+Is the range of carbon densities narrower in the "hard boundary" set?
+```{r, fig.width = 6, fig.height = 6}
+
+Y_level1a_aw <- Y_level1a[aw_boundary_ix, ]
+X_level1a_aw <- X_level1a[aw_boundary_ix, ]
+
+#pdf(file = 'vegC_density_aw.pdf', width = 6, height = 6)
+plot(Y_level1a[,'treeFrac_lnd_mean'],Y_level1a[,'cVeg_lnd_mean'], main = "Vegetation (tree) carbon density",
+     xlab = 'treeFrac_lnd_mean', ylab  = 'cVeg_lnd_mean' )
+
+points( Y_level1a_aw[,'treeFrac_lnd_mean'],Y_level1a_aw[,'cVeg_lnd_mean'], pch = 19, col = 'red')
+legend('topleft', legend = c('Level1a','AW constraints'), pch = c(21, 19), col = c('black', 'red'))
+#   dev.off()
 
 
+
+```
+
+
+
+
+```{r}
+c_density <- Y_level1a[,'treeFrac_lnd_mean'] / Y_level1a[,'cVeg_lnd_mean']
+
+hist(c_density)
+
+
+
+```
+
+## Now that we have constraints, we can explore their effect on the output 
+
+```{r, fig.width = 20, fig.height = 20}
+# Pairs plot of output
+y_names_mean <- c('nbp_lnd_mean', 'fLuc_lnd_mean', 'npp_nlim_lnd_mean', 'cSoil_lnd_mean',
+            'cVeg_lnd_mean', 'landCoverFrac_lnd_mean', 'fHarvest_lnd_mean',
+            'lai_lnd_mean', 'rh_lnd_mean', 'treeFrac_lnd_mean', 'c3PftFrac_lnd_mean', 
+            'c4PftFrac_lnd_mean', 'shrubFrac_lnd_mean', 'baresoilFrac_lnd_mean')
+
+Y_level1a_mean <- Y_level1a[,y_names_mean]
+
+pcol <- rep('black', nrow(Y_level1a_mean))
+pcol[aw_boundary_ix] <- 'red'
+pairs(Y_level1a_mean, col = pcol, lower.panel = NULL, pch = 19, cex.labels = 1.5)
+
+
+
+
+```
+
+## How much does constraining an output constrain other outputs?
+For example, what effect has the AW "hard boundary" constraint produced on ranges of the other (marginal) outputs? Which constraint is doing the majority of the work?
+
+
+A function to find the proportion of output space that is removed (or retained) when applying a constraint.
+```{r}
+
+constraint_prop <- function(Y, constraint_ix){
+  
+  Yconst <- Y[constraint_ix, ]
+  Yconst_norm <- normalize(Yconst, wrt = Y)
+  rn <- apply(Yconst_norm, 2, range)
+  out <- rn
+  out
+  
+}
+
+
+```
+
+```{r}
+Y_constraint_plot <- function(constraint_range, constraint_columns, ...){
+  # A function to plot the output of constraint_prop
+  
+  par(mar = c(12,4,3,2),las = 2)
+
+pcol = rep('black', ncol(constraint_range))
+pcol[constraint_columns] <- 'red' # plot the outputs where we have specified the constraints in red.
+
+plot(1:ncol(constraint_range),constraint_range[2,], ylim = c(0,1) , axes = FALSE, xlab = '', ylab = 'range of ensemble (fraction)', col = pcol, pch = 19, ...)
+points(1:ncol(constraint_range), constraint_range[1,], col = pcol, pch = 19)
+segments(x0 = 1:ncol(constraint_range), y0 = constraint_range[1,], x1 = 1:ncol(constraint_range), y1 = constraint_range[2,], col = pcol, lwd =2 )
+
+axis(side = 1, labels = colnames(constraint_range), at = 1:ncol(constraint_range))
+axis(2)
+abline(h = c(0,1), col = 'red')
+  
+}
+```
+
+All constraints together take the normalized range of all the outputs to a little under a half of the original range, on average. Of course, four of the inputs are constrained here, which has quite a large impact.
+```{r}
+Y_level1a_mean_aw_norm_rn <- constraint_prop(Y = Y_level1a_mean, constraint_ix = aw_boundary_ix)
+mean_constraint_all <- mean(Y_level1a_mean_aw_norm_rn[2, ] - Y_level1a_mean_aw_norm_rn[1, ])
+Y_constraint_plot(Y_level1a_mean_aw_norm_rn,constraint_columns = c(c(1,3,4,5)), main = paste('mean constrained range =', round(mean_constraint_all,3)))
+```
+
+We can see what impacts the constraints have individually
+```{r}
+
+nbp_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10)
+npp_ix <- which(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 )
+cSoil_ix <- which(Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000)
+cVeg_ix <- which(Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800)
+
+```
+
+The NBP constraint has no marginal impact
+```{r}
+
+Y_level1a_mean_nbp_const <- constraint_prop(Y = Y_level1a_mean, constraint_ix = nbp_ix )
+mean_constraint_nbp <- mean(Y_level1a_mean_nbp_const[2, ] - Y_level1a_mean_nbp_const[1, ])
+Y_constraint_plot(Y_level1a_mean_nbp_const,1,  main = paste('mean constrained range =', round(mean_constraint_nbp,3)))
+
+```
+
+```{r}
+
+Y_level1a_mean_npp_const <- constraint_prop(Y = Y_level1a_mean, constraint_ix = npp_ix )
+mean_constraint_npp <- mean(Y_level1a_mean_npp_const[2, ] - Y_level1a_mean_npp_const[1, ])
+Y_constraint_plot(Y_level1a_mean_npp_const,3,  main = paste('mean constrained range =', round(mean_constraint_npp,3)))
+
+```
+
+
+```{r}
+
+Y_level1a_mean_cSoil_const <- constraint_prop(Y = Y_level1a_mean, constraint_ix = cSoil_ix )
+mean_constraint_cSoil <- mean(Y_level1a_mean_cSoil_const[2, ] - Y_level1a_mean_cSoil_const[1, ])
+Y_constraint_plot(Y_level1a_mean_cSoil_const,1,  main = paste('mean constrained range =', round(mean_constraint_cSoil,3)))
+
+```
+Vegetation carbon (cVeg) has the strongest impact on everything else. This is no suprise, given that so few of the ensemble members seem to simulate carbon vegetation high enough.
+```{r}
+
+Y_level1a_mean_cVeg_const <- constraint_prop(Y = Y_level1a_mean, constraint_ix = cVeg_ix )
+mean_constraint_cVeg <- mean(Y_level1a_mean_cVeg_const[2, ] - Y_level1a_mean_cVeg_const[1, ])
+Y_constraint_plot(Y_level1a_mean_cVeg_const,5,  main = paste('mean constrained range =', round(mean_constraint_cVeg,3)))
+
+```
 
 ```{r}
 
