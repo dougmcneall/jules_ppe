@@ -19,7 +19,7 @@ We build and test gaussian process emulators, perform a sensitivity analyis, and
 Andy thinks there might be mileage in analysing the atmospheric growth, which is here.
 /home/h01/hadaw/Research/ES_PPE/Oct20
   
-At the moment, this vignette is hampered by the fact that emulators are failing on a few of the outputs which represent change over the historical perid. The emulator is fine for predicting absolute values in the modern period.
+At the moment, this vignette is hampered by the fact that emulators are failing on a few of the outputs which represent change over the historical period. The emulator is fine for predicting absolute values in the modern period.
 
 Andy would like to see timeseries of:
 cVeg, cSoil and nbp, npp in GtC and GtC/yr.
@@ -89,6 +89,13 @@ nc <- nc_open(paste0(floc,fn))
 # What variables are in the file? 
 varlist <- nc.get.variable.list(nc)
 
+
+for(i in 1:length(varlist)){
+  
+  var <- varlist[i]
+  print(var)
+  print(ncatt_get(nc,var,"long_name")[[2]])
+}
 ```
 
 ## Extract a time series of an annual, globally aggregated variable
@@ -134,37 +141,115 @@ makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:20
 
 ## Plot timeseries of aggregated global timeseries 
 
-```{r include=FALSE }
+```{r include=FALSE,message=FALSE, warning = FALSE}
 
 #ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
 #yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
 #Y_const_level1 <- Y_level1[, ynames_const]
 
+# primary carbon cycle outputs
 npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
 nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
 cSoil_ens <-  makeTimeseriesEnsemble(variable = "cSoil_lnd_sum") / 1e12
 cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
+lai_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "lai_lnd_mean")
+
+# fluxes
+rh_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "rh_lnd_sum") / (1e12/ysec)
+fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fLuc_lnd_sum") / (1e12/ysec)
+fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fHarvest_lnd_sum") / (1e12/ysec)
+
+
+# fractions
+treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "treeFrac_lnd_mean")
+shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "shrubFrac_lnd_mean")
+baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "baresoilFrac_lnd_mean")
+#c3PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c3PftFrac_lnd_mean_ens")
+#c4PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c4PftFrac_lnd_mean_ens")
+
 
 ```
 
 
-```{r plot-carbon-cycle-timeseries, fig.width = 8, fig.height = 8}
+```{r plot-carbon-cycle-timeseries-primary, fig.width = 9, fig.height = 6}
 
-par(mfrow= c(2,2))
+par(mfrow= c(1,4), las = 1)
 
-ylim = range(c(nbp_ens[,1], nbp_ens[,164]))
-matplot(years, t(nbp_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NBP sum', main = 'NBP')
+plotcol <- c(makeTransparent('black', 70))
+
+ylim = c(-10, 10)
+matplot(years, t(nbp_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, 
+        ylab = 'GtC/year', main = 'NBP',
+        bty = 'n')
 
 ylim = range(c(npp_ens[,1], npp_ens[,164]))
-matplot(years, t(npp_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NPP sum', main = 'NPP')
+matplot(years, t(npp_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC/year', main = 'NPP',
+        bty = 'n')
 
 ylim = range(c(cSoil_ens[,1], cSoil_ens[,164]))
-matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Soil carbon sum', main = 'Soil Carbon')
+matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'Soil Carbon',
+        bty = 'n')
 
 ylim = range(c(cVeg_ens[,1], cVeg_ens[,164]))
-matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Veg carbon sum', main = 'Vegetation Carbon')
+matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'Vegetation Carbon',
+        bty = 'n')
 
 ```
+
+
+```{r plot-carbon-cycle-timeseries-secondary, fig.width = 9, fig.height = 6}
+
+par(mfrow= c(1,4), las = 1)
+
+ylim = range(lai_lnd_mean_ens)
+matplot(years, t(lai_lnd_mean_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'LAI', main = 'Leaf area index',
+        bty = 'n')
+
+ylim = range(treeFrac_lnd_mean_ens)
+matplot(years, t(treeFrac_lnd_mean_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'fraction', main = 'Tree fraction',
+        bty = 'n')
+
+ylim = range(shrubFrac_lnd_mean_ens)
+matplot(years, t(shrubFrac_lnd_mean_ens ), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'fraction', main = 'Shrub fraction',
+        bty = 'n')
+
+ylim = range(baresoilFrac_lnd_mean_ens)
+matplot(years, t(baresoilFrac_lnd_mean_ens ), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'fraction', main = 'bare soil fraction',
+        bty = 'n')
+
+```
+```{r plot-carbon-cycle-timeseries-tertiary, fig.width = 7, fig.height = 6}
+
+par(mfrow= c(1,3), las = 1)
+  
+ylim = range(rh_lnd_sum_ens)
+matplot(years, t(rh_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'fraction', main = 'Heterotrophic Respiration',
+        bty = 'n')
+
+ylim = range(fLuc_lnd_sum_ens)
+matplot(years, t(fLuc_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC/year', main = 'Land use change emissions',
+        bty = 'n')
+
+ylim = range(fHarvest_lnd_sum_ens)
+matplot(years, t(fHarvest_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC/year', main = 'Harvest C flux to atmosphere',
+        bty = 'n')
+
+
+
+
+```
+
+
 ```{r}
 
 npp_ens_anom <- anomalizeTSmatrix(npp_ens, 1:20)
@@ -174,21 +259,30 @@ cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
 
 ```
 
-```{r plot-carbon-cycle-anomaly-timeseries, fig.width = 8, fig.height = 8}
+```{r plot-carbon-cycle-anomaly-timeseries, fig.width = 9, fig.height = 6}
 
-par(mfrow= c(2,2))
+par(mfrow= c(1,4), las = 1)
 
-ylim = range(c(nbp_ens_anom[,1], nbp_ens_anom[,164]))
-matplot(years, t(nbp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NBP sum Anomaly', main = 'NBP Anomaly')
+ylim = range(-10, 10)
+
+matplot(years, t(nbp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'NBP sum Anomaly', main = 'NBP Anomaly',
+        bty = 'n')
 
 ylim = range(c(npp_ens_anom[,1], npp_ens_anom[,164]))
-matplot(years, t(npp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'NPP sum Anomaly', main = 'NPP Anomaly')
+matplot(years, t(npp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'NPP sum Anomaly', main = 'NPP Anomaly',
+        bty = 'n')
 
 ylim = range(c(cSoil_ens_anom[,1], cSoil_ens_anom[,164]))
-matplot(years, t(cSoil_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Soil carbon sum anomaly', main = 'Soil Carbon Anomaly')
+matplot(years, t(cSoil_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'Soil carbon sum anomaly', main = 'Soil Carbon Anomaly',
+        bty = 'n')
 
 ylim = range(c(cVeg_ens_anom[,1], cVeg_ens_anom[,164]))
-matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = cbPal, ylab = 'Veg carbon sum anomaly', main = 'Vegetation Carbon Anomaly')
+matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'Veg carbon sum anomaly', main = 'Vegetation Carbon Anomaly',
+        bty = 'n')
 
 
 ```
@@ -364,20 +458,23 @@ par(oma = c(10,10,0,0))
 #par(xpd = TRUE)
 pairs(X_nlevel0, 
       xlim = c(0,1), ylim = c(0,1),
-      col = 'red', 
+      labels = 1:d,
+      col = makeTransparent('red', 150),
       gap = 0,
       pch = 20,
+      xaxt ='n', yaxt = 'n',
       lower.panel = NULL)
 
-#legend('bottomright', legend = paste(1:d, colnames(lhs)), bty = 'n')
-legend('left', col = 'red', pch = 20, legend = 'test')
+reset()
 
-# plot failures over everything else
-#X.all <- rbind(X.level0, X.nlevel0)
-#colvec <- rep('grey', nrow(X))
-#colvec[(nrow(X.level0)+1):nrow(X.all)] <- 'red'
-#pairs(X.all, xlim = c(0,1), ylim = c(0,1),col = colvec, gap = 0, lower.panel = NULL, pch = 20, cex = 0.5)
+legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.2, bty = 'n')
 
+```
+
+## exit knitr
+```{r}
+
+knitr::knit_exit()
 ```
 
 
@@ -474,6 +571,11 @@ y_level1 <- Y_level1[, 'npp_nlim_lnd_sum']
 ```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
 em_npp_level0 <- km(~., design = X_level0,  response = y_level0)
 em_npp_level1 <- km(~., design = X_level1,  response = y_level1)
+
+em_npp_level0_ms <- km(~., design = X_level0,  response = y_level0, multistart = 4)
+em_npp_level1_ms <- km(~., design = X_level1,  response = y_level1, multistart = 4)
+
+
 ```
 
 
@@ -523,35 +625,41 @@ prop_mae(y_level1, loo_npp_level1$mean)
 
 ```
 
+
 ```{r}
 
-# Given a km model, produce some error statistics
 
-kmLooStats <- function(km, type = 'UK'){
-  
-  loo <- leaveOneOut.km(km, type = type, trend.reestim = TRUE)
-  mae <- MAE(Y = km@y, Ypred = loo$mean)
-  rmse <- RMSE(Y = km@y, Ypred = loo$mean)
-  
-  maxerr <- max(loo$mean)
-  
-  absdiff <- abs(diff(range(km@y)))
-  pmae <- (mae / absdiff) * 100
-  
-  return(list(loo = loo, mae = mae, pmae = pmae, maxerr = maxerr))
-  
-}
+
 
 ```
 
 ```{r}
 
+# MOVE THIS TO IMPTOOLS OR EMTOOLS
+# Given a km model, produce some error statistics
+
+
+```
+
+```{r}
+
+# It doesn't look like Multistart makes a big difference at all for NPP
 errstats_npp_level0 <- kmLooStats(km = em_npp_level0)
+errstats_npp_level0_ms <- kmLooStats(km = em_npp_level0_ms)
+
 errstats_npp_level1 <- kmLooStats(km = em_npp_level1)
+errstats_npp_level1_ms <- kmLooStats(km = em_npp_level1_ms)
+
 
 # proportional mean absolute error
 errstats_npp_level0$pmae
+errstats_npp_level0_ms$pmae
+
+
 errstats_npp_level1$pmae
+errstats_npp_level1_ms$pmae
+
+
 
 
 ```
@@ -1154,57 +1262,6 @@ axis(1, at = 1:length(y_names_sum), labels = y_names_sum)
 ```
 
 
-# Direct twoStep emulator using foreach
-```{r}
-
-library(doParallel)
-registerDoParallel(cores = detectCores() - 1)
-
-direct_twoStep_glmnet_parallel <- function(X, Y, ...){
-  
-  d <- ncol(Y)
-  
-  out <- vector(mode='list', length=d)
-  
-  foreach(i = 1:d) %dopar% {
-    
-    y <- Y[,i]
-    
-    em <- twoStep_glmnet(X=X, y = y, ...)
-    out[i] <- em
- 
-  }
-  
-  out
-} 
-
-```
-
-
-
-```{r}
-
-# I actually wrote code to do this createKmFitList, which isn't parallel at the moment.
-# Maybe make it parallel in the next version?
-
-library(doParallel)
-registerDoParallel(cores = detectCores() - 1)
-
-direct_twoStep_glmnet_parallel <- function(X, Y, ...){
-  
-  d <- ncol(Y)
-  foreach(i = 1:d) %dopar% {
-    
-    y <- Y[,i]
-    
-    em <- twoStep_glmnet(X=X, y = y, ...)
-  }
-} 
-
-
-
-```
-
 
 # History matching and generation of new ensemble members
 To use History Matching, we need to specify targets for various model outputs. We treat these targets as "observations" with an uncertainty where a model run marked as "implausible" (beyond 3sd) matches the hard boundaries previously identified by A. Wiltshire as being desirable.
@@ -1646,6 +1703,57 @@ for(i in 1:ncol(loo_mean_Y_level1a)){
 }
 ```
 
+Two other things I can think of to check: 1) how about using "multistart" to choose different starting conditions for optimising the emulators and 2) Using a flat prior for the mean function rather than a linear prior.
+```{r}
+
+fitlist_flatprior_Y_const_level1a_scaled <- vector(mode = 'list', length = ncol(Y_const_level1a_scaled))
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+  
+  y <- Y_const_level1a_scaled[,i]
+  fit <- km(formula =~1, design = X_level1a, response = y)
+  fitlist_flatprior_Y_const_level1a_scaled[[i]] <- fit
+
+}
+
+
+```
+
+```{r}
+loo_mean_flatprior_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+loo_sd_flatprior_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+  
+  for(i in 1:ncol(Y_const_level1a_scaled)){
+
+loo <- leaveOneOut.km(fitlist_flatprior_Y_const_level1a_scaled[[i]],type = 'UK', trend.reestim = TRUE )
+  loo_mean_flatprior_Y_level1a[,i] <- loo$mean
+  loo_sd_flatprior_Y_level1a[,i] <- loo$sd
+}
+
+```
+
+```{r, fig.width = 8, fig.height = 8}
+par(mfrow = c(2,2))
+
+for(i in 1:ncol(loo_mean_Y_level1a)){
+  
+  rn <- range(c(loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) ))
+  
+  
+  
+  plot(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_Y_level1a[aw_boundary_ix,i], ylim = rn, main = colnames(Y_const_level1a_scaled)[i], xlab = 'actual', ylab = 'predicted')
+  
+  points(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_flatprior_Y_level1a[aw_boundary_ix,i], col = 'red')
+  
+  
+  segments(x0 = Y_const_level1a_scaled[aw_boundary_ix, i], y0 = loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i])  , x1 = Y_const_level1a_scaled[aw_boundary_ix, i] , y1 = loo_mean_flatprior_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_flatprior_Y_level1a[aw_boundary_ix,i]) , col = makeTransparent('black', 70))
+  abline(0,1)
+  
+}
+
+
+
+```
 
 
 
@@ -1793,7 +1901,7 @@ Y_constraint_plot(Y_level1a_mean_npp_const,3,  main = paste('mean constrained ra
 
 Y_level1a_mean_cSoil_const <- constraint_prop(Y = Y_level1a_mean, constraint_ix = cSoil_ix )
 mean_constraint_cSoil <- mean(Y_level1a_mean_cSoil_const[2, ] - Y_level1a_mean_cSoil_const[1, ])
-Y_constraint_plot(Y_level1a_mean_cSoil_const,1,  main = paste('mean constrained range =', round(mean_constraint_cSoil,3)))
+Y_constraint_plot(Y_level1a_mean_cSoil_const,4,  main = paste('mean constrained range =', round(mean_constraint_cSoil,3)))
 
 ```
 Vegetation carbon (cVeg) has the strongest impact on everything else. This is no suprise, given that so few of the ensemble members seem to simulate carbon vegetation high enough.
@@ -1814,7 +1922,7 @@ Y_constraint_plot(Y_level1a_mean_cVeg_const,5,  main = paste('mean constrained r
 ```
 
 
-
+## Writing robust, parallelised, multistart  emulators
 ```{r}
 direct_twoStep_glmnet <- function(X, Y, ...){
   
@@ -1837,6 +1945,93 @@ direct_twoStep_glmnet <- function(X, Y, ...){
 
 ```
 
+
+# Direct twoStep emulator using foreach
+```{r}
+
+library(doParallel)
+registerDoParallel(cores = detectCores() - 1)
+
+direct_twoStep_glmnet_parallel <- function(X, Y, ...){
+  
+  d <- ncol(Y)
+  
+  out <- vector(mode='list', length=d)
+  
+  foreach(i = 1:d) %dopar% {
+    
+    y <- Y[,i]
+    
+    em <- twoStep_glmnet(X=X, y = y, ...)
+    out[i] <- em
+ 
+  }
+  
+  out
+} 
+
+```
+
+
+
+```{r}
+
+# I actually wrote code to do this createKmFitList, which isn't parallel at the moment.
+# Maybe make it parallel in the next version?
+
+library(doParallel)
+registerDoParallel(cores = detectCores() - 1)
+
+direct_twoStep_glmnet_parallel <- function(X, Y, ...){
+  
+  d <- ncol(Y)
+  foreach(i = 1:d) %dopar% {
+    
+    y <- Y[,i]
+    
+    em <- twoStep_glmnet(X=X, y = y, ...)
+  }
+} 
+
+
+
+```
+
+
+
+```{r}
+
+library(doParallel)
+cores=detectCores()
+cl <- makeCluster(cores[1]-1) #not to overload your computer
+registerDoParallel(cl)
+
+fitlist_test <- createKmFitListParallel(X = X_level1a, Y =  Y_const_level1a_scaled, formula = ~., multistart = 4)
+stopCluster(cl)
+
+```
+
+```{r, fig.width = 7, fig.height = 9}
+
+
+plot(fitlist_test[[4]])
+```
+
+
+```{r}
+
+summariseKmLoo <- function(fit){
+  
+  loo <- leaveOneOut.km(fit, type = 'UK', trend.reestim = TRUE)
+  
+  loo_mean <- mean(loo$)
+  
+  
+}
+
+
+
+```
 
 
 
