@@ -46,6 +46,7 @@ library(DiceKriging)
 library(DiceEval)
 library(ncdf4)
 library(ncdf4.helpers)
+library(readxl)
 
 library(foreach)
 
@@ -71,6 +72,31 @@ cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D
 ysec = 60*60*24*365
 years <- 1850:2013
 ```
+
+## Carbon budget data
+
+[Section 2.5 in Friedlingstein et al.](https://essd.copernicus.org/articles/12/3269/2020/#section2) describes how the land carbon sink is estimated.
+```{r, fig.width = 8, fig.height = 9}
+
+
+# Question: How closely should our model match this curve? Which output?
+# (My guess is 'Total Land Carbon anomaly')
+historical_carbon_budget <- read_excel('Global_Carbon_Budget_2020v1.0.xlsx', sheet = "Historical Budget", skip = 15)
+
+par(mfrow = c(3,1))
+ylim = c(-1, 6)
+
+plot(historical_carbon_budget$Year, historical_carbon_budget$`land sink`, type = 'l', bty = 'n', ylim = ylim)
+
+plot(historical_carbon_budget$Year, historical_carbon_budget$`land-use change emissions`, type = 'l', bty = 'n', ylim = ylim)
+
+plot(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growth`, type = 'l', bty = 'n', ylim = ylim)
+
+
+
+```
+
+
 
 
 ### Jules output data location
@@ -152,6 +178,9 @@ npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
 nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
 cSoil_ens <-  makeTimeseriesEnsemble(variable = "cSoil_lnd_sum") / 1e12
 cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
+
+total_land_carbon_ens <- cSoil_ens + cVeg_ens
+
 lai_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "lai_lnd_mean")
 
 # fluxes
@@ -177,10 +206,6 @@ par(mfrow= c(1,4), las = 1)
 
 plotcol <- c(makeTransparent('black', 70))
 
-ylim = c(-10, 10)
-matplot(years, t(nbp_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, 
-        ylab = 'GtC/year', main = 'NBP',
-        bty = 'n')
 
 ylim = range(c(npp_ens[,1], npp_ens[,164]))
 matplot(years, t(npp_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
@@ -195,6 +220,11 @@ matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotco
 ylim = range(c(cVeg_ens[,1], cVeg_ens[,164]))
 matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'GtC', main = 'Vegetation Carbon',
+        bty = 'n')
+
+ylim = range(total_land_carbon_ens)
+matplot(years, t(total_land_carbon_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, 
+        ylab = 'GtC', main = 'Total Land Carbon',
         bty = 'n')
 
 ```
@@ -225,9 +255,14 @@ matplot(years, t(baresoilFrac_lnd_mean_ens ), type = 'l', lty = 'solid',ylim = y
         bty = 'n')
 
 ```
-```{r plot-carbon-cycle-timeseries-tertiary, fig.width = 7, fig.height = 6}
+```{r plot-carbon-cycle-timeseries-tertiary, fig.width = 9, fig.height = 6}
 
 par(mfrow= c(1,3), las = 1)
+
+ylim = c(-10, 10)
+matplot(years, t(nbp_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, 
+        ylab = 'GtC/year', main = 'NBP',
+        bty = 'n')
   
 ylim = range(rh_lnd_sum_ens)
 matplot(years, t(rh_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
@@ -256,6 +291,8 @@ npp_ens_anom <- anomalizeTSmatrix(npp_ens, 1:20)
 nbp_ens_anom <- anomalizeTSmatrix(nbp_ens, 1:20)
 cSoil_ens_anom <- anomalizeTSmatrix(cSoil_ens, 1:20)
 cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
+total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
+
 
 ```
 
@@ -263,11 +300,10 @@ cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
 
 par(mfrow= c(1,4), las = 1)
 
-ylim = range(-10, 10)
-
-matplot(years, t(nbp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'NBP sum Anomaly', main = 'NBP Anomaly',
-        bty = 'n')
+# ylim = range(-10, 10)
+#matplot(years, t(nbp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+#        ylab = 'NBP sum Anomaly', main = 'NBP Anomaly',
+#        bty = 'n')
 
 ylim = range(c(npp_ens_anom[,1], npp_ens_anom[,164]))
 matplot(years, t(npp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
@@ -276,16 +312,31 @@ matplot(years, t(npp_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plo
 
 ylim = range(c(cSoil_ens_anom[,1], cSoil_ens_anom[,164]))
 matplot(years, t(cSoil_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'Soil carbon sum anomaly', main = 'Soil Carbon Anomaly',
+        ylab = 'GtC', main = 'Soil Carbon Anomaly',
         bty = 'n')
 
 ylim = range(c(cVeg_ens_anom[,1], cVeg_ens_anom[,164]))
 matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'Veg carbon sum anomaly', main = 'Vegetation Carbon Anomaly',
+        ylab = 'GtC', main = 'Vegetation Carbon Anomaly',
+        bty = 'n')
+
+ylim = range(total_land_carbon_anom)
+matplot(years, t(total_land_carbon_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'Total Land Carbon Anomaly',
         bty = 'n')
 
 
 ```
+
+## Can we understand change and absolute?
+```{r}
+
+
+
+
+
+```
+
 
 
 ## Function to extract the "modern value" direct from the file (last 20 years of the timeseries)
@@ -451,6 +502,8 @@ rx = rbind(rep(0,32), rep(1,32))
 
 There are clear run failure thresholds in the parameters rootd_ft_io and lai_max, and quite strong visual indications that a_wl_io and bio_hum_cn matter.
 
+
+NEXT, histograms of failure with the LHS value
 ```{r run-failure-pairs, fig.width = 12, fig.height = 12}
 
 #simple way
@@ -470,13 +523,6 @@ reset()
 legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.2, bty = 'n')
 
 ```
-
-## exit knitr
-```{r}
-
-knitr::knit_exit()
-```
-
 
 
 ## Testing Gaussian Process emulators
@@ -1356,6 +1402,96 @@ polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
 
 ```
 
+## Timeseries that match the constraints.
+Plot the original ensemble, plus the stuff that matches the constraints. Include anomalies.
+
+```{r, fig.width = 12, fig.height = 9}
+
+# remove to level 1a Relative to toplevel_ix
+toplevel_to_level_1a_ix <-(toplevel_ix[-Y_nlevel0_ix])[level1a_ix]
+
+# So further constraining to level 2 can be associated back to the top level.
+
+level2_ix = which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10 &
+                    Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
+  )
+```
+
+
+We find that adding a constraint to level 2 constrains the behaviour of the soil carbon pool, but not the vegetation carbon pool. Probably not a surprise, given the Soil Carbon pool (and changes) are much larger than the vegetation carbon pool.
+
+```{r, fig.width = 12, fig.height = 8}
+#cSoil_ens_anom [toplevel_to_level_1a_ix, ]
+
+par(mfrow= c(1,4), las = 1)
+
+plotcol <- c(makeTransparent('black', 70))
+overplotcol <- c(makeTransparent('red', 70))
+
+
+ylim = range(cSoil_ens)
+matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'cSoil',
+        bty = 'n')
+matlines( years, t((cSoil_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+
+ylim = range(cSoil_ens)
+matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'cVeg',
+        bty = 'n')
+matlines( years, t((cVeg_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+
+
+
+ylim = range(cSoil_ens_anom)
+matplot(years, t(cSoil_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'cSoil Anomaly',
+        bty = 'n')
+matlines( years, t((cSoil_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+
+
+ylim = range(cSoil_ens_anom)
+matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC/year', main = 'cVeg Anomaly',
+        bty = 'n')
+matlines( years, t((cVeg_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+
+```
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+par(mfrow= c(1,2), las = 1)
+
+plotcol <- c(makeTransparent('black', 70))
+overplotcol <- c(makeTransparent('red', 70))
+
+
+ylim = range(total_land_carbon_ens)
+matplot(years, t(total_land_carbon_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'Total land carbon',
+        bty = 'n')
+matlines( years, t((total_land_carbon_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+
+ylim = range(total_land_carbon_anom)
+matplot(years, t(total_land_carbon_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'Total land carbon anomaly',
+        bty = 'n')
+matlines( years, t((total_land_carbon_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+
+
+
+
+
+
+
+```
+
+
+
+
 
 ## Augment the design.
 The function addNroyDesignPoints builds an emulator for each model output in Y. It compares the output of each emulator at a number of candidate desin points, and chooses a space-filling set of them that that are Not Ruled Out Yet (statistically close to the observation at Y_target).
@@ -2020,14 +2156,14 @@ plot(fitlist_test[[4]])
 
 ```{r}
 
-summariseKmLoo <- function(fit){
+#summariseKmLoo <- function(fit){
   
-  loo <- leaveOneOut.km(fit, type = 'UK', trend.reestim = TRUE)
+#  loo <- leaveOneOut.km(fit, type = 'UK', trend.reestim = TRUE)
   
-  loo_mean <- mean(loo$)
+#  loo_mean <- mean(loo$)
   
   
-}
+#}
 
 
 
