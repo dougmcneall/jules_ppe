@@ -1422,26 +1422,26 @@ level2_ix = which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10 &
 
 We find that adding a constraint to level 2 constrains the behaviour of the soil carbon pool, but not the vegetation carbon pool. Probably not a surprise, given the Soil Carbon pool (and changes) are much larger than the vegetation carbon pool.
 
-```{r, fig.width = 12, fig.height = 8}
+```{r vegC-soilC-constrained, fig.width = 12, fig.height = 8}
 #cSoil_ens_anom [toplevel_to_level_1a_ix, ]
 
 par(mfrow= c(1,4), las = 1)
 
 plotcol <- c(makeTransparent('black', 70))
-overplotcol <- c(makeTransparent('red', 70))
+overplotcol <- c(makeTransparent('tomato3', 200))
 
 
 ylim = range(cSoil_ens)
 matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'GtC', main = 'cSoil',
         bty = 'n')
-matlines( years, t((cSoil_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+matlines( years, t((cSoil_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol,  lwd = 1.5, lty = 'solid')
 
 ylim = range(cSoil_ens)
 matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'GtC', main = 'cVeg',
         bty = 'n')
-matlines( years, t((cVeg_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+matlines( years, t((cVeg_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = overplotcol, lwd = 1.5, lty = 'solid')
 
 
 
@@ -1449,42 +1449,72 @@ ylim = range(cSoil_ens_anom)
 matplot(years, t(cSoil_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'GtC', main = 'cSoil Anomaly',
         bty = 'n')
-matlines( years, t((cSoil_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+matlines( years, t((cSoil_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol, lwd = 1.5, lty = 'solid')
 
 
 ylim = range(cSoil_ens_anom)
 matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC/year', main = 'cVeg Anomaly',
+        ylab = 'GtC', main = 'cVeg Anomaly',
         bty = 'n')
-matlines( years, t((cVeg_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+matlines( years, t((cVeg_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol,lwd = 1.5, lty = 'solid')
 
 ```
 
+## Total land carbon change
 
-```{r, fig.width = 7, fig.height = 8}
+We plot the JULES total land carbon change from 1850, together with "observations" from the Global Carbon Budget (Friedligstein et al, 2020). The "observations are the cumulative sum of the 'land sink' column on the "historical observations tab of the data from the paper. It states "The land sink is the average of several dynamic global vegetation models that reproduce the observed mean total land sink of the 1990s."
+
+```{r total-land-carbon-change, message = FALSE, warning = FALSE, fig.width = 8, fig.height = 8}
 
 par(mfrow= c(1,2), las = 1)
-
-plotcol <- c(makeTransparent('black', 70))
-overplotcol <- c(makeTransparent('red', 70))
-
 
 ylim = range(total_land_carbon_ens)
 matplot(years, t(total_land_carbon_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'GtC', main = 'Total land carbon',
         bty = 'n')
-matlines( years, t((total_land_carbon_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+matlines( years, t((total_land_carbon_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = overplotcol, lty = 'solid', lwd = 1.5)
 
 ylim = range(total_land_carbon_anom)
 matplot(years, t(total_land_carbon_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'GtC', main = 'Total land carbon anomaly',
         bty = 'n')
-matlines( years, t((total_land_carbon_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'red', lty = 'solid')
+matlines( years, t((total_land_carbon_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = overplotcol, lty = 'solid', lwd = 1.5)
+
+#Anomalize historical observations to 1850 - 1870
+historical_total_land_carbon_obs <- cumsum(historical_carbon_budget$`land sink`)
+historical_total_land_carbon_obs_anom <- historical_total_land_carbon_obs - historical_total_land_carbon_obs[which(historical_carbon_budget$Year %in% 1850:1870)]
+
+lines(historical_carbon_budget$Year,historical_total_land_carbon_obs_anom, type = 'l',col = 'blue', lwd = 2)
+legend('topleft', legend = c('Ruled out', 'Level1a constraint', 'historical'), col = c('black', overplotcol, 'blue'),
+       lwd = c(1,1.5,2), lty = 'solid')
 
 
+```
+
+### Land carbon Sink?
+
+I think to make a fair comparison, we might need to take the diff of the anomaly (or just the timeseries), as the above represents the total change since 1850, and I think all the "land sink" stuff looks at the year-to-year changes.
+
+```{r total-land-carbon-sink, warning = FALSE, message = FALSE}
 
 
+landsink_ens <- matrix(NA, nrow = nrow(total_land_carbon_ens), ncol = ncol(total_land_carbon_ens)-1)
 
+for(i in 1:nrow(landsink_ens)){
+  
+  landsink_ens[i, ] <- diff(total_land_carbon_ens[i, ])
+}
+
+
+ylim = range(landsink_ens)
+matplot(years[-1], t(landsink_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, xlab = '',
+        ylab = 'GtC/year', main = 'Total land carbon sink',
+        bty = 'n')
+matlines( years[-1], t((landsink_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = 'tomato3', lty = 'solid')
+
+lines(historical_carbon_budget$Year, historical_carbon_budget$`land sink`, col = 'blue', lwd = 2, xlab = '')
+legend('bottomleft', legend = c('Ruled out','level 1a constrained','historical'), col = c('black','tomato3', 'blue' ), lty ='solid',
+       lwd = c(1,1,2))
 
 
 ```
@@ -1651,7 +1681,6 @@ rug(Y_target[4], col = 'black')
 rug(c(Y_target[4] + 3*discsd[4],Y_target[4] - 3*discsd[4]) , col = 'red')
   
 ```
-
 
 
 How good are the four emulators that we've built? Are there biases? (there's no real evidence of this)
