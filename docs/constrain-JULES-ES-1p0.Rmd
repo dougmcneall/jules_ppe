@@ -3,7 +3,7 @@ title: "Sensitivity analysis and constraint of the parameter space of Earth Syst
 author: "Doug McNeall"
 date: "24/03/2021"
 output: 
-    html_document:
+    html_notebook:
         toc: true
         toc_float: true
         toc_depth: 3
@@ -76,7 +76,7 @@ years <- 1850:2013
 ## Carbon budget data
 
 [Section 2.5 in Friedlingstein et al.](https://essd.copernicus.org/articles/12/3269/2020/#section2) describes how the land carbon sink is estimated.
-```{r, fig.width = 8, fig.height = 9}
+```{r, historical-carbon-budget, warning = FALSE, fig.width = 8, fig.height = 9}
 
 
 # Question: How closely should our model match this curve? Which output?
@@ -100,7 +100,7 @@ plot(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growth
 
 
 ### Jules output data location
-```{r}
+```{r, load-output-ensemble}
 
 ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
 ensmember <- 'P0000/'
@@ -125,7 +125,7 @@ for(i in 1:length(varlist)){
 ```
 
 ## Extract a time series of an annual, globally aggregated variable
-```{r}
+```{r, extarct-time-series}
 
 extractTimeseries <- function(nc, variable){
     dat <- ncvar_get(nc, variable)
@@ -200,83 +200,71 @@ baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "baresoilFrac_lnd
 ```
 
 
-```{r plot-carbon-cycle-timeseries-primary, fig.width = 9, fig.height = 6}
+```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
 
-par(mfrow= c(1,4), las = 1)
+par(mfrow= c(3,4), las = 1)
 
 plotcol <- c(makeTransparent('black', 70))
 
-
 ylim = range(c(npp_ens[,1], npp_ens[,164]))
 matplot(years, t(npp_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC/year', main = 'NPP',
+        ylab = 'GtC', main = 'NPP', xlab = '',
         bty = 'n')
 
 ylim = range(c(cSoil_ens[,1], cSoil_ens[,164]))
 matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC', main = 'Soil Carbon',
+        ylab = 'GtC', main = 'Soil Carbon',xlab = '',
         bty = 'n')
 
 ylim = range(c(cVeg_ens[,1], cVeg_ens[,164]))
 matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC', main = 'Vegetation Carbon',
+        ylab = 'GtC', main = 'Vegetation Carbon',xlab = '',
         bty = 'n')
 
 ylim = range(total_land_carbon_ens)
 matplot(years, t(total_land_carbon_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, 
-        ylab = 'GtC', main = 'Total Land Carbon',
+        ylab = 'GtC', main = 'Total Land Carbon',xlab = '',
         bty = 'n')
 
-```
-
-
-```{r plot-carbon-cycle-timeseries-secondary, fig.width = 9, fig.height = 6}
-
-par(mfrow= c(1,4), las = 1)
 
 ylim = range(lai_lnd_mean_ens)
 matplot(years, t(lai_lnd_mean_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'LAI', main = 'Leaf area index',
+        ylab = 'LAI', main = 'Leaf area index',xlab = '',
         bty = 'n')
 
 ylim = range(treeFrac_lnd_mean_ens)
 matplot(years, t(treeFrac_lnd_mean_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'fraction', main = 'Tree fraction',
+        ylab = 'fraction', main = 'Tree fraction',xlab = '',
         bty = 'n')
 
 ylim = range(shrubFrac_lnd_mean_ens)
 matplot(years, t(shrubFrac_lnd_mean_ens ), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'fraction', main = 'Shrub fraction',
+        ylab = 'fraction', main = 'Shrub fraction',xlab = '',
         bty = 'n')
 
 ylim = range(baresoilFrac_lnd_mean_ens)
 matplot(years, t(baresoilFrac_lnd_mean_ens ), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'fraction', main = 'bare soil fraction',
+        ylab = 'fraction', main = 'bare soil fraction',xlab = '',
         bty = 'n')
-
-```
-```{r plot-carbon-cycle-timeseries-tertiary, fig.width = 9, fig.height = 6}
-
-par(mfrow= c(1,3), las = 1)
 
 ylim = c(-10, 10)
 matplot(years, t(nbp_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, 
-        ylab = 'GtC/year', main = 'NBP',
+        ylab = 'GtC', main = 'NBP', xlab = '',
         bty = 'n')
   
 ylim = range(rh_lnd_sum_ens)
 matplot(years, t(rh_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'fraction', main = 'Heterotrophic Respiration',
+        ylab = 'GtC/year', main = 'Heterotrophic Respiration', xlab = '',
         bty = 'n')
 
 ylim = range(fLuc_lnd_sum_ens)
 matplot(years, t(fLuc_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC/year', main = 'Land use change emissions',
+        ylab = 'GtC/year', main = 'Land use change emissions', xlab = '',
         bty = 'n')
 
 ylim = range(fHarvest_lnd_sum_ens)
 matplot(years, t(fHarvest_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC/year', main = 'Harvest C flux to atmosphere',
+        ylab = 'GtC/year', main = 'Harvest C flux to atmosphere', xlab = '',
         bty = 'n')
 
 
@@ -285,18 +273,13 @@ matplot(years, t(fHarvest_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, c
 ```
 
 
-```{r}
+```{r plot-carbon-cycle-anomaly-timeseries, fig.width = 9, fig.height = 6}
 
 npp_ens_anom <- anomalizeTSmatrix(npp_ens, 1:20)
 nbp_ens_anom <- anomalizeTSmatrix(nbp_ens, 1:20)
 cSoil_ens_anom <- anomalizeTSmatrix(cSoil_ens, 1:20)
 cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
 total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
-
-
-```
-
-```{r plot-carbon-cycle-anomaly-timeseries, fig.width = 9, fig.height = 6}
 
 par(mfrow= c(1,4), las = 1)
 
@@ -506,6 +489,8 @@ There are clear run failure thresholds in the parameters rootd_ft_io and lai_max
 NEXT, histograms of failure with the LHS value
 ```{r run-failure-pairs, fig.width = 12, fig.height = 12}
 
+# NB, plotting the inverse of this doesn't give you much information
+
 #simple way
 par(oma = c(10,10,0,0))
 #par(xpd = TRUE)
@@ -521,6 +506,19 @@ pairs(X_nlevel0,
 reset()
 
 legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.2, bty = 'n')
+
+```
+
+
+```{r, fig.width = 12, fig.height = 8}
+
+par(mfrow = c(4, 8), mar = c(4,3,2,1))
+
+for(i in 1:d){
+  
+  hist(X_nlevel0[,i], xlim = c(0,1), breaks = seq(from=0, to = 1, by = 0.1), col = 'grey', main = '', ylim = c(0,9),
+       border = 'white', xlab = colnames(X_nlevel0)[i], ylab = '', las = 1, cex.lab = 1.5)
+}
 
 ```
 
@@ -1520,7 +1518,146 @@ legend('bottomleft', legend = c('Ruled out','level 1a constrained','historical')
 ```
 
 
+### Identify parts of parameter space where the land carbon sink is at its maximum
+What do these parts of parameter space tell us about what we need to do to have the model reproduce reality?
+```{r}
 
+# Build an emulator for total land carbon uptake at the end of the century
+
+
+# ensemble of modern landsink
+landsink_modern_ix <- which(years[-1] %in% 1994:2013)
+
+landsink_modern_ens <- (apply(landsink_ens[, landsink_modern_ix], 1, mean))
+
+landsink_modern_ens_level1a <- landsink_modern_ens[toplevel_to_level_1a_ix]
+
+# observations of modern land sink
+
+hist_ix <- which(historical_carbon_budget$Year %in% 1994:2013)
+landsink_modern_obs <- mean(historical_carbon_budget$`land sink`[hist_ix ])
+
+# This is all 499 members
+landsink_modern_err <- landsink_modern_ens - landsink_modern_obs
+
+landsink_modern_err_level1a <- landsink_modern_err[toplevel_to_level_1a_ix]#
+
+
+
+#[level2_ix, ]
+
+# Build emulators 
+
+# Identify the parts of parameter space where the differences are low
+
+
+# Are we getting close for the right reasons? What else is going wrong?
+
+
+
+
+```
+
+
+```{r, fig.width = 12, fig.height = 6}
+
+
+par(mfrow = c(4,8), mar = c(3,2,2,1))
+for(i in 1:d){
+  
+  plot(X_level1a[, i],landsink_modern_err_level1a, )
+  
+}
+
+
+```
+
+```{r}
+
+
+fit_landsink_err <- km(~.,design = X_level1a, response =  landsink_modern_err_level1a)
+
+
+```
+```{r, fig.width = 6, fig.height = 8}
+
+plot(fit_landsink_err)
+
+```
+
+### what parts of parameter space are the closest?
+```{r}
+
+# Two strategies - plot land sink error against parameters, and identify bits of parameter space with smallest error
+
+#low_error_ix <- landsink_modern_err_level1a
+
+
+mins <- apply(X_level1a,2,FUN = min)
+maxes <- apply(X_level1a,2,FUN = max)
+  
+nsamp_unif <- 100000  
+X_unif <- samp_unif(nsamp_unif, mins = mins, maxes = maxes)
+
+pred_unif <- predict(fit_landsink_err, newdata = X_unif, type = 'UK')
+
+```
+
+```{r, fig.width = 12, fig.height = 12, warning=FALSE, message = FALSE}
+
+
+par(oma = c(0,0,0,3), bg = 'white')
+pairs(X_level1a,
+      labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = cpoints,
+      z= landsink_modern_ens_level1a,
+      col = byr,
+      cex.labels = 1,
+      col.axis = 'white',
+      pch = 20
+      )
+
+#image.plot(legend.only = TRUE,
+#           zlim = c(0,1),
+#           col = blues,
+#           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+#           horizontal = TRUE
+#)
+
+#  legend('left', legend = paste(1:d, colnames(lhs)), cex = 0.9, bty = 'n')
+
+
+```
+
+```{r, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 12}
+
+
+X_kept <- X_unif[abs(pred_unif$mean) < 1, ] 
+
+par(oma = c(0,0,0,3), bg = 'white')
+pairs(X_kept,
+      labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc.col = blues)
+
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = blues,
+           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+           horizontal = TRUE
+)
+
+legend('left', legend = paste(1:d, colnames(lhs)), cex = 0.9, bty = 'n')
+
+
+
+
+
+```
 
 
 ## Augment the design.
