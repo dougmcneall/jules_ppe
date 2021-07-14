@@ -1,0 +1,434 @@
+---
+title: "design-JULES-ES-1p0-wave01.Rmd"
+author: "Doug McNeall"
+date: "7/12/2021"
+output: html_document
+---
+
+
+# History matching wave 0 and generation of new ensemble members for wave 1
+To use History Matching, we need to specify targets for various model outputs. We treat these targets as "observations" with an uncertainty where a model run marked as "implausible" (beyond 3sd) matches the hard boundaries previously identified by A. Wiltshire as being desirable/not implausible.
+
+Choose the centre of the (implied) uniform distribution as a target for the history matching.  
+cs_gb.target = (3000 - 750) / 2 =  1125  
+cv.target = (800 - 300) / 2 = 250  
+npp_n_gb.target = (80 - 35) / 2 = 22.5  
+nbp.target = 0  
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.path = "figs/", echo = TRUE, message = FALSE, warnings = FALSE)
+```
+
+
+```{r prelim, results='hide', message = FALSE, warnings = FALSE}
+# Load packages, data, do basic constraints on the ensemble
+source('JULES-ES-1p0-common.R')
+source('~/myRpackages/julesR/vignettes/default_jules_parameter_perturbations.R')
+```
+
+
+```{r scaled-output}
+ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
+yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
+Y_const_level1a <- Y_level1a[, ynames_const]
+
+scalevec <- c(1e12/ysec, 1e12/ysec, 1e12, 1e12)
+Y_const_level1a_scaled <- sweep(Y_const_level1a, 2, STATS = scalevec, FUN = '/' )
+
+# This is a "normalisation vector", for making the output numbers more manageable.
+#cs_gb       cv    gpp_gb        nbp npp_n_gb    runoff
+norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
+
+# nbp  npp  csoil  cveg
+Y_lower <- c(-10, 35, 750, 300)
+Y_upper <- c(10, 80, 3000, 800)
+
+# I'm going to set it so that + 4sd aligns approximately with the original limits
+# given by Andy Wiltshire. This gives room for uncertainty from the emulator
+Y_target = Y_upper - (abs(Y_upper - (Y_lower)) / 2 )# abs() to fix the problem with negative numbers
+
+# standard deviation is derived from the limits and the central target
+# (this distance is assumed to be 4 standard deviations.
+Y_sd = (Y_upper - Y_target) / 4
+names(Y_sd) = colnames(Y_const_level1a_scaled)
+
+
+p = ncol(Y_const_level1a_scaled)
+
+obs_sd_list = as.list(rep(0.01,p))
+disc_list =  as.list(rep(0,p)) 
+disc_sd_list =  as.list(Y_sd)
+thres = 3
+
+mins_aug = apply(X_level1a, 2, FUN = min)
+maxes_aug =apply(X_level1a, 2, FUN = max)
+
+# convert Y_target for ingestion into function
+Y_target = matrix(Y_target, nrow = 1)
+
+```
+
+
+
+## Augment the design.
+The function addNroyDesignPoints builds an emulator for each model output in Y. It compares the output of each emulator at a number of candidate desin points, and chooses a space-filling set of them that that are Not Ruled Out Yet (statistically close to the observation at Y_target).
+
+```{r, warning=FALSE, message=FALSE, results='hide'}
+
+# use invisible() to hide the output from km (emulator fitting)
+invisible({capture.output({
+
+# Final output needs to be expressed in terms of original LHS, then put back out to conf files.
+
+# This function adds n.aug potential design points, and finds their implausibility
+# score in X.nroy
+
+wave1 = addNroyDesignPoints(X = X_level1a, 
+                            Y = Y_const_level1a_scaled, 
+                            Y_target = Y_target,
+                            n_aug = 50000, 
+                            mins_aug = mins_aug,
+                            maxes_aug = maxes_aug,
+                            thres = 3,
+                            disc_list=disc_list,
+                            disc_sd_list = disc_sd_list,
+                            obs_sd_list = obs_sd_list,
+                            n_app = 500,
+                            nreps = 500)
+
+})})
+
+```
+
+
+## Write the augmented design to JULES configuration files
+The function write_jules_design here simply takes the points calculated by addNroyDesignPoints and writes them to configuration files.
+
+```{r}
+# Easiest way to generate a design of the right size is to have a "fac" which takes
+# the names from the parameter list, and then multiplies everything by 0.5 or 2
+
+tf <- 'l_vg_soil'
+# we don't want anything that is TRUE/FALSE to be in fac
+fac_init <- names(paramlist)
+not_tf_ix <- which(names(paramlist)!=tf)
+paramlist_trunc <-paramlist[not_tf_ix]
+
+fac <- names(paramlist_trunc)
+
+maxfac <-lapply(paramlist_trunc,function(x) x$max[which.max(x$max)] / x$standard[which.max(x$max)])
+minfac <- lapply(paramlist_trunc,function(x) x$min[which.max(x$max)] / x$standard[which.max(x$max)])
+
+# create a directory for the configuration files
+confdir <- 'conf_files_augment_JULES-ES-1p0'
+
+dir.create(confdir)
+
+X_mm <- wave1$X_mm
+
+# This is the function that writes the configuration files.
+write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
+                    fac = fac, minfac = minfac, maxfac = maxfac,
+                    tf = tf,
+                    fnprefix = paste0(confdir,'/param-perturb-P'),
+                    lhsfn = paste0(confdir,'/lhs_example.txt'),
+                    stanfn = paste0(confdir,'/stanparms_example.txt'),
+                    allstanfn = paste0(confdir,'/allstanparms_example.txt'),
+                    rn = 12,
+                    startnum = 500)
+```
+
+## Check the design
+Check that the augmented design produces what we expect. New ensemble members should be somewhat constrained within the boundaries of the original design, if the comparison to data offers any constraint.
+
+```{r, fig.width = 15, fig.height = 15}
+
+X_mm <- wave1$X_mm
+
+pairs(rbind(X, X_mm), xlim = c(0,1), ylim = c(0,1), gap = 0, lower.panel = NULL, 
+      col = c(rep(makeTransparent('grey', 150), nrow(X)), rep(makeTransparent('red', 80), nrow(X_mm))),
+      pch = c(rep(21, nrow(X)), rep(20, nrow(X_mm)))
+      )
+
+par(xpd = NA)
+
+legend('bottom',
+       legend = c('Original design', 'New points'),
+       col = c('grey', 'red'),
+       inset = 0.15,
+       cex = 1.5,
+       pch = c(21,20)
+)
+
+```
+
+
+## Check the emulators that produce the new design
+Do a leave-one-out cross validation of points inside the hard boundaries of the constraints, using the wave1 emulator fits.
+
+
+```{r}
+
+aw_boundary_ix = which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10 &
+                         Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                         Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
+                         Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
+)
+
+
+
+X_aw_boundary = X_level1a[aw_boundary_ix, ]
+Y_aw_boundary = Y_const_level1a_scaled[aw_boundary_ix, ]
+
+```
+
+
+```{r}
+
+loo_mean_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+loo_sd_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+  
+  for(i in 1:ncol(Y_const_level1a_scaled)){
+
+loo <- leaveOneOut.km(wave1$fit_list[[i]],type = 'UK', trend.reestim = TRUE )
+  loo_mean_Y_level1a[,i] <- loo$mean
+  loo_sd_Y_level1a[,i] <- loo$sd
+}
+
+```
+
+We see in the leave-one-out analysis that the emulator is consistently under-predicting the vegetation carbon (though the uncertainty estimate often covers the actual value).This suggests (1) that there isn't really a huge problem with a model discrepancy (or at least that isn't the only problem), and (2) the history matching is working as it should, and taking into account a not-great emulator.
+
+```{r, fig.width = 8, fig.height = 8}
+
+par(mfrow = c(2,2), las = 1)
+
+for(i in 1:ncol(loo_mean_Y_level1a)){
+  
+  rn <- range(c(loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) ))
+  
+  
+  
+  plot(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_Y_level1a[aw_boundary_ix,i], ylim = rn, main = colnames(Y_const_level1a_scaled)[i], xlab = 'actual', ylab = 'predicted', bty = 'l')
+  
+  segments(x0 = Y_const_level1a_scaled[aw_boundary_ix, i], y0 = loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i])  , x1 = Y_const_level1a_scaled[aw_boundary_ix, i] , y1 = loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , col = makeTransparent('black', 70))
+  abline(0,1)
+  
+}
+
+
+```
+
+## Compare the straight km with a two-step emulator
+Is a two-step emulator any better at emulating those crucial points which fall within aw's hard boundaries? First, create a list of emulator fits.
+
+```{r}
+
+invisible({capture.output({
+
+fitlist_Y_const_level1a_scaled <- vector(mode = 'list', length = ncol(Y_const_level1a_scaled))
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+  
+  y <- Y_const_level1a_scaled[,i]
+  fit <- twoStep_glmnet(X = X_level1a, y)
+  fitlist_Y_const_level1a_scaled[[i]] <- fit
+
+}
+
+})})
+```
+
+```{r}
+loo_mean_glmnet_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+loo_sd_glmnet_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+  
+  for(i in 1:ncol(Y_const_level1a_scaled)){
+
+loo <- leaveOneOut.km(fitlist_Y_const_level1a_scaled[[i]]$emulator,type = 'UK', trend.reestim = TRUE )
+  loo_mean_glmnet_Y_level1a[,i] <- loo$mean
+  loo_sd_glmnet_Y_level1a[,i] <- loo$sd
+}
+
+```
+
+It doesn't appear that the two-step emulator (here plotted in red) is doing any better than the regular emulator.
+```{r, fig.width = 8, fig.height = 8}
+par(mfrow = c(2,2))
+
+for(i in 1:ncol(loo_mean_Y_level1a)){
+  
+  rn <- range(c(loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) ))
+  
+  
+  
+  plot(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_Y_level1a[aw_boundary_ix,i], ylim = rn, main = colnames(Y_const_level1a_scaled)[i], xlab = 'actual', ylab = 'predicted')
+  
+  points(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_glmnet_Y_level1a[aw_boundary_ix,i], col = 'red')
+  
+  
+  segments(x0 = Y_const_level1a_scaled[aw_boundary_ix, i], y0 = loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i])  , x1 = Y_const_level1a_scaled[aw_boundary_ix, i] , y1 = loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , col = makeTransparent('black', 70))
+  abline(0,1)
+  
+}
+```
+
+Two other things I can think of to check: 1) how about using "multistart" to choose different starting conditions for optimising the emulators and 2) Using a flat prior for the mean function rather than a linear prior.
+```{r}
+
+fitlist_flatprior_Y_const_level1a_scaled <- vector(mode = 'list', length = ncol(Y_const_level1a_scaled))
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+  
+  y <- Y_const_level1a_scaled[,i]
+  fit <- km(formula =~1, design = X_level1a, response = y)
+  fitlist_flatprior_Y_const_level1a_scaled[[i]] <- fit
+
+}
+
+
+```
+
+```{r}
+loo_mean_flatprior_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+loo_sd_flatprior_Y_level1a <- matrix(nrow = nrow(X_level1a), ncol = ncol(Y_const_level1a_scaled))
+  
+  for(i in 1:ncol(Y_const_level1a_scaled)){
+
+loo <- leaveOneOut.km(fitlist_flatprior_Y_const_level1a_scaled[[i]],type = 'UK', trend.reestim = TRUE )
+  loo_mean_flatprior_Y_level1a[,i] <- loo$mean
+  loo_sd_flatprior_Y_level1a[,i] <- loo$sd
+}
+
+```
+
+```{r, fig.width = 8, fig.height = 8}
+par(mfrow = c(2,2))
+
+for(i in 1:ncol(loo_mean_Y_level1a)){
+  
+  rn <- range(c(loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i]) , loo_mean_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_Y_level1a[aw_boundary_ix,i]) ))
+  
+  
+  
+  plot(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_Y_level1a[aw_boundary_ix,i], ylim = rn, main = colnames(Y_const_level1a_scaled)[i], xlab = 'actual', ylab = 'predicted')
+  
+  points(Y_const_level1a_scaled[aw_boundary_ix, i], loo_mean_flatprior_Y_level1a[aw_boundary_ix,i], col = 'red')
+  
+  
+  segments(x0 = Y_const_level1a_scaled[aw_boundary_ix, i], y0 = loo_mean_Y_level1a[aw_boundary_ix,i] - (2*loo_sd_Y_level1a[aw_boundary_ix,i])  , x1 = Y_const_level1a_scaled[aw_boundary_ix, i] , y1 = loo_mean_flatprior_Y_level1a[aw_boundary_ix,i] + (2*loo_sd_flatprior_Y_level1a[aw_boundary_ix,i]) , col = makeTransparent('black', 70))
+  abline(0,1)
+  
+}
+
+
+
+```
+
+
+
+
+## Does the emulator have a bias? Leave-one-out analysis
+
+```{r, fig.width = 10, fig.height = 10}
+
+Y_loo_list <- vector(mode ='list', length = length(wave1$fit_list))
+
+for(i in 1:length(wave1$fit_list)){
+
+y_loo <- leaveOneOut.km(wave1$fit_list[[i]], type = 'UK', trend.reestim = TRUE)
+
+Y_loo_list[[i]] <- y_loo
+
+}
+
+
+for(i in 1:length(wave1$fit_list)){
+  
+
+  
+}
+
+```
+
+
+
+
+Visualise the predicted outputs at the NROY points of the old design, and the new suggested design.
+```{r}
+Y_mm_list <- vector(mode ='list', length = length(wave1$fit_list))
+
+for(i in 1:length(wave1$fit_list)){
+
+y_mm <- predict(object=wave1$fit_list[[i]], newdata = wave1$X_mm, type = 'UK')
+
+Y_mm_list[[i]] <- y_mm
+
+}
+```
+
+## Visualising the emulated outputs at the proposed new design points.
+
+Interestingly, these aren't perfectly within the original hard boundaries set by Andy, even though I've set those boundaries to be the +- 4 standard deviation threholds in the History Match. I suggest this is because there is model discrepancy, and that there is considerable wriggle room induced from emulator uncertainty.
+
+In particular, it appears that vegetation carbon is difficult to keep high, and that many NROY proposed members have a fairly low vegetation carbon. This might need a discrepancy term, or adjusting in some other way. It certainly needs exploring, and a OAAT plot might give clues as to the parameters to choose.
+
+```{r, fig.width = 10, fig.height = 10}
+# Histogram of level 1 constraints
+hcol = 'darkgrey'
+lcol = 'black'
+par(mfrow = c(2,2), fg = 'darkgrey', las = 1)
+
+discsd <- c(disc_sd_list, recursive = TRUE)
+
+hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], col = hcol, main = 'NBP', xlab = 'GtC/year')
+hist(Y_mm_list[[1]]$mean, add = TRUE, col = 'black')
+polygon(x = c(-10, 100, 100, -10), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[1], col = 'black')
+rug(c(Y_target[1] + 3*discsd[1],Y_target[1] - 3*discsd[1]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'], col = hcol , main = 'NPP', xlab = 'GtC/year')
+hist(Y_mm_list[[2]]$mean, add = TRUE, col = 'black')
+polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[2], col = 'black')
+rug(c(Y_target[2] + 3*discsd[2],Y_target[2] - 3*discsd[2]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'cSoil_lnd_sum'], col = hcol, main = 'Soil Carbon', xlab = 'GtC')
+hist(Y_mm_list[[3]]$mean, add = TRUE, col = 'black')
+polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[3], col = 'black')
+rug(c(Y_target[3] + 3*discsd[3],Y_target[3] - 3*discsd[3]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'cVeg_lnd_sum'], col = hcol, main = 'Vegetation Carbon', xlab = 'GtC')
+hist(Y_mm_list[[4]]$mean, add = TRUE, col = 'black')
+polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+       border =  makeTransparent('tomato2'))
+rug(Y_target[4], col = 'black')
+rug(c(Y_target[4] + 3*discsd[4],Y_target[4] - 3*discsd[4]) , col = 'red')
+  
+```
+
+
+How good are the four emulators that we've built? Are there biases? (there's no real evidence of this)
+```{r, fig.width = 8, fig.height = 8}
+
+par(mfrow = c(2,2))
+
+for(i in 1:4){
+  
+hist(wave1$pred_list[[i]]$mean, main = colnames(Y_const_level1a_scaled)[i])
+  
+}
+
+
+
+```
+
