@@ -31,36 +31,11 @@ Load libraries, functions and data.
 # Load helper functions
 
 knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
-# load some helper functions
-source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
-source('explore-JULES-ES-1p0_PPE_functions.R')
 
+# load helper functions, data and do preliminary processing of the ensemble.
 source('JULES-ES-1p0-common.R')
-source('~/myRpackages/julesR/vignettes/default_jules_parameter_perturbations.R')
 ```
 
-```{r, message = FALSE, warning=FALSE}
-# Load packages
-
-library(RColorBrewer)
-library(wesanderson)
-library(fields)
-library(MASS)
-library(DiceKriging)
-library(DiceEval)
-library(ncdf4)
-library(ncdf4.helpers)
-library(readxl)
-
-library(foreach)
-
-library(emtools)
-library(imptools)
-library(viztools)
-library(julesR)
-
-
-```
 
 
 ## Carbon budget data
@@ -68,7 +43,7 @@ library(julesR)
 [Section 2.5 in Friedlingstein et al.](https://essd.copernicus.org/articles/12/3269/2020/#section2) describes how the land carbon sink is estimated.
 ```{r, historical-carbon-budget, warning = FALSE, fig.width = 10, fig.height = 10}
 
-pdf(file = 'carbon_budget.pdf', width = 10, height = 8)
+#pdf(file = 'carbon_budget.pdf', width = 10, height = 8)
 # Question: How closely should our model match this curve? Which output?
 # (My guess is 'Total Land Carbon anomaly')
 historical_carbon_budget <- read_excel('Global_Carbon_Budget_2020v1.0.xlsx', sheet = "Historical Budget", skip = 15, n_max = 270)
@@ -99,13 +74,13 @@ plot(historical_carbon_budget$Year, historical_carbon_budget$`ocean sink`, main 
 
 plot(historical_carbon_budget$Year, historical_carbon_budget$`budget imbalance`, main = 'budget imbalance', ylab = '', type = 'l', bty = 'n', ylim = ylim)
 
-dev.off()
+#dev.off()
 ```
 
 
-
-
 ### Variables available for analysis
+
+Load a single ensemble member to examine contents
 ```{r, load-output-ensemble}
 ensmember <- 'P0000/'
 subdir <- 'stats/'
@@ -127,85 +102,13 @@ for(i in 1:length(varlist)){
 }
 ```
 
-## Extract a time series of an annual, globally aggregated variable
-```{r, extarct-time-series}
-
-extractTimeseries <- function(nc, variable){
-    dat <- ncvar_get(nc, variable)
-    out <- dat
-    out
-}
-
-makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:2013){
-  
-  # nens is number of ensemble members
-  # nts length of timeseries
-  # cn is colnames()
-  datmat <- matrix(NA, nrow = nens, ncol = nts)
-  colnames(datmat) <- cn
-  
-  enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
-  floc <- paste0(ensloc,ensmember,subdir)
-  
-  for(i in 1:nens){
-    
-    vec <- rep(NA,nts)
-    
-    ensmember <- enslist[i] 
-    
-    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
- 
-    
-    try(nc <- nc_open(paste0(fn)))
-    try(dat <- extractTimeseries(nc, variable))
-    
-    datmat[i, ] <- dat
-    nc_close(nc)
-  }
-  datmat
-}
-
-```
-
 
 ## Plot timeseries of aggregated global timeseries 
-
-```{r include=FALSE,message=FALSE, warning = FALSE}
-
-#ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
-#yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
-#Y_const_level1 <- Y_level1[, ynames_const]
-
-# primary carbon cycle outputs
-npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
-nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
-cSoil_ens <-  makeTimeseriesEnsemble(variable = "cSoil_lnd_sum") / 1e12
-cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
-
-total_land_carbon_ens <- cSoil_ens + cVeg_ens
-
-lai_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "lai_lnd_mean")
-
-# fluxes
-rh_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "rh_lnd_sum") / (1e12/ysec)
-fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fLuc_lnd_sum") / (1e12/ysec)
-fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fHarvest_lnd_sum") / (1e12/ysec)
-
-
-# fractions
-treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "treeFrac_lnd_mean")
-shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "shrubFrac_lnd_mean")
-baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "baresoilFrac_lnd_mean")
-#c3PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c3PftFrac_lnd_mean_ens")
-#c4PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c4PftFrac_lnd_mean_ens")
-
-
-```
 
 
 ```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
 
-pdf(file = 'figs/plot-carbon-cycle-timeseries-primary-1.pdf', width = 10, height = 12)
+#pdf(file = 'figs/plot-carbon-cycle-timeseries-primary-1.pdf', width = 10, height = 12)
 par(mfrow= c(3,4), las = 1)
 
 plotcol <- c(makeTransparent('black', 70))
@@ -271,18 +174,12 @@ matplot(years, t(fHarvest_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, c
         ylab = 'GtC/year', main = 'Harvest C flux to atmosphere', xlab = '',
         bty = 'n')
 
-dev.off()
+#dev.off()
 
 ```
 
 
 ```{r plot-carbon-cycle-anomaly-timeseries, fig.width = 9, fig.height = 6}
-
-npp_ens_anom <- anomalizeTSmatrix(npp_ens, 1:20)
-nbp_ens_anom <- anomalizeTSmatrix(nbp_ens, 1:20)
-cSoil_ens_anom <- anomalizeTSmatrix(cSoil_ens, 1:20)
-cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
-total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
 
 par(mfrow= c(1,4), las = 1)
 
@@ -316,164 +213,6 @@ matplot(years, t(total_land_carbon_anom), type = 'l', lty = 'solid',ylim = ylim,
 
 
 
-## Function to extract the "modern value" direct from the file (last 20 years of the timeseries)
-```{r extract-modern-value-function, results = 'hide'}
-# for each of the variables in the file, average the last 20 years as the "modern" value,
-# and then place in a matrix
-
-modernValue <- function(nc, variable, ix){
-  # A basic function to read a variable and 
-  # take the mean of the timeseries at locations ix
-  dat <- ncvar_get(nc, variable)
-  out <- mean(dat[ix])
-  out
-}
-#144:164 is the 1993:2013
-modernValue(nc = nc, variable = "npp_nlim_lnd_mean", ix = 144:164)
-
-# apply to the test file to check it works
-#vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164)
-
-```
-
-## Loop to extract the "modern value" of a number of model outputs
-
-```{r load-ensemble, warning = FALSE, message = FALSE, results = FALSE}
-# Generate ensemble numbers, mean of the last 20 years of the timeseries (1994-2013)
-
-if (file.exists("ensemble.rdata")) {
-  load("ensemble.rdata")
-} else {
-  
-  nens = 499
-  datmat <- matrix(nrow = nens, ncol = length(varlist))
-  colnames(datmat) <- varlist
-  
-  enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
-  floc <- paste0(ensloc,ensmember,subdir)
-  
-  for(i in 1:nens){
-    
-    vec <- rep(NA, length(varlist))
-    
-    ensmember <- enslist[i] 
-    
-    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
-    #print(fn)
-    
-    try(nc <- nc_open(paste0(fn)))
-    try(vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164))
-    datmat[i, ] <- vec
-    nc_close(nc)
-  }
-  
-  save(nens, datmat,enslist,floc, file ="ensemble.rdata")
-}
-```
-
-
-## Calculate an ensemble of anomalies for all variables
-For each ensemble member and each variable, calculate the change from the 20 years at the start of the run, to the twenty years at the end of the run.
-
-```{r}
-tsAnomaly <- function(nc, variable, startix = 1:20, endix = 144:164){
-
-  # A basic function to read a variable and calculate the anomaly at the end of the run
-  dat <- ncvar_get(nc, variable)
-  endMean <- mean(dat[endix])
-  startMean <- mean(dat[startix])
-  out <- endMean - startMean
-  out
-}
-
-tsAnomaly(nc = nc, variable = "npp_nlim_lnd_mean")
-```
-
-```{r load-anomaly-ensemble, warning = FALSE, message = FALSE, results = FALSE}
-# Generate ensemble  mean of the last 20 years of the timeseries (1994-2013)
-
-if (file.exists("anomaly_ensemble.rdata")) {
-  load("anomaly_ensemble.rdata")
-} else {
-  
-  nens = 499
-  datmatAnom <- matrix(nrow = nens, ncol = length(varlist))
-  colnames(datmatAnom) <- varlist
-  
-  enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
-  floc <- paste0(ensloc,ensmember,subdir)
-  
-  for(i in 1:nens){
-    
-    vec <- rep(NA, length(varlist))
-    
-    ensmember <- enslist[i] 
-    
-    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
-    #print(fn)
-    
-    try(nc <- nc_open(paste0(fn)))
-    try(vec <- sapply(varlist, FUN = tsAnomaly, nc = nc))
-    datmatAnom[i, ] <- vec
-    nc_close(nc)
-  }
-  
-  save(nens, datmatAnom, enslist,floc, file ="anomaly_ensemble.rdata")
-}
-```
-
-
-## Clean data sets to "level 0"
-Initial clean of data set, removing variables that don't change, and removing NAs (models that didn't run).
-```{r level-0-output}
-
-Y_nlevel0_ix <- which(is.na(datmat[,'year']))
-
-YAnom_nlevel0_ix <- which(is.na(datmatAnom[,'year']))
-
-# This should be true to proceed, or we'll have to start excluding the combined set.
-identical(Y_nlevel0_ix, YAnom_nlevel0_ix)
-
-# Y is the whole data set
-Y <- datmat
-# Y_level0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
-Y_level0 <- datmat[-Y_nlevel0_ix, -c(2,30,31)]
-Y_nlevel0 <- datmat[Y_nlevel0_ix, -c(2, 30, 31)]
-
-
-# Y is the whole data set
-YAnom <- datmatAnom
-# Y.level0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
-YAnom_level0 <- datmatAnom[-YAnom_nlevel0_ix, -c(2,30,31)]
-YAnom_nlevel0 <- datmatAnom[YAnom_nlevel0_ix, -c(2,30,31)]
-
-```
-
-```{r level-0-input}
-# load the original design and input space, normalize to [0-1]
-
-# Load up the data
-lhs_i = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_i/lhs_u-ao732.txt', header = TRUE)
-lhs_ii = read.table('~/brazilCSSP/code/brazil_cssp/analyze_u-ao732/data/ES_PPE_ii/lhs_u-ao732a.txt', header = TRUE)
-
-toplevel_ix = 1:499
-
-# The raw input data is a latin hypercube
-lhs = rbind(lhs_i, lhs_ii)[toplevel_ix, ]
-lhs_level0 <- lhs[-Y_nlevel0_ix,]
-
-X = normalize(lhs)
-colnames(X) = colnames(lhs)
-
-X_level0 <- X[-Y_nlevel0_ix,]
-X_nlevel0 <- X[Y_nlevel0_ix,]
-
-d = ncol(X)
-# lower and higher bound on the normalised matrix for visualisation
-rx = rbind(rep(0,32), rep(1,32))
-```
-
-
 ## Where did the model fail to run?
 ("probability of run failure" Could be an interesting project - logit transformation for probability of run failure? Some other ML like SVM?
 
@@ -484,7 +223,7 @@ NEXT, histograms of failure with the LHS value
 ```{r run-failure-pairs, fig.width = 11, fig.height = 11}
 
 # NB, plotting the inverse of this doesn't give you much information
-pdf(file = 'figs/run-failure-pairs.pdf', width = 11, height = 11)
+#pdf(file = 'figs/run-failure-pairs.pdf', width = 11, height = 11)
 #simple way
 #par(xpd = TRUE)
 pairs(X_nlevel0, 
@@ -501,7 +240,7 @@ reset()
 
 legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.2, bty = 'n')
 
-dev.off()
+#dev.off()
 
 ```
 
@@ -600,6 +339,9 @@ abline(v = 0.9)
 
 
 ```{r failure-pairs, fig.width=12, fig.height=12, fig.path='figs/', dev=c('png', 'pdf')}
+
+
+low_npp_ix <- which(Y[,'npp_nlim_lnd_sum'] < 1e5)
 # code from https://stackoverflow.com/questions/28182872/how-to-use-different-sets-of-data-in-lower-and-upper-panel-of-pairs-function-in
 
 
@@ -672,8 +414,6 @@ for(i in 1:d){
 #dev.off()
 
 ```
-
-
 
 
 ## Level 1 constraint - remove ensemble members with F0 above threshold

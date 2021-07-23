@@ -26,8 +26,9 @@ library(viztools)
 library(julesR)
 
 # move the right functions here
-#source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
-#source('explore-JULES-ES-1p0_PPE_functions.R')
+source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
+source('explore-JULES-ES-1p0_PPE_functions.R')
+source('~/myRpackages/julesR/vignettes/default_jules_parameter_perturbations.R')
 
 
 ## ----------------------------------------------------------------------
@@ -54,7 +55,6 @@ years <- 1850:2013
 ## ----------------------------------------------------------------------
 ## Helper functions
 ## ----------------------------------------------------------------------
-
 
 reset <- function() {
   # Allows annotation of graphs, resets axes
