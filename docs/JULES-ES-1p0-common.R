@@ -16,6 +16,7 @@ library(DiceEval)
 library(ncdf4)
 library(ncdf4.helpers)
 library(readxl)
+library(wesanderson)
 
 library(foreach)
 
@@ -42,6 +43,10 @@ rb = brewer.pal(11, "RdBu")
 br = rev(rb)
 blues = brewer.pal(9, 'Blues')
 cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+zissou5 <- wes_palette('Zissou1', 5, type = c('discrete', 'continuous'))
+zblue <- makeTransparent(as.character(zissou5)[1], 150)
+zred <- makeTransparent(as.character(zissou5)[5], 150)
 
 ysec = 60*60*24*365
 years <- 1850:2013

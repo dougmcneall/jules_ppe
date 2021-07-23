@@ -34,12 +34,16 @@ knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warning
 # load some helper functions
 source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
 source('explore-JULES-ES-1p0_PPE_functions.R')
+
+source('JULES-ES-1p0-common.R')
+source('~/myRpackages/julesR/vignettes/default_jules_parameter_perturbations.R')
 ```
 
 ```{r, message = FALSE, warning=FALSE}
 # Load packages
 
 library(RColorBrewer)
+library(wesanderson)
 library(fields)
 library(MASS)
 library(DiceKriging)
@@ -58,20 +62,6 @@ library(julesR)
 
 ```
 
-
-```{r}
-# Some pallete options
-yg = brewer.pal(9, "YlGn")
-ryb = brewer.pal(11, "RdYlBu")
-byr = rev(ryb)
-rb = brewer.pal(11, "RdBu")
-br = rev(rb)
-blues = brewer.pal(9, 'Blues')
-cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-
-ysec = 60*60*24*365
-years <- 1850:2013
-```
 
 ## Carbon budget data
 
@@ -115,10 +105,8 @@ dev.off()
 
 
 
-### Jules output data location
+### Variables available for analysis
 ```{r, load-output-ensemble}
-
-ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
 ensmember <- 'P0000/'
 subdir <- 'stats/'
 
@@ -130,7 +118,6 @@ nc <- nc_open(paste0(floc,fn))
 
 # What variables are in the file? 
 varlist <- nc.get.variable.list(nc)
-
 
 for(i in 1:length(varlist)){
   
@@ -218,6 +205,7 @@ baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "baresoilFrac_lnd
 
 ```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
 
+pdf(file = 'figs/plot-carbon-cycle-timeseries-primary-1.pdf', width = 10, height = 12)
 par(mfrow= c(3,4), las = 1)
 
 plotcol <- c(makeTransparent('black', 70))
@@ -258,7 +246,7 @@ matplot(years, t(shrubFrac_lnd_mean_ens ), type = 'l', lty = 'solid',ylim = ylim
         ylab = 'fraction', main = 'Shrub fraction',xlab = '',
         bty = 'n')
 
-ylim = range(baresoilFrac_lnd_mean_ens)
+ylim = c(0,100)
 matplot(years, t(baresoilFrac_lnd_mean_ens ), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'fraction', main = 'bare soil fraction',xlab = '',
         bty = 'n')
@@ -283,8 +271,7 @@ matplot(years, t(fHarvest_lnd_sum_ens), type = 'l', lty = 'solid',ylim = ylim, c
         ylab = 'GtC/year', main = 'Harvest C flux to atmosphere', xlab = '',
         bty = 'n')
 
-
-
+dev.off()
 
 ```
 
@@ -327,15 +314,6 @@ matplot(years, t(total_land_carbon_anom), type = 'l', lty = 'solid',ylim = ylim,
 
 ```
 
-## Can we understand change and absolute?
-```{r}
-
-
-
-
-
-```
-
 
 
 ## Function to extract the "modern value" direct from the file (last 20 years of the timeseries)
@@ -354,7 +332,7 @@ modernValue <- function(nc, variable, ix){
 modernValue(nc = nc, variable = "npp_nlim_lnd_mean", ix = 144:164)
 
 # apply to the test file to check it works
-vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164)
+#vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164)
 
 ```
 
@@ -503,12 +481,11 @@ There are clear run failure thresholds in the parameters rootd_ft_io and lai_max
 
 
 NEXT, histograms of failure with the LHS value
-```{r run-failure-pairs, fig.width = 12, fig.height = 12}
+```{r run-failure-pairs, fig.width = 11, fig.height = 11}
 
 # NB, plotting the inverse of this doesn't give you much information
-
+pdf(file = 'figs/run-failure-pairs.pdf', width = 11, height = 11)
 #simple way
-par(oma = c(10,10,0,0))
 #par(xpd = TRUE)
 pairs(X_nlevel0, 
       xlim = c(0,1), ylim = c(0,1),
@@ -517,16 +494,21 @@ pairs(X_nlevel0,
       gap = 0,
       pch = 20,
       xaxt ='n', yaxt = 'n',
-      lower.panel = NULL)
+      lower.panel = NULL,
+      oma = c(0.5, 0.5, 0.5, 0.5))
 
 reset()
 
 legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.2, bty = 'n')
 
+dev.off()
+
 ```
 
 
 ```{r, fig.width = 12, fig.height = 8}
+
+#pdf(file = 'figs/run-failure-hists.pdf', width = 12, height = 8)
 
 par(mfrow = c(4, 8), mar = c(4,3,2,1))
 
@@ -536,7 +518,11 @@ for(i in 1:d){
        border = 'white', xlab = colnames(X_nlevel0)[i], ylab = '', las = 1, cex.lab = 1.5)
 }
 
+#dev.off()
+
 ```
+
+Could try an SVM, logistic regression or similar.
 
 
 ## Testing Gaussian Process emulators
@@ -609,6 +595,85 @@ plot(X_level0[,'f0_io'], Y_level0[, 'npp_nlim_lnd_sum'], xlab = 'f0_io', main = 
 abline(v = 0.9)
 
 ```
+
+
+
+
+```{r failure-pairs, fig.width=12, fig.height=12, fig.path='figs/', dev=c('png', 'pdf')}
+# code from https://stackoverflow.com/questions/28182872/how-to-use-different-sets-of-data-in-lower-and-upper-panel-of-pairs-function-in
+
+
+#X <- matrix(runif(300), ncol=3)
+#Y <- matrix(c(sort(runif(100, 0, 10)), 
+#              sort(runif(100, 0, 10)), 
+#              sort(runif(100, 0, 10))), ncol=3)
+
+#pdf(file = 'figs/run-failure-pairs.pdf', width = 12, height = 10)
+x1 <- X[low_npp_ix, ]
+x2 <- X_nlevel0
+
+XY <- rbind(x1, x2)
+
+
+pairs(XY,
+      lower.panel=function(x, y, ...) {
+        Xx <- x[seq_len(nrow(x1))] # corresponds to X subset
+        Xy <- y[seq_len(nrow(x1))] # corresponds to X subset
+        #usr <- par("usr"); on.exit(par(usr))
+        #par(usr = c(range(x1[, -ncol(x1)]), range(x1[, -1]))) # set up limits
+        points(Xx, Xy, col = zblue, pch = 19, cex = 0.8)
+       # if(par('mfg')[2] == 1) axis(2) # if left plot, add left axis
+        #if(par('mfg')[1] == ncol(x1)) axis(1) # if bottom plot add bottom axis
+      }, 
+      upper.panel=function(x, y, ...) {
+        Yx <- x[(nrow(x1) + 1):length(x)] # Y subset
+        Yy <- y[(nrow(x1) + 1):length(y)] # Y subset
+        
+        #cntr <- outer(Yx, Yx, FUN='*') # arbitrary function for contour
+       # usr <- par("usr"); on.exit(par(usr))
+        #par(usr = c(range(x2[, -1]), range(x2[, -ncol(x2)]))) # set up limits
+        points(Yx, Yy, col = zred, pch = 19, cex = 0.8)
+        #contour(Yx, Yy, cntr, add=TRUE)
+        #if(par('mfg')[2] == ncol(x2)) axis(4) # if right plot, add right axis
+        #if(par('mfg')[1] == 1) axis(3) # if top plot, add top axis
+      }, 
+      #tick=FALSE, # suppress the default tick marks
+      #line=1,
+      gap = 0,
+      xlim = c(0,1), ylim = c(0,1),
+      labels = 1:d,
+      oma = c(2, 18, 2, 2)) # move the default tick labels off the plot 
+
+reset()
+
+legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.1, bty = 'n')
+legend('topleft', pch = 19, col = c( zred, zblue), legend = c('failed', 'zero carbon cycle'), bty = 'n', inset = 0.02, cex = 1.1 )
+
+#dev.off()
+
+```
+
+
+```{r, fig.width = 12, fig.height = 8}
+
+#pdf(file = 'figs/run-failure-hists.pdf', width = 12, height = 8)
+
+par(mfrow = c(4,8), mar = c(5,3,2,1))
+
+for(i in 1:d){
+  
+  hist(x1[,i], xlim = c(0,1), breaks = seq(from=0, to = 1, by = 0.1), col = zblue, main = '', ylim = c(0,50),
+       border = 'white', xlab = colnames(X_nlevel0)[i], ylab = '', las = 1, cex.lab = 1.5)
+  
+  hist(x2[,i], breaks = seq(from=0, to = 1, by = 0.1), col = zred, border = 'white', add = TRUE)
+}
+
+   
+#dev.off()
+
+```
+
+
 
 
 ## Level 1 constraint - remove ensemble members with F0 above threshold
