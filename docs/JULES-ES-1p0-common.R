@@ -1,6 +1,7 @@
 # JULES-ES-1p0-common.R
 # A script to underly JULES-ES-1p0 ensemble work. Loading data, helper functions etc.
-# Loads ensemble and constrains ensemble to "level 0", which excludes inputs where the model doesn't run.
+# Loads ensemble and constrains ensemble to "level 1a", which excludes inputs where the model doesn't run, and removes 
+# ensemble members above/below (normalised) thresholds in f0_io and b_wl_io.
 # Doug McNeall July 2021
 
 
@@ -372,6 +373,21 @@ Y_level1a <- Y_level0[level1a_ix,]
 YAnom_level1a <- YAnom_level0[level1a_ix, ]
 
 
+p <- ncol(X_level0)
+
+## ---------------------------------------------------------------------------------------------
+# Outputs used for constraining the model
+## ---------------------------------------------------------------------------------------------
+ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
+yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
+Y_const_level1a <- Y_level1a[, ynames_const]
+
+scalevec <- c(1e12/ysec, 1e12/ysec, 1e12, 1e12)
+Y_const_level1a_scaled <- sweep(Y_const_level1a, 2, STATS = scalevec, FUN = '/' )
+
+# This is a "normalisation vector", for making the output numbers more manageable.
+#cs_gb       cv    gpp_gb        nbp npp_n_gb    runoff
+norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
 
 
 

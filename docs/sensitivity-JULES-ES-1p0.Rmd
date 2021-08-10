@@ -1,0 +1,351 @@
+---
+title: "Sensitivity Analysis Earth System configuration of JULES"
+author: "Doug McNeall"
+date: "09/08/2021"
+output: 
+    html_notebook:
+        toc: true
+        toc_float: true
+        toc_depth: 3
+        number_sections: true
+---
+
+
+## Preliminaries
+Load libraries, functions and data.
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
+# Load helper functions
+
+knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
+
+# load helper functions, data and do preliminary processing of the ensemble.
+source('JULES-ES-1p0-common.R')
+
+```
+
+```{r}
+
+twoStep_sens <- function(X, y, n=21, predtype = 'UK', nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, seed=NULL, trace=FALSE, maxit=100,
+                        REPORT=10, factr=1e7, pgtol=0.0, parinit=NULL, popsize=100){
+  # Sensitivity analysis with twoStep emulator. 
+  # Calculates the variance of the output varied one at a time across each input.
+  d = ncol(X)
+  X_norm <- normalize(X)
+  X_oaat <- oaat_design(X_norm, n, med = TRUE)
+  colnames(X_oaat) = colnames(X)
+  
+  twoStep_em = twoStep_glmnet(X=X, y=y, nugget=nugget, nuggetEstim=nuggetEstim, noiseVar=noiseVar,
+                              seed=seed, trace=trace, maxit=maxit,
+                              REPORT=REPORT, factr=factr, pgtol=pgtol,
+                              parinit=parinit, popsize=popsize)
+  
+  oaat_pred = predict(twoStep_em$emulator, newdata = X_oaat, type = predtype)
+  
+  sens = sensvar(oaat_pred = oaat_pred, n=n, d=d)
+  out = sens
+  out
+}
+```
+
+
+```{r, warning=FALSE, message = FALSE}
+
+if (file.exists("oat_twostep.rdata")) {
+  load("oat_twostep.rdata")
+} else {
+oat_test <- twoStep_sens(X = X_level1, y = y_level1)
+
+
+save(oat_test, file = "oat_twostep.rdata")
+}
+
+```
+
+
+```{r}
+y_names_sum <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum',
+            'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
+            'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
+            'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
+
+
+
+
+if (file.exists("oaat_Y.rdata")) {
+  load("oaat_Y.rdata")
+} else {
+  
+  
+oat_var_sensmat_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1[, yname]
+  oat <- twoStep_sens(X = X_level1, y = y)
+  oat_var_sensmat_Y[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_Y, file = "oaat_Y.rdata")
+}
+```
+
+## Sensitivity at level1 constraint (truncated f0_io)
+bwl_io becomes very influential across a number of variables
+
+```{r, fig.width= 10, fig.height = 6}
+# normalize the sensitivity matrix
+colnames(oat_var_sensmat_Y) <- colnames(X_level1)
+rownames(oat_var_sensmat_Y) <- y_names_sum
+
+#test <- normalize(t(oat.var.sensmat))
+
+#image(test)
+#par()
+heatmap(oat_var_sensmat_Y, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
+heatmap(oat_var_sensmat_Y, mar = c(10,10), scale = 'row')
+
+```
+
+
+```{r, fig.width =12, fig.height = 7}
+
+
+normsens_Y <- normalize(t(oat_var_sensmat_Y))
+
+par(mar = c(12,12,5,2))
+image(normsens_Y, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+```
+
+# Sensitivity at level1a constraint (f0_io and b_wl_io truncated)
+Define constraint level 1a as those members that run, and have F0_io <0.9 & b_wl_io > 0.15 (normalised).
+
+```{r}
+
+y_level1a <- Y_level1a[, 'npp_nlim_lnd_sum']
+
+```
+
+
+```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
+em_level1a <- km(~., design = X_level1a,  response = y_level1a)
+```
+
+
+ # Plot the regular km emulator.
+
+```{r, fig.width = 7, fig.height = 7}
+plot(em_level1a)
+
+
+```
+
+
+```{r}
+if (file.exists("oaat_level1a_Y.rdata")) {
+  load("oaat_level1a_Y.rdata")
+} else {
+  
+  
+oat_var_sensmat_level1a_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1a[, yname]
+  oat <- twoStep_sens(X = X_level1a, y = y)
+  oat_var_sensmat_level1a_Y[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_level1a_Y, file = "oaat_level1a_Y.rdata")
+}
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+
+p <- ncol(X_level1a)
+
+y_level1a <- Y_level1a[,'npp_nlim_lnd_sum']
+
+par(mfrow = c(5,7), mar = c(3,1,3,1))
+for(i in 1:p){
+  plot(X_level1a[,i], y_level1a, xlab = '', ylab = '', main = colnames(X_level1a)[i], xlim = c(0,1))
+}
+
+```
+
+# comparision of sensitivities level1 vs level1a
+With b_wl truncated, we can clearly see the sensitivities change.
+
+```{r, fig.width= 10, fig.height = 6}
+# normalize the sensitivity matrix
+colnames(oat_var_sensmat_level1a_Y) <- colnames(X_level1a)
+rownames(oat_var_sensmat_level1a_Y) <- y_names_sum
+
+#test <- normalize(t(oat.var.sensmat))
+
+#image(test)
+#par()
+heatmap(oat_var_sensmat_level1a_Y, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
+heatmap(oat_var_sensmat_level1a_Y, mar = c(10,10), scale = 'row')
+
+```
+
+
+```{r, fig.width =12, fig.height = 7}
+
+normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
+
+par(mar = c(12,12,5,2))
+image(normsens_level1a_Y, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1a), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance across level 1a ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+```
+
+
+
+```{r}
+# This fails for "cVeg_lnd_sum"
+# The result will be that some of the columns are repeated.
+
+if (file.exists("oaat_YAnom.rdata")) {
+  load("oaat_YAnom.rdata")
+} else {
+
+oat_var_sensmat_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- YAnom_level1[, yname]
+  try(oat <- twoStep_sens(X = X_level1, y = y))
+  oat_var_sensmat_YAnom[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_YAnom, file = "oaat_YAnom.rdata")
+
+}
+```
+
+
+
+```{r, fig.width= 10, fig.height = 6}
+# normalize the sensitivity matrix
+colnames(oat_var_sensmat_YAnom) <- colnames(X_level1)
+rownames(oat_var_sensmat_YAnom) <- y_names_sum
+
+#test <- normalize(t(oat.var.sensmat))
+
+#image(test)
+#par()
+heatmap(oat_var_sensmat_YAnom, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
+heatmap(oat_var_sensmat_YAnom, mar = c(10,6), scale = 'row')
+
+```
+
+
+```{r, fig.width =12, fig.height = 7}
+
+normsens_YAnom <- normalize(t(oat_var_sensmat_YAnom))
+
+par(mar = c(12,12,5,2))
+image(normsens_YAnom, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+```
+
+
+# Plot both sensitivity matrices on top of one another.
+It looks as though both the absolute value and the change over time are controlled by the same parameters.
+```{r, fig.width =12, fig.height = 12}
+par(mfrow = c(2,1), mar = c(12,12,5,2))
+
+image(normsens_Y, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+
+image(normsens_YAnom, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+
+```
+
+
+## One-at-a-time sensitivity analysis of constraining variables for understanding model response
+It's obviously hard to maintain a high vegetation carbon in particular. What parameter values might you choose to do this, and what might be the trade-offs you have to make?
+
+
+
+```{r}
+fit_list_const_level1a <- createKmFitList(X = X_level1a, Y = Y_const_level1a_scaled)
+
+```
+
+
+```{r}
+
+X_oaat_level1a <- oaat_design(X_level1a, n=21, med = TRUE)
+colnames(X_oaat_level1a) = colnames(X)
+
+y_oaat <- predict.km(fit_list_const_level1a[[4]], newdata = X_oaat_level1a, type = 'UK')
+
+```
+
+
+
+
+First, what parameters affect vegetation carbon and how? How sure are we about that?
+
+```{r, fig.width = 8, fig.height = 10}
+
+
+oaatLinePlot(X_oaat = X_oaat_level1a, y_oaat_mean = y_oaat$mean, y_oaat_sd = y_oaat$sd, 
+             n_oaat = 21,nr = 6, nc = 6) 
+
+
+```
+
+
+
+```{r}
+
+Y_oaat_const_level1a_scaled <- matrix(ncol = ncol(Y_const_level1a_scaled), nrow = nrow(X_oaat_level1a))
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+
+  y_oaat <- predict.km(fit_list_const_level1a[[i]], newdata = X_oaat_level1a, type = 'UK')
+  Y_oaat_const_level1a_scaled[,i] <- y_oaat$mean
+}
+
+```
+
+
+What might be the trade-offs for a high (or accurate) vegetation carbon? are they acceptable? Plot the oaat sensitivity of the other 3 outputs we're calibrating on. 
+
+```{r, fig.width=10, fig.height = 10}
+Y_oaat_const_level1a_scaled_norm <- normalize(Y_oaat_const_level1a_scaled)
+
+oaatLinePlotMulti(X_oaat = X_oaat_level1a, Y_oaat = Y_oaat_const_level1a_scaled_norm ,  n_oaat = 21, nr = 6, nc = 6,
+                  lwd = 3, cols = cbPal[c(1,2,6,8)])
+  
+reset()
+legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = cbPal[c(1,2,6,8)], lty = 'solid', lwd = 3, horiz = TRUE)
+
+
+```
+

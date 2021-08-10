@@ -1,0 +1,339 @@
+---
+title: "Testing emulators of the Earth System configuration of JULES"
+author: "Doug McNeall"
+date: "09/08/2021"
+output: 
+    html_notebook:
+        toc: true
+        toc_float: true
+        toc_depth: 3
+        number_sections: true
+---
+
+## Preliminaries
+Load libraries, functions and data.
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
+# Load helper functions
+
+knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
+
+# load helper functions, data and do preliminary processing of the ensemble.
+source('JULES-ES-1p0-common.R')
+
+```
+
+
+
+### Comparison of level 0 and level 1 emulators for NPP (modern value)
+
+```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
+em_npp_level0 <- km(~., design = X_level0,  response = y_level0)
+em_npp_level1 <- km(~., design = X_level1,  response = y_level1)
+
+em_npp_level0_ms <- km(~., design = X_level0,  response = y_level0, multistart = 4)
+em_npp_level1_ms <- km(~., design = X_level1,  response = y_level1, multistart = 4)
+
+
+```
+
+
+ # Plot the regular km emulator. Doesn't look great.
+
+```{r plot-em-npp-level0, fig.width = 7, fig.height = 7}
+plot(em_npp_level0)
+```
+
+```{r plot-em-npp-level1, fig.width = 7, fig.height = 7}
+plot(em_npp_level1)
+```
+
+
+### Leave-one-out summaries of NPP emulators
+```{r}
+
+loo_npp_level0 <- leaveOneOut.km(em_npp_level0, type = 'UK', trend.reestim = TRUE)
+loo_npp_level1 <- leaveOneOut.km(em_npp_level1, type = 'UK', trend.reestim = TRUE)
+
+RMSE ( loo_npp_level0$mean, y_level0)
+RMSE ( loo_npp_level1$mean, y_level1)
+
+
+# How about MAE over the range
+prop_mae <- function(Y, Ypred){
+  # mean absolute error as a proportion of the range of output
+  
+  absdiff <- abs(diff(range(Y)))
+  
+  mae <- MAE(Y, Ypred)
+  
+  propmae <- (mae / absdiff) * 100
+  
+  propmae
+  
+}
+
+prop_mae(y_level0, loo_npp_level0$mean)
+
+prop_mae(y_level1, loo_npp_level1$mean)
+
+
+
+
+
+
+```
+
+
+
+```{r}
+
+# It doesn't look like Multistart makes a big difference at all for NPP
+errstats_npp_level0 <- kmLooStats(km = em_npp_level0)
+errstats_npp_level0_ms <- kmLooStats(km = em_npp_level0_ms)
+
+errstats_npp_level1 <- kmLooStats(km = em_npp_level1)
+errstats_npp_level1_ms <- kmLooStats(km = em_npp_level1_ms)
+
+
+# proportional mean absolute error
+errstats_npp_level0$pmae
+errstats_npp_level0_ms$pmae
+
+
+errstats_npp_level1$pmae
+errstats_npp_level1_ms$pmae
+
+
+
+
+```
+
+
+
+## How good are the emulators for each output?
+The emulators appear to be at least capturing the broad response for all of the output variables.
+
+First, plot the straight kriging emulators
+
+```{r, fig.width = 12, fig.height = 6, results = 'hide'}
+
+if (file.exists("km_emulators_Y.rdata")) {
+  load("km_emulators_Y.rdata")
+} else {
+  
+  emlist_km_Y <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    yname <- y_names_sum[i]
+    y <- Y_level1[, yname]
+    
+    em <- km(~., design = X_level1, response = y)
+    emlist_km_Y[[i]] <- em
+  }
+  
+  loolist_km_Y <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    loo <- leaveOneOut.km(model = emlist_km_Y[[i]], type = 'UK', trend.reestim = TRUE)
+    loolist_km_Y[[i]] <- loo
+  }
+  
+  save(emlist_km_Y,loolist_km_Y, file = "km_emulators_Y.rdata")
+}
+
+```
+
+```{r}
+
+
+loostats_km_Y <- vector(mode = 'list', length = length(y_names_sum))
+
+for(i in 1:length(emlist_km_Y)){
+  
+  loostats <- kmLooStats(emlist_km_Y[[i]])
+  loostats_km_Y[[i]] <- loostats
+  print(loostats$pmae)
+}
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y)){
+  
+  y <- Y_level1[, y_names_sum[i]]
+  loo <- loolist_km_Y[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = y_names_sum[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+  legend('bottomright',legend = paste('mae =',round(loostats_km_Y[[i]]$pmae,2),'%') , bty = 'n')
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Modern Value (Y)', side = 3, line = 0, outer = TRUE, cex = 2) 
+
+```
+
+```{r, fig.width = 12, fig.height = 6, results = 'hide'}
+
+if (file.exists("km_emulators_YAnom.rdata")) {
+  load("km_emulators_YAnom.rdata")
+} else {
+  
+  emlist_km_YAnom <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    yname <- y_names_sum[i]
+    y <- YAnom_level1[, yname]
+    
+    em <- km(~., design = X_level1, response = y)
+    emlist_km_YAnom[[i]] <- em
+  }
+  
+  loolist_km_YAnom <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    loo <- leaveOneOut.km(model = emlist_km_YAnom[[i]], type = 'UK', trend.reestim = TRUE)
+    loolist_km_YAnom[[i]] <- loo
+  }
+  
+  save(emlist_km_YAnom,loolist_km_YAnom, file = "km_emulators_YAnom.rdata")
+}
+
+```
+
+
+# km emulators for change in variables over time
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_YAnom)){
+  
+  y <- YAnom_level1[, y_names_sum[i]]
+  loo <- loolist_km_YAnom[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = y_names_sum[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+  
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Change over time (YAnom)', side = 3, line = 1, outer = TRUE, cex = 2) 
+
+```
+
+Next, plot the twostep glmnet/km emulators
+
+```{r, fig.width = 12, fig.height = 6}
+# Twostep glmnet emulators
+
+if (file.exists("ts_emulators_Y.rdata")) {
+  load("ts_emulators_Y.rdata")
+} else {
+  
+  emlist_twoStep_glmnet_Y <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    yname <- y_names_sum[i]
+    y <- Y_level1[, yname]
+    
+    em <- twoStep_glmnet(X = X_level1, y = y)
+    emlist_twoStep_glmnet_Y[[i]] <- em
+  }
+  
+  loolist_twoStep_glmnet_Y <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    loo <- leaveOneOut.km(model = emlist_twoStep_glmnet_Y[[i]]$emulator, type = 'UK', trend.reestim = TRUE)
+    loolist_twoStep_glmnet_Y[[i]] <- loo
+  }
+  
+  
+  
+  save(emlist_twoStep_glmnet_Y, loolist_twoStep_glmnet_Y, file = "ts_emulators_Y.rdata")
+
+}
+
+
+```
+
+```{r}
+# Can get numerical performance using
+
+loostats_twoStep_glmnet_Y <- vector(mode = 'list', length = length(y_names_sum))
+
+for(i in 1:length(emlist_twoStep_glmnet_Y)){
+  
+  loostats <- kmLooStats(emlist_twoStep_glmnet_Y[[i]]$emulator)
+  loostats_twoStep_glmnet_Y[[i]] <- loostats
+  print(loostats$pmae)
+}
+
+
+```
+
+
+
+## TwoStep emulator performance for modern values
+
+```{r, fig.width = 12, fig.height = 12}
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_twoStep_glmnet_Y)){
+  
+  y <- Y_level1[, y_names_sum[i]]
+  loo <- loolist_twoStep_glmnet_Y[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = y_names_sum[i] , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+  legend('bottomright',legend = paste('mae =',round(loostats_twoStep_glmnet_Y[[i]]$pmae,2),'%') , bty = 'n')
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Modern Value (Y)', side = 3, line = 0, outer = TRUE, cex = 2) 
+
+```
+
+# Compare Leave-one-out statistics for the two types of emulator
+
+We use the leave-one-out Mean Absolute Error, expressed as a percentage of the range of the output across the ensemble. We find that the twostep emulatorisn't significantly more accurate, and is indeed *less* accurate for tree fraction.
+
+```{r, fig.width = 8, fig.height = 7}
+
+
+km_pmae <- sapply(loostats_km_Y, '[[', 'pmae')
+ts_pmae <- sapply(loostats_twoStep_glmnet_Y, '[[', 'pmae')
+
+par(mar = c(12,4,2,1), las =1 )
+plot(1:length(y_names_sum), km_pmae,
+     ylim = c(0,15), pch = 19,
+     axes = FALSE, xlab = '', 
+     ylab = 'LOO MAE (% of range)',
+     cex = 1.2)
+points(1:length(y_names_sum),ts_pmae , col= 'red', pch = 19, cex = 1.2)
+legend('topleft', c('km emulator', 'twoStep emulator'), pch = 19, col = c('black', 'red'), pt.cex = 1.2)
+axis (2)
+par(las = 2)
+axis(1, at = 1:length(y_names_sum), labels = y_names_sum)
+
+```
+
+
+
