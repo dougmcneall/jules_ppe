@@ -21,10 +21,22 @@ knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warning
 
 # load helper functions, data and do preliminary processing of the ensemble.
 source('JULES-ES-1p0-common.R')
-
 ```
 
+
 ```{r}
+# Helper functions
+
+sensvar = function(oaat_pred, n, d){
+  # Calculate variance as a global sensitivity meansure
+  out = rep(NA,d)
+  for(i in 1:d){
+    ix = seq(from = ((i*n) - (n-1)), to =  (i*n), by = 1)
+    out[i] = var(oaat_pred$mean[ix])
+  }
+  out
+}
+
 
 twoStep_sens <- function(X, y, n=21, predtype = 'UK', nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, seed=NULL, trace=FALSE, maxit=100,
                         REPORT=10, factr=1e7, pgtol=0.0, parinit=NULL, popsize=100){
@@ -46,6 +58,36 @@ twoStep_sens <- function(X, y, n=21, predtype = 'UK', nugget=NULL, nuggetEstim=F
   out = sens
   out
 }
+
+
+
+oaatSensvarKm <- function(X, y, n = 21, formula = ~., predtype = 'UK', ...){
+  # one-at-a-time sensitivity summary with a standard dicekriging emulator
+  
+  d = ncol(X)
+  X_norm <- normalize(X)
+  X_oaat <- oaat_design(X_norm, n, med = TRUE)
+  colnames(X_oaat) = colnames(X)
+  
+
+  em <- km(formula = formula, design = X, response = y, ...)
+  
+  oaat_pred = predict(em, newdata = X_oaat, type = predtype)
+  
+  sens = sensvar(oaat_pred = oaat_pred, n=n, d=d)
+  out = sens
+  out
+  
+}
+
+```
+
+```{r}
+# We're just interested in the "sum" (global totals) data, not the "mean" (global means) data
+y_names_sum <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum',
+            'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
+            'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
+            'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
 ```
 
 
@@ -64,13 +106,6 @@ save(oat_test, file = "oat_twostep.rdata")
 
 
 ```{r}
-y_names_sum <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum',
-            'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
-            'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
-            'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
-
-
-
 
 if (file.exists("oaat_Y.rdata")) {
   load("oaat_Y.rdata")
@@ -90,6 +125,8 @@ for(i in 1:length(y_names_sum)){
 save(y_names_sum, oat_var_sensmat_Y, file = "oaat_Y.rdata")
 }
 ```
+
+
 
 ## Sensitivity at level1 constraint (truncated f0_io)
 bwl_io becomes very influential across a number of variables
@@ -124,13 +161,13 @@ mtext('One-at-a-time sensitivity, variance across level 1 ensemble', side = 3, a
 
 # Sensitivity at level1a constraint (f0_io and b_wl_io truncated)
 Define constraint level 1a as those members that run, and have F0_io <0.9 & b_wl_io > 0.15 (normalised).
-
 ```{r}
 
 y_level1a <- Y_level1a[, 'npp_nlim_lnd_sum']
 
-```
+oaat_sens_npp <- oaatSensvarKm(X = X_level1a, y = y_level1a)
 
+```
 
 ```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
 em_level1a <- km(~., design = X_level1a,  response = y_level1a)
@@ -151,19 +188,106 @@ if (file.exists("oaat_level1a_Y.rdata")) {
   load("oaat_level1a_Y.rdata")
 } else {
   
-  
 oat_var_sensmat_level1a_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
 
 for(i in 1:length(y_names_sum)){
   
   yname <- y_names_sum[i]
   y <- Y_level1a[, yname]
-  oat <- twoStep_sens(X = X_level1a, y = y)
+  oat <- oaatSensvarKm(X = X_level1a, y = y)
   oat_var_sensmat_level1a_Y[i, ] <- oat
 }
 
 save(y_names_sum, oat_var_sensmat_level1a_Y, file = "oaat_level1a_Y.rdata")
 }
+
+```
+
+
+```{r, fig.width = 12, fig.height = 8}
+normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
+
+par(mar = c(12,12,5,2))
+image(normsens_level1a_Y, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1a), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance across level 1a ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+
+```
+
+# Anomaly sensitivities
+
+```{r}
+if (file.exists("oaat_level1a_YAnom.rdata")) {
+  load("oaat_level1a_YAnom.rdata")
+} else {
+  
+oat_var_sensmat_level1a_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- YAnom_level1a[, yname]
+  oat <- oaatSensvarKm(X = X_level1a, y = y)
+  oat_var_sensmat_level1a_YAnom[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_level1a_YAnom, file = "oaat_level1a_YAnom.rdata")
+}
+
+```
+
+
+
+```{r, fig.width = 12, fig.height = 7}
+
+
+
+normsens_level1a_YAnom <- normalize(t(oat_var_sensmat_level1a_YAnom))
+
+par(mar = c(12,12,5,2))
+image(normsens_level1a_YAnom, axes = FALSE, col = blues)
+axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1a), las = 2)
+axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
+mtext('One-at-a-time sensitivity, variance across level 1a ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+
+
+```
+
+```{r, fig.width = 12, fig.height=6}
+# Summarise the sensitivity summaries per parameter
+
+normsens_mean_Y <- apply(normsens_level1a_Y ,1, mean)
+normsens_mean_YAnom <- apply(normsens_level1a_YAnom ,1, mean)
+
+
+rn <- range(normsens_mean_Y, normsens_mean_YAnom)
+plot(normsens_mean_Y)
+points(normsens_mean_YAnom, col = 'red')
+
+plot(normsens_mean_Y,  normsens_mean_YAnom)
+abline(0,1)
+
+
+
+```
+
+
+```{r, fig.height = 8, fig.width = 4}
+
+sort_ix <- sort(normsens_mean_Y, decreasing = FALSE, index.return = TRUE)
+
+dotchart(normsens_mean_Y[sort_ix$ix], labels = colnames(X_level1a)[sort_ix$ix], bg = zissou5[5] , xlim = c(0,0.8), pch = 19)
+points(normsens_mean_YAnom[sort_ix$ix], 1:32, col = zissou5[1], pch = 19)
+         
+dotchart(normsens_mean_Y, labels = colnames(X_level1a), bg = zissou5[5] , xlim = c(0,0.8), pch = 19)
+points(normsens_mean_YAnom, 1:32, col = zissou5[1], pch = 19)
+
+
+#dotchart(data$sold, pch = 21, labels = data$month, bg = "green",
+#         pt.cex = 1.5, xlim = range(data$expected, data$sold) + c(-2, 2))
+#points(data$expected, 1:nrow(data), col = "red", pch = 19, cex = 1.5)
 
 ```
 
@@ -286,8 +410,38 @@ mtext('One-at-a-time sensitivity, variance of historical change across level 1 e
 ```
 
 
+Need Y and Yanom sensitivities at level 1a
+
+```{r}
+# This fails for "cVeg_lnd_sum"
+# The result will be that some of the columns are repeated.
+
+if (file.exists("oaat_level1a_YAnom.rdata")) {
+  load("oaat_level1a_YAnom.rdata")
+} else {
+
+oat_var_sensmat_level1a_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- YAnom_level1a[, yname]
+  try(oat <- twoStep_sens(X = X_level1a, y = y))
+  oat_var_sensmat_level1a_YAnom[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_level1a_YAnom, file = "oaat_level1a_YAnom.rdata")
+
+}
+```
+
+
+
 ## One-at-a-time sensitivity analysis of constraining variables for understanding model response
-It's obviously hard to maintain a high vegetation carbon in particular. What parameter values might you choose to do this, and what might be the trade-offs you have to make?
+"Constraining variables" being those we use to constrain the model (npp, nbp, cSoil and cVeg).
+It's hard to maintain a high vegetation carbon in particular.  
+
+Further idea: What parameter values might you choose to do this, and what might be the trade-offs you have to make?
 
 
 
@@ -298,15 +452,18 @@ fit_list_const_level1a <- createKmFitList(X = X_level1a, Y = Y_const_level1a_sca
 
 
 ```{r}
+# Check that oatSensVar and the plotting make sense
+
+
+oaat_sens_cVeg <- oaatSensvarKm(X = X_level1a, y = Y_const_level1a_scaled[,"cVeg_lnd_sum"])
 
 X_oaat_level1a <- oaat_design(X_level1a, n=21, med = TRUE)
+
 colnames(X_oaat_level1a) = colnames(X)
 
 y_oaat <- predict.km(fit_list_const_level1a[[4]], newdata = X_oaat_level1a, type = 'UK')
 
 ```
-
-
 
 
 First, what parameters affect vegetation carbon and how? How sure are we about that?
@@ -316,8 +473,6 @@ First, what parameters affect vegetation carbon and how? How sure are we about t
 
 oaatLinePlot(X_oaat = X_oaat_level1a, y_oaat_mean = y_oaat$mean, y_oaat_sd = y_oaat$sd, 
              n_oaat = 21,nr = 6, nc = 6) 
-
-test
 
 
 ```
