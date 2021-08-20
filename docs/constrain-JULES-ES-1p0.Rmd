@@ -430,42 +430,6 @@ hist(x2[,i], xlim = c(0,1),breaks = seq(from=0, to = 1, by = 0.1), col = zred, b
 ```
 
 
-```{r}
-
-
-
-
-```
-
-```{r}
-
-# MOVE THIS TO IMPTOOLS OR EMTOOLS
-# Given a km model, produce some error statistics
-
-
-```
-
-
-
-
-
-
-```{r}
-# DiceEval is useful but slow/awkward
-
-# DE_em_npp_level0 <- modelFit(X = X_level0, Y = y_level0, type = 'Kriging', formula = ~. )
-# DE_em_npp_level1 <- modelFit(X = X_level1, Y = y_level1, type = 'Kriging', formula = ~. )
-
-# npp_em_cv_level0 <- crossValidation(DE_em_npp_level0, 5)
-# npp_em_cv_level1  <- crossValidation(DE_em_npp_level1, 5)
-
-```
-
-
-
-
-
-
 ## Re-examine bwl_io
 A closer look at bwl_io now that the impact of f0_io has been removed shows a large number of "zero" NPP when bwl_io is at low values, which could well be the source of apparent sensitivity.
 

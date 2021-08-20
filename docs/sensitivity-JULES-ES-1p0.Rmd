@@ -296,7 +296,7 @@ Y_oaat_const_level1a_scaled_norm <- normalize(Y_oaat_const_level1a_scaled)
             }
   
           }
-  
+    
         }
 
 #pdf(file = 'figs/Y_oaat_const_level1a_scaled_norm.pdf', width = 10, height = 10)

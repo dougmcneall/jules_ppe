@@ -5,6 +5,9 @@
 # Doug McNeall July 2021
 
 
+# Note: at the moment, makeTimeSeriesEnsemble opens a file and extracts a single timesries, which is really inefficient.  
+# Refactor to extract all the necessary timeseries.
+
 ## ----------------------------------------------------------------------
 ## Load packages
 ## ----------------------------------------------------------------------
