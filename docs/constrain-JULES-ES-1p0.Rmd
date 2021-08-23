@@ -450,7 +450,6 @@ for(i in 1:p){
 
 
 
-
 ```{r}
 
 # Write an emulator wrapper
@@ -551,19 +550,115 @@ Plot the original ensemble, plus the stuff that matches the constraints. Include
 "Level 2" constraints are broad constraints produced by AW
 "Level 3" constraints are tighter constraints from citeable sources produced by ER.
 
+
 ```{r, fig.width = 12, fig.height = 9}
 
-# remove to level 1a Relative to toplevel_ix
+# remove to level 1a Relative to toplevel_ix - useful for plotting etc.
 toplevel_to_level_1a_ix <-(toplevel_ix[-Y_nlevel0_ix])[level1a_ix]
 
 # So further constraining to level 2 can be associated back to the top level.
 
-level2_ix = which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10 &
+level2_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10 &
                     Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
                     Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
                   Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
+                  
+                  
   )
 
+
+```
+
+
+## Cumulative NBP
+Email from ER:
+
+Hello,
+
+I’ve had a look for some multi-model ranges…
+
+From the ILAMB CMIP6 pages.
+NBP accumulated between 1959 and 2014: (-227 INM) -106 to +16.3 Gt
+GPP 1980-2014 mean: 104-144 Gt/yr (157 INM, 159 BCC)
+cVeg 1996-2006 mean: 338-582 Gt (635 INM)
+cSoil 2000-2001 mean: 319-1760 Gt
+
+From Spencer’s recent paper about a subset of CMIP6 models.
+NBP 2000-2009 mean: 0.45-2.24 Gt/yr
+
+From Trendy 2019 ensemble, all are 1985-2014 means.
+NBP: 0.21-1.82 Gt/yr
+GPP: 107-165 Gt/yr
+cVeg: 335-869 Gt
+cSoil: 626-3595 Gt
+
+I can update the Trendy results to the latest 2020 version and/or change the meaning period if needed.
+
+Cheers,
+Eddy.
+
+```{r, width = 7, height = 7}
+# Apply some constraints to NBP to see how much further it gets you
+#From the ILAMB CMIP6 pages.
+#NBP accumulated between 1959 and 2014: (-227 INM) -106 to +16.3 Gt
+
+
+cumulative_nbp <- matrix(nrow = nrow(nbp_ens), ncol = ncol(nbp_ens))
+
+for(i in 1:nrow(cumulative_nbp)){
+  
+  cnbp <- cumsum(nbp_ens[i, ])
+  cumulative_nbp[i, ] <- cnbp
+  
+}
+
+
+par(mfrow = c(1,2))
+matplot(t(nbp_ens), type = 'l', ylab = 'GtC/year', col = plotcol, ylim = c(-10, 10))
+
+ylim = c(-150, 200)
+
+matplot(years, t(cumulative_nbp), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, 
+        ylab = 'GtC', main = 'NBP', xlab = '',
+        bty = 'n')
+
+```
+
+```{r}
+# extract nbp accumulated between 1959 and 2014:
+
+start_ix = which(years == 1959)
+end_ix <- which(years == 2013)
+
+
+nbp_modern_accum <- cumulative_nbp[, end_ix] - cumulative_nbp[, start_ix]
+
+
+#par(mfrow = c(2,1))
+#hist(nbp_modern_accum , xlim = c(-100, 150))
+
+nbp_modern_accum_level1a <- nbp_modern_accum[toplevel_to_level_1a_ix]
+
+#hist(nbp_modern_accum_level1a , xlim = c(-100, 150))
+
+nbp_accum_ix <- which(nbp_modern_accum_level1a > -106 &  nbp_modern_accum_level1a <16.3)
+
+ylim = range(c(-100, 150))
+matplot(years, t(cumulative_nbp), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'cumulative NBP',
+        bty = 'n')
+matlines( years, t((cumulative_nbp[toplevel_to_level_1a_ix, ])[nbp_accum_ix, ]),col = overplotcol,lwd = 1.5, lty = 'solid')
+
+
+
+
+
+```
+
+
+
+
+```{r }
 
 # 1837 < cSoil < 3257 Pg
 # 380 < cVeg < 536 Pg
@@ -572,11 +667,11 @@ level2_ix = which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10 &
 # Plus decadal ranges of NBP (1960-2019) from -0.4 Pg/yr to +2.6 Pg/yr, where NBP is the net flux into the land including land-use
 # emissions.
 
-level3_ix = which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -0.4 & Y_const_level1a_scaled[,'nbp_lnd_sum'] < 2.6 &
+level3_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -0.4 & Y_const_level1a_scaled[,'nbp_lnd_sum'] < 2.6 &
                     Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 1837 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3257 &
                   Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 380 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 536
   )
-
+  
 
 ```
 
@@ -622,7 +717,7 @@ matlines( years, t((cVeg_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]),col 
 ```
 
 ## Atmospheric growth
-We can calculated the atmospheric growth as Fossil fule emissions (GCB) - Ocean uptake  (GCB) - net land flux (JULES NBP)
+We can calculate the atmospheric growth as Fossil fule emissions (GCB) - Ocean uptake  (GCB) - net land flux (JULES NBP)
 
 Conversely, we can calculate the land uptake as NBP = FF - ocean - ag (Do we have AG in JULES?)
 
@@ -658,13 +753,13 @@ for(i in 1:nrow(nbp_ens)){
   
 }
 
-pdf(width = 8, height = 6, file = 'ag.pdf')
+#pdf(width = 8, height = 6, file = 'ag.pdf')
 matplot(years, t(ag), type = 'l', lty = 'solid',ylim = c(0, 8), col = 'darkred', 
          ylab = 'GtC', main = 'atmospheric growth', xlab = '',
          bty = 'n', xlim = c(1960, 2020))
 
 lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growth`, col = 'black', lwd =2)
-dev.off()
+#dev.off()
 
 ```
 

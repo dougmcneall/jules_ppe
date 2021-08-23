@@ -117,6 +117,7 @@ makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:20
   datmat
 }
 
+
 ## Function to extract the "modern value" direct from the file (last 20 years of the timeseries)
 # for each of the variables in the file, average the last 20 years as the "modern" value,
 # and then place in a matrix
@@ -164,29 +165,39 @@ twoStep_glmnet <- function(X, y, nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, 
 ## Load ensemble
 ## ----------------------------------------------------------------------
 
-# primary carbon cycle outputs
-npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
-nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
-cSoil_ens <-  makeTimeseriesEnsemble(variable = "cSoil_lnd_sum") / 1e12
-cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
+
+if (file.exists("ensemble_timeseries.rdata")) {
+  load("ensemble_timeseries.rdata")
+} else {
+  
+  # primary carbon cycle outputs
+  npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+  nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
+  cSoil_ens <-  makeTimeseriesEnsemble(variable = "cSoil_lnd_sum") / 1e12
+  cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
+  
+  
+  lai_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "lai_lnd_mean")
+  
+  # fluxes
+  rh_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "rh_lnd_sum") / (1e12/ysec)
+  fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fLuc_lnd_sum") / (1e12/ysec)
+  fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fHarvest_lnd_sum") / (1e12/ysec)
+  
+  
+  # fractions
+  treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "treeFrac_lnd_mean")
+  shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "shrubFrac_lnd_mean")
+  baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "baresoilFrac_lnd_mean")
+  #c3PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c3PftFrac_lnd_mean_ens")
+  #c4PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c4PftFrac_lnd_mean_ens")
+  
+  save(npp_ens, nbp_ens, cSoil_ens, cVeg_ens, lai_lnd_mean_ens, rh_lnd_sum_ens, fLuc_lnd_sum_ens, fHarvest_lnd_sum_ens,
+       treeFrac_lnd_mean_ens, shrubFrac_lnd_mean_ens, baresoilFrac_lnd_mean_ens, file = "ensemble_timeseries.rdata" )
+  
+}
 
 total_land_carbon_ens <- cSoil_ens + cVeg_ens
-
-lai_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "lai_lnd_mean")
-
-# fluxes
-rh_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "rh_lnd_sum") / (1e12/ysec)
-fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fLuc_lnd_sum") / (1e12/ysec)
-fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fHarvest_lnd_sum") / (1e12/ysec)
-
-
-# fractions
-treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "treeFrac_lnd_mean")
-shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "shrubFrac_lnd_mean")
-baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "baresoilFrac_lnd_mean")
-#c3PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c3PftFrac_lnd_mean_ens")
-#c4PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c4PftFrac_lnd_mean_ens")
-
 
 ## ----------------------------------------------------------------------
 ## Anomalize ensemble

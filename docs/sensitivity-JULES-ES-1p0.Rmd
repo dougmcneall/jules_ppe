@@ -328,7 +328,7 @@ knit_exit()
 
 normsens_mean_Y <- apply(normsens_level1a_Y ,1, mean)
 normsens_mean_YAnom <- apply(normsens_level1a_YAnom ,1, mean)
-
+  
 sort_ix <- sort(normsens_mean_Y, decreasing = FALSE, index.return = TRUE)
 
 dotchart(normsens_mean_Y[sort_ix$ix], labels = colnames(X_level1a)[sort_ix$ix], bg = zissou5[5] , xlim = c(0,0.8), pch = 19)
