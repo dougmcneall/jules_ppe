@@ -519,11 +519,13 @@ Y_target = matrix(Y_target, nrow = 1)
 # Histogram of level 1 constraints
 hcol = 'darkgrey'
 lcol = 'black'
+
+#pdf(file = 'figs/level_2_constraints_hists.pdf', width = 6, height = 5)
 par(mfrow = c(2,2), fg = 'darkgrey', las = 1)
 
 
 hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], col = hcol, main = 'NBP', xlab = 'GtC/year')
-polygon(x = c(-10, 100, 100, -10), y = c(0, 0, 1000, 1000),
+polygon(x = c(0, 100, 100, 0), y = c(0, 0, 1000, 1000),
         col = makeTransparent('tomato2'),
         border = makeTransparent('tomato2'))
 
@@ -543,9 +545,9 @@ polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
         col = makeTransparent('tomato2'),
        border =  makeTransparent('tomato2'))
 
+#dev.off()
+
 ```
-
-
 
 
 
@@ -559,7 +561,7 @@ toplevel_to_level_1a_ix <-(toplevel_ix[-Y_nlevel0_ix])[level1a_ix]
 
 # So further constraining to level 2 can be associated back to the top level.
 
-level2_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -10 &
+level2_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > 0 &
                     Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
                     Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
                   Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
@@ -586,7 +588,123 @@ pairs(X_level1a[level2_ix,],
       oma = c(0.5, 0.5, 0.5, 0.5)
 )
 
+
+
 ```
+
+We find that adding a constraint to level 2 constrains the behaviour of the soil carbon pool, but not the vegetation carbon pool. Probably not a surprise, given the Soil Carbon pool (and changes) are much larger than the vegetation carbon pool.
+
+```{r vegC-soilC-constrained, fig.width = 12, fig.height = 8}
+#cSoil_ens_anom [toplevel_to_level_1a_ix, ]
+
+pdf(file = 'figs/vegC-soilC-constrained.pdf', width = 12, height = 8)
+
+par(mfrow= c(1,4), las = 1)
+
+plotcol <- c(makeTransparent('black', 70))
+overplotcol <- c(makeTransparent('tomato3', 200))
+
+
+ylim = range(cSoil_ens)
+matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'cSoil',
+        bty = 'n')
+matlines( years, t((cSoil_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol,  lwd = 1.5, lty = 'solid')
+
+ylim = range(cSoil_ens)
+matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'cVeg',
+        bty = 'n')
+matlines( years, t((cVeg_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = overplotcol, lwd = 1.5, lty = 'solid')
+
+
+
+ylim = range(cSoil_ens_anom)
+matplot(years, t(cSoil_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'cSoil Anomaly',
+        bty = 'n')
+matlines( years, t((cSoil_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol, lwd = 1.5, lty = 'solid')
+
+
+ylim = range(cVeg_ens_anom)
+matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
+        ylab = 'GtC', main = 'cVeg Anomaly',
+        bty = 'n')
+matlines( years, t((cVeg_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol,lwd = 1.5, lty = 'solid')
+
+dev.off()
+
+```
+
+
+## Emulated density pairs plot of input space that matches level 2 constraints
+
+```{r}
+
+# Samples from a uniform distribution across all of input space
+nsamp_unif <- 100000   
+X_unif <- samp_unif(nsamp_unif, mins = (rep(0, d)), maxes = rep(1,d))
+
+Y_unif <- matrix(nrow = nsamp_unif, ncol = p)
+colnames(Y_unif) <- colnames(Y_const_level1a_scaled)
+
+level1a_emlist <- vector('list',p)
+
+# Build an emulator for each output individually
+for(i in 1:p){
+  em <- km(~., design = X_level1a, response = Y_const_level1a_scaled[,i])
+  level1a_emlist[[i]] <- em
+  pred <- predict(em, newdata = X_unif, type = 'UK')
+  Y_unif[,i] <- pred$mean
+}
+
+# Find the inputs where the mean of the emulated output is 
+# within the tolerable limits set by the modeller.
+y_unif_ix_kept <- which(Y_unif[,'nbp_lnd_sum'] > 0 &
+                    Y_unif[,'npp_nlim_lnd_sum'] > 35 & Y_unif[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_unif[,'cSoil_lnd_sum'] > 750 & Y_unif[,'cSoil_lnd_sum'] < 3000 &
+                  Y_unif[,'cVeg_lnd_sum'] > 300 & Y_unif[,'cVeg_lnd_sum'] < 800
+                  )
+  
+X_kept <- X_unif[y_unif_ix_kept, ]
+
+# we've removed 80% of our prior input space
+(nrow(X_kept) / nsamp_unif) * 100
+
+
+
+```
+
+
+```{r}
+y_unif_ix_rejected = setdiff(1:nsamp_unif, y_unif_ix_kept)
+X_rejected = X_unif[y_unif_ix_kept, ]
+```
+
+```{r, include = FALSE,  fig.width = 10, fig.height = 10}
+pdf(file = 'graphics/pairs_dens_level0_km.pdf', width = 10, height = 10)
+#dev.new(width = 10, height = 10)
+par(oma = c(0,0,0,3), bg = 'white')
+pairs(X_kept,
+      labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc.col = blues)
+
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = blues,
+           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+           horizontal = TRUE
+)
+
+reset()
+
+legend('left', legend = paste(1:d, colnames(lhs)), cex = 0.9, bty = 'n', inset = 0.05, 0.05)
+```
+
 
 
 ## Constrain with Cumulative NBP
@@ -597,7 +715,7 @@ Hello,
 I’ve had a look for some multi-model ranges…
 
   From the ILAMB CMIP6 pages.
-  NBP accumulated between 1959 and 2014: (-227 INM) -106 to +16.3 Gt
+  NBP accumulated between 1959 and 2014: (227 INM)  -16.3 Gt to +106 Gt
 GPP 1980-2014 mean: 104-144 Gt/yr (157 INM, 159 BCC)
 cVeg 1996-2006 mean: 338-582 Gt (635 INM)
 cSoil 2000-2001 mean: 319-1760 Gt
@@ -632,12 +750,12 @@ for(i in 1:nrow(cumulative_nbp)){
 }
 
 par(mfrow = c(1,2))
-matplot(t(nbp_ens), type = 'l', ylab = 'GtC/year', col = plotcol, ylim = c(-10, 10))
+matplot(t(nbp_ens), main = 'NBP', type = 'l', ylab = 'GtC/year', col = plotcol, ylim = c(-10, 10))
 
 ylim = c(-150, 200)
 
 matplot(years, t(cumulative_nbp), type = 'l', lty = 'solid',ylim = ylim, col = plotcol, 
-        ylab = 'GtC', main = 'NBP', xlab = '',
+        ylab = 'GtC', main = 'cumulative NBP', xlab = '',
         bty = 'n')
 
 ```
@@ -663,11 +781,11 @@ nbp_modern_accum_level1a <- nbp_modern_accum[toplevel_to_level_1a_ix]
 
 #hist(nbp_modern_accum_level1a , xlim = c(-100, 150))
 
-nbp_accum_ix <- which(nbp_modern_accum_level1a > -106 &  nbp_modern_accum_level1a <16.3)
+nbp_accum_ix <- which(nbp_modern_accum_level1a > -16.3 &  nbp_modern_accum_level1a < 106)
 
 ylim = range(c(-120, 200))
 
-#pdf(file = 'figs/cumulative_nbp_constrained.pdf', width = 5, height = 7)
+pdf(file = 'figs/cumulative_nbp_constrained.pdf', width = 5, height = 7)
 matplot(years, t(cumulative_nbp), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'GtC', main = 'cumulative NBP',
         bty = 'n')
@@ -675,7 +793,7 @@ matlines( years, t((cumulative_nbp[toplevel_to_level_1a_ix, ])[nbp_accum_ix, ]),
 matlines( years, t((cumulative_nbp[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = awcol,lwd = 1.5, lty = 'solid')
 
 legend('topleft', legend  = c('Cumulative NBP constraint', 'AW constraint'), col = c(nbpcol, awcol) , lty = 'solid', lwd = 1.5)
-#dev.off()
+dev.off()
 
 
 ```
@@ -701,13 +819,13 @@ outcols <- rep(makeTransparent('black', 50), nrow(Y_const_level1a_scaled_nbp))
 outcols[nbp_accum_ix ] <- nbpcol
 outcols[level2_ix] <- awcol
 
-#pdf(file = 'figs/cumulative_nbp_constrained_pairs.pdf', width = 9, height = 9)
+pdf(file = 'figs/cumulative_nbp_constrained_pairs.pdf', width = 9, height = 9)
 
 pairs(Y_const_level1a_scaled_nbp, col = outcols, lower.panel = NULL, pch = 19)
 reset()
 legend('bottomleft', legend  = c('Cumulative NBP constraint', 'AW constraint'), col = c(nbpcol, awcol) , pch = 19, cex = 1.5,
        inset = 0.1)
-#dev.off()
+  dev.off()
 
 ```
 
@@ -763,45 +881,7 @@ level3_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -0.4 & Y_const_level
 ```
 
 
-We find that adding a constraint to level 2 constrains the behaviour of the soil carbon pool, but not the vegetation carbon pool. Probably not a surprise, given the Soil Carbon pool (and changes) are much larger than the vegetation carbon pool.
 
-```{r vegC-soilC-constrained, fig.width = 12, fig.height = 8}
-#cSoil_ens_anom [toplevel_to_level_1a_ix, ]
-
-par(mfrow= c(1,4), las = 1)
-
-plotcol <- c(makeTransparent('black', 70))
-overplotcol <- c(makeTransparent('tomato3', 200))
-
-
-ylim = range(cSoil_ens)
-matplot(years, t(cSoil_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC', main = 'cSoil',
-        bty = 'n')
-matlines( years, t((cSoil_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol,  lwd = 1.5, lty = 'solid')
-
-ylim = range(cSoil_ens)
-matplot(years, t(cVeg_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC', main = 'cVeg',
-        bty = 'n')
-matlines( years, t((cVeg_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = overplotcol, lwd = 1.5, lty = 'solid')
-
-
-
-ylim = range(cSoil_ens_anom)
-matplot(years, t(cSoil_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC', main = 'cSoil Anomaly',
-        bty = 'n')
-matlines( years, t((cSoil_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol, lwd = 1.5, lty = 'solid')
-
-
-ylim = range(cVeg_ens_anom)
-matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC', main = 'cVeg Anomaly',
-        bty = 'n')
-matlines( years, t((cVeg_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol,lwd = 1.5, lty = 'solid')
-
-```
 
 ## Atmospheric growth
 We can calculate the atmospheric growth as Fossil fule emissions (GCB) - Ocean uptake  (GCB) - net land flux (JULES NBP)
