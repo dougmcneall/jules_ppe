@@ -215,6 +215,50 @@ oaatSensvarSummaryPlot(oat_var_sensmat_level1a_YAnom)
 ```
 
 
+### Ranking sensitivity of the parameters.
+
+```{r}
+
+oaatSensvarRank <- function(oat_sens_mat){
+  
+  ynames <- rownames(oat_sens_mat)
+  xnames <- colnames(oat_sens_mat)
+  
+  normsens <- normalize(t(oat_sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
+
+Y_level1a_sensrank <- oaatSensvarRank(oat_var_sensmat_level1a_Y)
+YAnom_level1a_sensrank <- oaatSensvarRank(oat_var_sensmat_level1a_YAnom)
+
+  
+sens_ranks <- cbind(Y_level1a_sensrank$rank, YAnom_level1a_sensrank$rank )
+colnames(sens_ranks) <- c('modern_value', 'anomaly')
+
+min_rank <- apply(sens_ranks,1, min)
+
+all_ranks <- cbind(sens_ranks, min_rank)
+
+plot(sens_ranks[,1], sens_ranks[,2], xlab = 'modern value rank', ylab = 'anomaly rank')
+
+
+rank_ix <- sort(min_rank, decreasing = FALSE, index.return = TRUE)
+
+# All ranks is the table of rankings, with min_rank being the highest ranking
+all_ranks[rank_ix$ix, ]
+  
+```
+
+
+
+
 ## One-at-a-time sensitivity analysis of constraining variables for understanding model response
 "Constraining variables" being those we use to constrain the model (npp, nbp, cSoil and cVeg).
 It's hard to maintain a high vegetation carbon in particular.  
