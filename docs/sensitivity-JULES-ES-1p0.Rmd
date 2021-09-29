@@ -124,6 +124,54 @@ oaatSensvarSummaryPlot <- function(oat_sens_mat){
   
 }
 
+
+
+
+sensMatSummaryPlot <- function(sens_mat, col = blues, maintext = 'Sensitivity Matrix', xlab = 'sensitivity summary'){
+  # Summary plots of a sensitivity matrix
+  
+  
+  # relies on rotate(), fields,  which need sorting for transfer to package
+  
+  ynames <- rownames(sens_mat)
+  xnames <- colnames(sens_mat)
+  
+  normsens <- normalize(t(sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  sort_ix <- sort(normsens_mean, decreasing = TRUE, index.return = TRUE)
+  
+  par(mar = c(15,12,5,1), mfrow = c(1,2))
+  
+  layout(matrix(c(1,1,2), ncol = 3, nrow = 1))
+  
+  image(rotate(normsens[sort_ix$ix, ]), axes = FALSE, col = col)
+  
+  axis(1, at = seq(from = 0, to = 1, length.out = length(ynames)), labels = ynames, las = 3, cex.axis = 1.2)
+  axis(2, at = seq(from = 1, to = 0, length.out = length(xnames)), labels = xnames[sort_ix$ix], las = 1, cex.axis = 1.2)
+  mtext(maintext, side = 3, adj = 0, line = 2, cex = 1)
+  
+  lab_ix <- (1:length(xnames)) - 0.5
+  
+  par(yaxs = 'i', mar = c(15,1,5,5))
+  plot(rev(normsens_mean[sort_ix$ix]), lab_ix, xlab = xlab, ylab = '', ylim = c(0,length(xnames)), type = 'n', yaxt = 'n')
+  abline(h = lab_ix, col = 'grey', lty = 'dashed')
+  points( rev(normsens_mean[sort_ix$ix]),lab_ix, col = zissou5[1], pch = 19, cex = 1.5)
+  
+  image.plot(legend.only = TRUE,
+             zlim = c(0,1),
+             col = col,
+             legend.args = list(text = 'Relative sensitivity', side = 3, line = 1),
+             horizontal = TRUE
+  )
+}
+
+
+
+
+
+
+
 ```
 
 ```{r}
@@ -215,46 +263,7 @@ oaatSensvarSummaryPlot(oat_var_sensmat_level1a_YAnom)
 ```
 
 
-### Ranking sensitivity of the parameters.
 
-```{r}
-
-oaatSensvarRank <- function(oat_sens_mat){
-  
-  ynames <- rownames(oat_sens_mat)
-  xnames <- colnames(oat_sens_mat)
-  
-  normsens <- normalize(t(oat_sens_mat))
-  normsens_mean <- apply(normsens,1, mean)
-  
-  rank <- rank(-normsens_mean)
-  
-  
-  return(list(mean = normsens_mean, rank = rank))
-  
-}
-
-
-Y_level1a_sensrank <- oaatSensvarRank(oat_var_sensmat_level1a_Y)
-YAnom_level1a_sensrank <- oaatSensvarRank(oat_var_sensmat_level1a_YAnom)
-
-  
-sens_ranks <- cbind(Y_level1a_sensrank$rank, YAnom_level1a_sensrank$rank )
-colnames(sens_ranks) <- c('modern_value', 'anomaly')
-
-min_rank <- apply(sens_ranks,1, min)
-
-all_ranks <- cbind(sens_ranks, min_rank)
-
-plot(sens_ranks[,1], sens_ranks[,2], xlab = 'modern value rank', ylab = 'anomaly rank')
-
-
-rank_ix <- sort(min_rank, decreasing = FALSE, index.return = TRUE)
-
-# All ranks is the table of rankings, with min_rank being the highest ranking
-all_ranks[rank_ix$ix, ]
-  
-```
 
 
 
@@ -380,12 +389,6 @@ bp_convert <- function(fastmodel){
 X_fast <- fast99(model = NULL, factors = colnames(X_level1a), n = 3000,
                  q = "qunif", q.arg = list(min = 0, max = 1))
 
-
-#yname <- y_names_sum[i]
-# y <- Y_level1a[, yname]
-
-
-
 fast_tell_list <- vector(mode = 'list', length = ncol(Y_level1a))
 
 for(i in 1:ncol(Y_level1a)){
@@ -400,7 +403,6 @@ for(i in 1:ncol(Y_level1a)){
   fast_tell_list[[i]] <- fast_tell
   
 }
-
 
 
 ```
@@ -433,26 +435,154 @@ for(i in 1:length(fast_tell_list)){
 ```
 
 
-
 ```{r, fig.width = 7, fig.height = 8}
-
 
 colnames(FAST_total) <- colnames(X_level1a)
 rownames(FAST_total) <- colnames(Y_level1a)
-#pdf(file = 'figs/oat_var_sensmat_level1a_YAnom.pdf', width = 7, height = 8)
+#pdf(file = 'figs/FAST_sensmat_level1a.pdf', width = 7, height = 8)
 oaatSensvarSummaryPlot(FAST_total)
 #dev.off()
 
 ```
 
+
 ```{r}
 
 
+multiFAST<- function(X, Y){
+  
+  
+  # Generate a design for the FAST99 analysis
+  X_fast <- fast99(model = NULL, factors = colnames(X), n = 3000,
+                   q = "qunif", q.arg = list(min = 0, max = 1))
+  
+  fit_list <- createKmFitList(X = X, Y = Y)
+  fast_tell_list <- vector(mode = 'list', length = ncol(Y))
+  
+  
+  for(i in 1:ncol(Y)){
+    
+    
+    
+    fit <- fit_list[[i]]
+    # Predict the response at the FAST99 design points using the emulator
+    pred_fast <- predict(fit, newdata = X_fast$X, type = 'UK')
+    
+    # Calculate the sensitivity indices
+    fast_tell <- tell(X_fast, pred_fast$mean)
+    
+    fast_tell_list[[i]] <- fast_tell
+    
+  }
+  
+  return(list(fit_list = fit_list, fast_tell_list = fast_tell_list))
+  
+}
 
 
 ```
 
 
+```{r}
+
+MF_YAnom <- multiFAST(X = X_level1a, Y = YAnom_level1a)
+
+```
+
+
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+FAST_total_YAnom <- matrix(nrow = length(MF_YAnom$fast_tell_list), ncol = d)
+
+for(i in 1:length(MF_YAnom$fast_tell_list)){
+ 
+  # sum the direct effect and interaction terms to get a total
+  FAST_total_YAnom[i, ] <- apply(bp_convert(MF_YAnom$fast_tell_list[[i]]),2,sum)
+}
+
+colnames(FAST_total_YAnom) <- colnames(X_level1a)
+rownames(FAST_total_YAnom) <- colnames(Y_level1a)
+#pdf(file = 'figs/FAST_sensmat_level1a.pdf', width = 7, height = 8)
+sensMatSummaryPlot(FAST_total_YAnom)
+#dev.off()
+
+```
+
+```{r, fig.width = 7, fig.height = 8}
+
+pdf(file = 'figs/FAST_sensmat_Y_level1a.pdf', width = 7, height = 8)
+sensMatSummaryPlot(FAST_total)
+dev.off()
+
+pdf(file = 'figs/FAST_sensmat_YAnom_level1a.pdf', width = 7, height = 8)
+sensMatSummaryPlot(FAST_total_YAnom)
+dev.off()
+
+```
+
+
+
+### Ranking sensitivity of the parameters.
+
+```{r}
+
+oaatSensvarRank <- function(oat_sens_mat){
+  
+  ynames <- rownames(oat_sens_mat)
+  xnames <- colnames(oat_sens_mat)
+  
+  normsens <- normalize(t(oat_sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
+SensRank <- function(sens_mat){
+  
+  # summarising and ranking parameters in a sensitivity matrix
+  
+  ynames <- rownames(sens_mat)
+  xnames <- colnames(sens_mat)
+  
+  normsens <- normalize(t(sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
+
+sensrank_Y_level1a_oat <- SensRank(oat_var_sensmat_level1a_Y)
+sensrank_YAnom_level1a_oat <- SensRank(oat_var_sensmat_level1a_YAnom)
+
+sensrank_FAST <- SensRank(FAST_total)
+sensrank_FAST_YAnom <- SensRank(FAST_total_YAnom)
+
+  
+sens_ranks <- cbind(sensrank_Y_level1a_oat$rank,sensrank_FAST$rank,  sensrank_YAnom_level1a_oat$rank, sensrank_FAST_YAnom$rank )
+colnames(sens_ranks) <- c('OAT_modern_value', 'FAST_modern_value', 'OAT_anomaly', 'FAST_anomaly')
+
+min_rank <- apply(sens_ranks,1, min)
+
+all_ranks <- cbind(sens_ranks, min_rank)
+
+#plot(sens_ranks[,1], sens_ranks[,2], xlab = 'modern value rank', ylab = 'anomaly rank')
+
+
+rank_ix <- sort(min_rank, decreasing = FALSE, index.return = TRUE)
+
+# All ranks is the table of rankings, with min_rank being the highest ranking
+all_ranks[rank_ix$ix, ]
+  
+```
 
 ```{r}
 
