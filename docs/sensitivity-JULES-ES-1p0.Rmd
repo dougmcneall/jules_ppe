@@ -355,6 +355,103 @@ legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = cbPal[c(1,2,6,8)], lty = '
 
 
 
+# FAST sensitivity analysis
+
+```{r}
+fit_list_Y_level1a <- createKmFitList(X = X_level1a, Y = Y_level1a)
+```
+
+
+```{r}
+
+library(sensitivity)
+
+bp_convert <- function(fastmodel){
+  # get the FAST summary into an easier format for barplot
+  fast_summ <- print(fastmodel)
+  fast_diff <- fast_summ[ ,2] - fast_summ[ ,1]
+  fast_bp <- t(cbind(fast_summ[ ,1], fast_diff))
+  fast_bp
+}
+
+# Need to think about how mins and maxes are dealt with - we have a truncated input design
+
+# Generate a design for the FAST99 analysis
+X_fast <- fast99(model = NULL, factors = colnames(X_level1a), n = 3000,
+                 q = "qunif", q.arg = list(min = 0, max = 1))
+
+
+#yname <- y_names_sum[i]
+# y <- Y_level1a[, yname]
+
+
+
+fast_tell_list <- vector(mode = 'list', length = ncol(Y_level1a))
+
+for(i in 1:ncol(Y_level1a)){
+  
+  fit <- fit_list_Y_level1a[[i]]
+  # Predict the response at the FAST99 design points using the emulator
+  pred_fast <- predict(fit, newdata = X_fast$X, type = 'UK')
+  
+  # Calculate the sensitivity indices
+  fast_tell <- tell(X_fast, pred_fast$mean)
+  
+  fast_tell_list[[i]] <- fast_tell
+  
+}
+
+
+
+```
+
+
+```{r}
+
+
+for(i in 1:length(fast_tell_list)){
+  par(las = 2, mar = c(9,5,3,2))
+  barplot(bp_convert(fast_tell_list[[i]]), col = c('skyblue', 'grey'), ylab = 'relative sensitivity', main = 'FAST99 Sensitivity')
+}
+
+
+```
+
+```{r}
+
+
+FAST_total <- matrix(nrow = length(fast_tell_list), ncol = d)
+
+for(i in 1:length(fast_tell_list)){
+ 
+  # sum the direct effect and interaction terms to get a total
+  FAST_total[i, ] <- apply(bp_convert(fast_tell_list[[i]]),2,sum)
+}
+
+
+
+```
+
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+
+colnames(FAST_total) <- colnames(X_level1a)
+rownames(FAST_total) <- colnames(Y_level1a)
+#pdf(file = 'figs/oat_var_sensmat_level1a_YAnom.pdf', width = 7, height = 8)
+oaatSensvarSummaryPlot(FAST_total)
+#dev.off()
+
+```
+
+```{r}
+
+
+
+
+```
+
 
 
 ```{r}
