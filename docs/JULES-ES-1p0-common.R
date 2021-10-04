@@ -56,6 +56,13 @@ zred <- makeTransparent(as.character(zissou5)[5], 150)
 ysec = 60*60*24*365
 years <- 1850:2013
 
+
+# We're just interested in the "sum" (global totals) data, not the "mean" (global means) data
+y_names_sum <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum',
+                 'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
+                 'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
+                 'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
+
 ## ----------------------------------------------------------------------
 ## Helper functions
 ## ----------------------------------------------------------------------

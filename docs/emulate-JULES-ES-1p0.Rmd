@@ -181,6 +181,105 @@ mtext('Modern Value (Y)', side = 3, line = 0, outer = TRUE, cex = 2)
 
 ```
 
+
+```{r, fig.width = 12, fig.height = 6, results = 'hide'}
+
+require(foreach)
+nCores <- 4
+require(doParallel)
+cl <-  makeCluster(nCores) 
+registerDoParallel(cl)
+
+if (file.exists("km_emulators_Ylevel1a.rdata")) {
+  load("km_emulators_Ylevel1a.rdata")
+} else {
+  
+  emlist_km_Ylevel1a <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    yname <- y_names_sum[i]
+    y <- Y_level1a[, yname]
+    
+    em <- km(~., design = X_level1a, response = y, multistart = 4)
+    emlist_km_Ylevel1a[[i]] <- em
+  }
+  
+  loolist_km_Ylevel1a <- vector(mode = 'list', length = length(y_names_sum))
+  
+  for(i in 1:length(y_names_sum)){
+    
+    loo <- leaveOneOut.km(model = emlist_km_Ylevel1a[[i]], type = 'UK', trend.reestim = TRUE)
+    loolist_km_Ylevel1a[[i]] <- loo
+  }
+  
+  save(emlist_km_Ylevel1a,loolist_km_Ylevel1a, file = "km_emulators_Ylevel1a.rdata")
+}
+
+stopCluster(cl)
+
+
+
+```
+
+
+```{r}
+
+
+loostats_km_Ylevel1a <- vector(mode = 'list', length = length(y_names_sum))
+
+for(i in 1:length(emlist_km_Ylevel1a)){
+  
+  loostats <- kmLooStats(emlist_km_Ylevel1a[[i]])
+  loostats_km_Ylevel1a[[i]] <- loostats
+  print(loostats$pmae)
+}
+
+```
+
+
+
+```{r}
+# level1 vs level 1a
+km_pmae_level1 <- sapply(loostats_km_Y, function(x) x$pmae)
+km_pmae_level1a <- sapply(loostats_km_Ylevel1a, function(x) x$pmae)
+
+plot(km_pmae_level1 , km_pmae_level1a )
+abline(0,1)
+
+```
+
+
+
+
+
+```{r, fig.width = 12, fig.height = 12}
+
+pdf(file = 'figs/kmloostats_Ylevel1a.pdf', width = 12, height = 12)
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y)){
+  
+  y <- Y_level1a[, y_names_sum[i]]
+  loo <- loolist_km_Ylevel1a[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+  legend('topleft', legend = y_names_sum[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Ylevel1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+dev.off()
+
+```
+
+
+
 ```{r, fig.width = 12, fig.height = 6, results = 'hide'}
 
 if (file.exists("km_emulators_YAnom.rdata")) {
