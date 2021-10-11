@@ -23,6 +23,157 @@ source('JULES-ES-1p0-common.R')
 
 ```
 
+## Specific helper functions
+```{r}
+
+mat2list <- function(X){
+  
+  # Turns the p columns of a matrix into a p length list,
+  # with each column becoming an element of the list
+  
+  out <- vector(mode = 'list', length = ncol(X))
+  for(i in 1:ncol(X)){
+    out[[i]] <- X[ , i]
+  }
+  out
+  
+}
+
+
+# How about MAE over the range
+prop_mae <- function(Y, Ypred){
+  # mean absolute error as a proportion of the range of output
+  
+  absdiff <- abs(diff(range(Y)))
+  
+  mae <- MAE(Y, Ypred)
+  
+  propmae <- (mae / absdiff) * 100
+  
+  propmae
+  
+}
+
+
+```
+
+## Leave-one-out analysis of emulators
+
+The leave-one-out section in a for loop can be replaced by using lapply (or mclapply for speed).  
+
+First, build a list of emulators and then perform a leave-one-out. 
+```{r, include = FALSE}
+# include = FALSE should run the code but supress all output.
+
+
+Y_sum_level1a <- Y_level1a[ , y_names_sum]
+YAnom_sum_level1a <- YAnom_level1a[ , y_names_sum]
+
+
+Y_sum_level1a_list <- mat2list(Y_sum_level1a)
+YAnom_sum_level1a_list <- mat2list(YAnom_sum_level1a)
+```
+
+
+Build the emulator lists
+```{r, include = FALSE}
+# Here, the list is a list version of the matrix Y_
+emlist_km_Y_level1a <- mclapply(X = Y_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+
+```
+
+```{r, include = FALSE}
+emlist_km_YAnom_level1a <- mclapply(X = YAnom_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+```
+
+
+Apply the leave-one-out test to each of the list members.
+
+```{r}
+
+loolist_km_Y_level1a <- mclapply(X = emlist_km_Y_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+loolist_km_YAnom_level1a <- mclapply(X = emlist_km_YAnom_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+```
+
+
+```{r}
+loostats_km_Y_level1a <- lapply(emlist_km_Y_level1a, FUN = kmLooStats)
+loostats_km_YAnom_level1a <- lapply(emlist_km_YAnom_level1a, FUN = kmLooStats)
+
+
+#loostats_km_Y_level1a <- vector(mode = 'list', length = length(y_names_sum))
+
+#for(i in 1:length(emlist_km_Y_level1a)){
+  
+#  loostats <- kmLooStats(emlist_km_Y_level1a[[i]])
+#  loostats_km_Y_level1a[[i]] <- loostats
+#  print(loostats$pmae)
+#}
+
+```
+
+```{r, fig.width = 12, fig.height = 12}
+
+pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_level1a[, y_names_sum[i]]
+  loo <- loolist_km_Y_level1a[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+  legend('topleft', legend = y_names_sum[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+dev.off()
+
+```
+
+```{r, fig.width = 12, fig.height = 12}
+
+pdf(file = 'figs/kmloostats_YAnom_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_YAnom_level1a)){
+  
+  y <- YAnom_level1a[, y_names_sum[i]]
+  loo <- loolist_km_YAnom_level1a[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent('black', 70),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
+  abline(0,1)
+  legend('topleft', legend = y_names_sum[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_YAnom_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+dev.off()
+
+```
+
+
+```{r}
+
+
+stop()
+
+```
+
 
 
 ### Comparison of level 0 and level 1 emulators for NPP (modern value)
@@ -65,19 +216,6 @@ RMSE ( loo_npp_level0$mean, y_level0)
 RMSE ( loo_npp_level1$mean, y_level1)
 
 
-# How about MAE over the range
-prop_mae <- function(Y, Ypred){
-  # mean absolute error as a proportion of the range of output
-  
-  absdiff <- abs(diff(range(Y)))
-  
-  mae <- MAE(Y, Ypred)
-  
-  propmae <- (mae / absdiff) * 100
-  
-  propmae
-  
-}
 
 prop_mae(y_level0, loo_npp_level0$mean)
 
@@ -151,11 +289,8 @@ if (file.exists("km_emulators_Y.rdata")) {
 
 ```
 
-```{r}
 
-Y_sum_level1a <- Y_level1a[ , y_names_sum]
 
-```
 
 
 ```{r}
@@ -163,9 +298,9 @@ Y_sum_level1a <- Y_level1a[ , y_names_sum]
 #fit_list_Y_sum_level1a <- createKmFitList(X = X_level1a, Y = Y_sum_level1a)
 #toc(log = TRUE)
 
-tic()
-fit_list_Y_sum_level1a_par <- createKmFitListParallel(X = X_level1a, Y = Y_sum_level1a, multistart = 4)
-toc(log = TRUE)
+#tic()
+#fit_list_Y_sum_level1a_par <- createKmFitListParallel(X = X_level1a, Y = Y_sum_level1a, multistart = 4)
+#toc(log = TRUE)
 
 ```
 
@@ -179,44 +314,23 @@ toc(log = TRUE)
 #  Ytest[[i]] <- Y_sum_level1a[, i]
 #}
 
-mat2list <- function(X){
-  
-  out <- vector(mode = 'list', length = ncol(X))
-  for(i in 1:ncol(X)){
-    out[[i]] <- X[ , i]
-  }
-  out
-  
-}
 
-#test <- mapply(km, formula = list(formula(~.), formula(~.)), design = X_level1a, response = Ytest)
-Y_sum_level1a_list <- mat2list(Y_sum_level1a)
 
-tic()
-test <- lapply(X = Y_sum_level1a_list, FUN = km, formula = ~., design = X_level1a)
-toc(log = TRUE)
+#tic()
+#test <- lapply(X = Y_sum_level1a_list, FUN = km, formula = ~., design = X_level1a)
+#toc(log = TRUE)
 
-tic()
-partest <- mclapply(X = Y_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
-toc(log = TRUE)
+#tic()
+#partest <- mclapply(X = Y_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+#toc(log = TRUE)
 
 
 ```
 
 
-```{r}
 
 
-loostats_km_Y <- vector(mode = 'list', length = length(y_names_sum))
 
-for(i in 1:length(emlist_km_Y)){
-  
-  loostats <- kmLooStats(emlist_km_Y[[i]])
-  loostats_km_Y[[i]] <- loostats
-  print(loostats$pmae)
-}
-
-```
 
 
 ```{r, fig.width = 12, fig.height = 12}
@@ -311,31 +425,7 @@ abline(0,1)
 
 
 
-```{r, fig.width = 12, fig.height = 12}
 
-#pdf(file = 'figs/kmloostats_Ylevel1a.pdf', width = 12, height = 12)
-par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
-for(i in 1:length(loolist_km_Y)){
-  
-  y <- Y_level1a[, y_names_sum[i]]
-  loo <- loolist_km_Ylevel1a[[i]]
-  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
-  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent('black', 70),
-       pch = 19)
-  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent('black', 70))
-  abline(0,1)
-  legend('topleft', legend = y_names_sum[i], bty = 'n', text.font = 2  )
-  legend('bottomright',legend = paste('pmae =',round(loostats_km_Ylevel1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
-
-}
-
-mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
-mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
-mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
-
-#dev.off()
-
-```
 
 
 
