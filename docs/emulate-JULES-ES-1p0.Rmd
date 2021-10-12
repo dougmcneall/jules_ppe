@@ -167,13 +167,141 @@ dev.off()
 ```
 
 
+## How well do we predict the constrained members?
+
 ```{r}
+# Identify all of the members which fall under a "level 2" constraint.
 
+level2_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > 0 &
+                    Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
+                  
+                  
+  )
 
-stop()
+# Build an emulator for the scaled output
+
+Y_const_level1a_scaled_list <- mat2list(Y_const_level1a_scaled)
+
+emlist_km_Y_const_level1a_scaled <- mclapply(X = Y_const_level1a_scaled_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
 
 ```
 
+```{r}
+
+loolist_km_Y_const_level1a_scaled  <- mclapply(X = emlist_km_Y_const_level1a_scaled, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+```
+
+
+```{r}
+# Would the prediction be in the constrained?
+
+
+pred_km_Y_const_level1a_scaled <- matrix(ncol = ncol(Y_const_level1a_scaled), nrow = nrow(Y_const_level1a_scaled))
+colnames(pred_km_Y_const_level1a_scaled) <- colnames(Y_const_level1a_scaled)
+
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+  
+  pred <- loolist_km_Y_const_level1a_scaled[[i]]$mean
+  pred_km_Y_const_level1a_scaled[, i] <- pred
+  
+}
+
+
+pred_level2_ix <- which(pred_km_Y_const_level1a_scaled[,'nbp_lnd_sum'] > 0 &
+                    pred_km_Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  pred_km_Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    pred_km_Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & pred_km_Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  pred_km_Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & pred_km_Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
+                  
+                  
+  )
+
+
+```
+
+
+
+```{r, fig.width = 10, fig.height = 10}
+
+# plot them up
+
+
+# True positive is things in both observed and predicted.
+
+tp_ix <- intersect(level2_ix, pred_level2_ix)
+
+# False positive is things in predicted but not in observed.
+fp_ix <- setdiff(pred_level2_ix, level2_ix)
+
+# False negative is things in observed but not predicted
+fn_ix <- setdiff(level2_ix, pred_level2_ix)
+
+# true negative is things not in observed or predicted
+
+tn_ix <- setdiff(1:nrow(Y_const_level1a_scaled), union(level2_ix, pred_level2_ix))
+
+#should be 362
+#length(c(tp_ix, fp_ix, fn_ix, tn_ix))
+
+clines_lower <- c(0, 35, 750, 300)
+clines_upper <- c(NA, 80, 3000, 800)
+
+# correctly predicted in constrained group = red
+colvec <- rep('black', nrow(Y_const_level1a_scaled))
+pchvec <- rep(21, nrow(Y_const_level1a_scaled))
+
+colvec[tp_ix] <- 'blue'
+pchvec[tp_ix] <- 19
+
+colvec[fp_ix] <- 'red'
+pchvec[fp_ix] <- 19
+
+colvec[fn_ix] <- 'gold'
+pchvec[fn_ix] <- 19
+
+colvec[tn_ix] <- 'grey'
+pchvec[tn_ix] <- 21
+  
+par(mfrow = c(2,2), oma = c(0.1,0.1,4,0.1))
+for(i in 1:4){
+plot(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], type = 'n', las = 1, main = colnames(Y_const_level1a_scaled)[i],
+     xlab = 'model', ylab = 'emulator')
+  
+abline(0,1)
+abline(v = clines_lower[i], col = 'grey')
+abline(v = clines_upper[i], col = 'grey', lty = 'dashed')
+
+abline(h = clines_lower[i], col = 'grey')
+abline(h = clines_upper[i], col = 'grey', lty = 'dashed')
+
+points(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], col = colvec, pch = pchvec)
+
+}
+
+reset()
+
+legend('top', legend = c('True positive', 'False Positive', 'False Negative', 'True Negative', 'lower bound', 'upper bound'), pch = c(19,19, 19, 21, NA, NA), col = c('blue', 'red', 'gold', 'grey', 'grey', 'grey'), lty = c(NA,NA,NA,NA, 'solid', 'dashed'), horiz = TRUE)
+
+```
+
+```{r}
+
+length(level2_ix)
+length(tp_ix)
+length(fn_ix)
+
+#what do we miss?
+length(fn_ix)
+
+
+
+length(tn_ix)
+
+
+```
 
 
 ### Comparison of level 0 and level 1 emulators for NPP (modern value)
