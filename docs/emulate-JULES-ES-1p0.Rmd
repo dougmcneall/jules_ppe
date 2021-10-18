@@ -55,6 +55,35 @@ prop_mae <- function(Y, Ypred){
 }
 
 
+
+withinConstraints <- function(X, Xrange){
+  # return the index of a matrix that conforms to constraints.  
+  
+  # X         ........  Matrix to be tested
+  # Xrange    ........ Range matrix. Each column has min value in row 1 and max value in row 2
+   
+  
+  kept_list <-vector(mode = 'list', length = ncol(X))
+  
+  for(i in 1:ncol(X)){
+
+    kept_ix <- which(X[ ,i] > Xrange[1, i] & X[ ,i] < Xrange[2, i])
+    
+    kept_list[[i]] <- kept_ix
+  }
+  
+  out <- kept_list[[1]]
+  # run along the list and just keep the intersection
+  # with each iteration
+  for(i in 1:length(kept_list)){
+    
+    out <- intersect(out, kept_list[[i]])
+  }
+  
+  out
+  
+}
+
 ```
 
 ## Leave-one-out analysis of emulators
@@ -116,7 +145,7 @@ loostats_km_YAnom_level1a <- lapply(emlist_km_YAnom_level1a, FUN = kmLooStats)
 
 ```{r, fig.width = 12, fig.height = 12}
 
-pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_Y_level1a)){
   
@@ -136,13 +165,13 @@ mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
 mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
 mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
 
-dev.off()
+#dev.off()
 
 ```
 
 ```{r, fig.width = 12, fig.height = 12}
 
-pdf(file = 'figs/kmloostats_YAnom_level1a.pdf', width = 12, height = 12)
+#pdf(file = 'figs/kmloostats_YAnom_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_YAnom_level1a)){
   
@@ -162,7 +191,7 @@ mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
 mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
 mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
 
-dev.off()
+#dev.off()
 
 ```
 
@@ -222,12 +251,11 @@ pred_level2_ix <- which(pred_km_Y_const_level1a_scaled[,'nbp_lnd_sum'] > 0 &
 
 ```
 
-
+Plotting the predictions, with a special focus on the constrained members. 
+The message is, to do better on predicting the members, we need to do better with the cVeg emulator. Many of its members are way too low, and this is dragging down the predictions. Some are false positives though.
+Could we plot Loo error vs the parameters?
 
 ```{r, fig.width = 10, fig.height = 10}
-
-# plot them up
-
 
 # True positive is things in both observed and predicted.
 
@@ -262,20 +290,22 @@ pchvec[fp_ix] <- 19
 colvec[fn_ix] <- 'gold'
 pchvec[fn_ix] <- 19
 
-colvec[tn_ix] <- 'grey'
+colvec[tn_ix] <- 'darkgrey'
 pchvec[tn_ix] <- 21
   
+
+#pdf(width = 10, height = 10, file = 'figs/Y_const_loo.pdf')
 par(mfrow = c(2,2), oma = c(0.1,0.1,4,0.1))
 for(i in 1:4){
 plot(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], type = 'n', las = 1, main = colnames(Y_const_level1a_scaled)[i],
      xlab = 'model', ylab = 'emulator')
   
 abline(0,1)
-abline(v = clines_lower[i], col = 'grey')
-abline(v = clines_upper[i], col = 'grey', lty = 'dashed')
+abline(v = clines_lower[i], col = 'darkgrey')
+abline(v = clines_upper[i], col = 'darkgrey', lty = 'dashed')
 
-abline(h = clines_lower[i], col = 'grey')
-abline(h = clines_upper[i], col = 'grey', lty = 'dashed')
+abline(h = clines_lower[i], col = 'darkgrey')
+abline(h = clines_upper[i], col = 'darkgrey', lty = 'dashed')
 
 points(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], col = colvec, pch = pchvec)
 
@@ -283,13 +313,209 @@ points(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], col = c
 
 reset()
 
-legend('top', legend = c('True positive', 'False Positive', 'False Negative', 'True Negative', 'lower bound', 'upper bound'), pch = c(19,19, 19, 21, NA, NA), col = c('blue', 'red', 'gold', 'grey', 'grey', 'grey'), lty = c(NA,NA,NA,NA, 'solid', 'dashed'), horiz = TRUE)
+legend('top', legend = c('True positive', 'False Positive', 'False Negative', 'True Negative', 'lower bound', 'upper bound'), pch = c(19,19, 19, 21, NA, NA), col = c('blue', 'red', 'gold', 'darkgrey', 'darkgrey', 'darkgrey'), lty = c(NA,NA,NA,NA, 'solid', 'dashed'), horiz = TRUE)
+
+#dev.off()
+
+```
+
+
+```{r}
+library(verification)
+
+
+model <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+
+model[level2_ix] <- TRUE
+emulator[pred_level2_ix] <- TRUE
+
+ver <- verify(obs = model, pred = emulator, frcst.type = 'binary')
+
+# ETS runs from -1/3 to 1, with 0 showing no skill, so we have some skill. Could be better.
+ver$ETS
+ver$HSS
+
+```
+
+## A better emulator for cVeg
+It's clear from other experiments that a major barrier to a good prediction of a constrained is a better emulator for cVeg.
+
+Some experiments to create a better emulator
+
+```{r}
+# more multistarts
+
+
+y <- Y_const_level1a_scaled[, 'cVeg_lnd_sum']
+# change the output
+
+# This breaks
+#m2 <- km(~.^2, design=X_level1a, response=y, multistart = 4)
+
+
+```
+
+
+
+```{r}
+require(foreach)
+
+# below an example for a computer with 2 cores, but also work with 1 core
+
+nCores <- 4
+require(doParallel)
+cl <-  makeCluster(nCores) 
+registerDoParallel(cl)
+
+# kriging model 1, with 4 starting points 
+m_stan <- km(~., design=X_level1a, response = y, multistart=4)
+m_logy <- km(~., design=X_level1a, response = log(y), multistart=4)
+m_sqrty <- km(~., design=X_level1a, response = sqrt(y), multistart=4)
+
+
+stopCluster(cl)
+
 
 ```
 
 ```{r}
+loo_m_stan <- leaveOneOut.km(m_stan, type = 'UK')
+
+loo_m_logy <- leaveOneOut.km(m_logy, type = 'UK')
+
+loo_m_sqrty <- leaveOneOut.km(m_sqrty, type = 'UK')
+
+
+```
+
+How good are the leave-one-out predictions of the transformed data?
+
+It appears the square root transformation outperforms the standard - but mostly at low values (which we don't think are realistic).
+
+```{r}
+
+plot(y, loo_m_stan$mean,col = makeTransparent('black', 150), pch = 19)
+points(y, exp(loo_m_logy$mean), col = makeTransparent('red', 150), pch = 19)
+points(y, (loo_m_sqrty$mean)^2, col = makeTransparent('blue', 150), pch = 19)
+abline(0,1)
+abline(h = c(300, 800))
+abline(v = c(300, 800))
+
+
+errSummary <- function(obs, pred){
+  
+    err <- pred - obs
+    mae <- mean(abs(err))
+    rmse <- sqrt(mean(err^2))
+    maxerr <- max(err)
+    absdiff <- abs(diff(range(obs)))
+    pmae <- (mae/absdiff) * 100
+    return(list(mae = mae, pmae = pmae, maxerr = maxerr))
+}
+
+
+errSummary(y, loo_m_stan$mean)
+
+errSummary(y, exp(loo_m_logy$mean))
+
+errSummary(y, (loo_m_sqrty$mean)^2)
+
+
+```
+
+
+##  
+```{r}
+test <- matrix(1:150, ncol = 3)
+colnames(test) <- c('col1', 'col2', 'col3')
+Xrange <- matrix(c(20, 100, 80, 100, 120, 147), ncol = 3, nrow = 2, byrow = FALSE)
+colnames(Xrange) <- c('col1', 'col2', 'col3')
+
+kept_list <-vector(mode = 'list', length = ncol(test))
+
+for(i in 1:3){
+  
+  kept_ix <- which(test[ ,i] > Xrange[1, i] & test[ ,i] < Xrange[2, i])
+  print(kept_ix)
+  
+  kept_list[[i]] <- kept_ix
+  
+  
+}
+
+out <- kept_list[[1]]
+
+for(i in 1:length(kept_list)){
+  
+  out <- intersect(out, kept_list[[i]])
+  print(out)
+  
+}
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+# Make a new matrix of predictions, and find which enemble members would pass the constraint.
+
+pred_km_Y_const_level1a_scaled_cVeg_sqrty <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_sqrty[, 'cVeg_lnd_sum'] <- (loo_m_sqrty$mean)^2
+
+pred_level2_sqrty_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_sqrty, AW_const)
+
+emulator_sqrty <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_sqrty[pred_level2_sqrty_ix] <- TRUE
+ver_sqrty<- verify(obs = model, pred = emulator_sqrty, frcst.type = 'binary')
+```
+
+
+```{r}
+
+# Make a new matrix of predictions, and find which enemble members would pass the constraint.
+
+pred_km_Y_const_level1a_scaled_cVeg_logy <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_logy[, 'cVeg_lnd_sum'] <- exp(loo_m_logy$mean)
+
+pred_level2_logy_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_logy, AW_const)
+
+
+emulator_logy <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_logy[pred_level2_logy_ix] <- TRUE
+ver_logy<- verify(obs = model, pred = emulator_logy, frcst.type = 'binary')
+# ETS runs from -1/3 to 1, with 0 showing no skill, so we have some skill. Could be better.
+ver$ETS
+ver$HSS
+
+ver_sqrty$ETS
+ver_sqrty$HSS
+
+
+ver_logy$ETS
+ver_logy$HSS
+
+```
+
+
+```{r}
+AW_const <- matrix(c(0, 1e12, 35, 80, 750, 3000, 300, 800), byrow = FALSE, nrow = 2)
+
+test_ix <- withinConstraints(Y_const_level1a_scaled, AW_const)
+
+
+withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_logy, AW_const)
+
+```
+
+
+```{r}
 
 length(level2_ix)
+
 length(tp_ix)
 length(fn_ix)
 
