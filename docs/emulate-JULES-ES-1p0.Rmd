@@ -86,6 +86,11 @@ withinConstraints <- function(X, Xrange){
 
 ```
 
+```{r}
+AW_const <- matrix(c(0, 1e12, 35, 80, 750, 3000, 300, 800), byrow = FALSE, nrow = 2)
+```
+
+
 ## Leave-one-out analysis of emulators
 
 The leave-one-out section in a for loop can be replaced by using lapply (or mclapply for speed).  
@@ -130,16 +135,6 @@ loolist_km_YAnom_level1a <- mclapply(X = emlist_km_YAnom_level1a, FUN = leaveOne
 ```{r}
 loostats_km_Y_level1a <- lapply(emlist_km_Y_level1a, FUN = kmLooStats)
 loostats_km_YAnom_level1a <- lapply(emlist_km_YAnom_level1a, FUN = kmLooStats)
-
-
-#loostats_km_Y_level1a <- vector(mode = 'list', length = length(y_names_sum))
-
-#for(i in 1:length(emlist_km_Y_level1a)){
-  
-#  loostats <- kmLooStats(emlist_km_Y_level1a[[i]])
-#  loostats_km_Y_level1a[[i]] <- loostats
-#  print(loostats$pmae)
-#}
 
 ```
 
@@ -200,14 +195,7 @@ mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
 
 ```{r}
 # Identify all of the members which fall under a "level 2" constraint.
-
-level2_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > 0 &
-                    Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
-                    Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
-                  Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
-                  
-                  
-  )
+level2_ix <- withinConstraints(Y_const_level1a_scaled, AW_const)
 
 # Build an emulator for the scaled output
 
@@ -239,15 +227,7 @@ for(i in 1:ncol(Y_const_level1a_scaled)){
   
 }
 
-
-pred_level2_ix <- which(pred_km_Y_const_level1a_scaled[,'nbp_lnd_sum'] > 0 &
-                    pred_km_Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  pred_km_Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
-                    pred_km_Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & pred_km_Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
-                  pred_km_Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & pred_km_Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
-                  
-                  
-  )
-
+pred_level2_ix <- withinConstraints(pred_km_Y_const_level1a_scaled, AW_const)
 
 ```
 
@@ -380,11 +360,11 @@ stopCluster(cl)
 ```
 
 ```{r}
-loo_m_stan <- leaveOneOut.km(m_stan, type = 'UK')
+loo_m_stan <- leaveOneOut.km(m_stan, type = 'UK', trend.reestim = TRUE)
 
-loo_m_logy <- leaveOneOut.km(m_logy, type = 'UK')
+loo_m_logy <- leaveOneOut.km(m_logy, type = 'UK', trend.reestim = TRUE)
 
-loo_m_sqrty <- leaveOneOut.km(m_sqrty, type = 'UK')
+loo_m_sqrty <- leaveOneOut.km(m_sqrty, type = 'UK', trend.reestim = TRUE)
 
 
 ```
@@ -425,41 +405,6 @@ errSummary(y, (loo_m_sqrty$mean)^2)
 ```
 
 
-##  
-```{r}
-test <- matrix(1:150, ncol = 3)
-colnames(test) <- c('col1', 'col2', 'col3')
-Xrange <- matrix(c(20, 100, 80, 100, 120, 147), ncol = 3, nrow = 2, byrow = FALSE)
-colnames(Xrange) <- c('col1', 'col2', 'col3')
-
-kept_list <-vector(mode = 'list', length = ncol(test))
-
-for(i in 1:3){
-  
-  kept_ix <- which(test[ ,i] > Xrange[1, i] & test[ ,i] < Xrange[2, i])
-  print(kept_ix)
-  
-  kept_list[[i]] <- kept_ix
-  
-  
-}
-
-out <- kept_list[[1]]
-
-for(i in 1:length(kept_list)){
-  
-  out <- intersect(out, kept_list[[i]])
-  print(out)
-  
-}
-```
-
-
-```{r}
-
-```
-
-
 ```{r}
 # Make a new matrix of predictions, and find which enemble members would pass the constraint.
 
@@ -475,7 +420,6 @@ ver_sqrty<- verify(obs = model, pred = emulator_sqrty, frcst.type = 'binary')
 
 
 ```{r}
-
 # Make a new matrix of predictions, and find which enemble members would pass the constraint.
 
 pred_km_Y_const_level1a_scaled_cVeg_logy <- pred_km_Y_const_level1a_scaled
@@ -486,8 +430,12 @@ pred_level2_logy_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_log
 
 emulator_logy <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
 emulator_logy[pred_level2_logy_ix] <- TRUE
-ver_logy<- verify(obs = model, pred = emulator_logy, frcst.type = 'binary')
+ver_logy <- verify(obs = model, pred = emulator_logy, frcst.type = 'binary')
 # ETS runs from -1/3 to 1, with 0 showing no skill, so we have some skill. Could be better.
+```
+
+
+```{r}
 ver$ETS
 ver$HSS
 
@@ -502,34 +450,140 @@ ver_logy$HSS
 
 
 ```{r}
-AW_const <- matrix(c(0, 1e12, 35, 80, 750, 3000, 300, 800), byrow = FALSE, nrow = 2)
+ver$tab
 
-test_ix <- withinConstraints(Y_const_level1a_scaled, AW_const)
+ver_logy$tab
 
+ver_sqrty$tab
 
-withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_logy, AW_const)
 
 ```
 
 
 ```{r}
 
-length(level2_ix)
+nCores <- 4
+require(doParallel)
+cl <-  makeCluster(nCores) 
+registerDoParallel(cl)
 
-length(tp_ix)
-length(fn_ix)
-
-#what do we miss?
-length(fn_ix)
-
+# kriging model 1, with 4 starting points 
+m_stan_gauss <- km(~., design=X_level1a, response = y, multistart=4, covtype = 'gauss' )
+loo_m_stan_gauss <- leaveOneOut.km(m_stan_gauss , type = 'UK', trend.reestim = TRUE)
+plot(y, loo_m_stan_gauss$mean)
 
 
-length(tn_ix)
+m_stan_gen <- km(~., design=X_level1a, response = y, optim.method = 'gen' )
+loo_m_stan_gen <- leaveOneOut.km(m_stan_gen, type = 'UK', trend.reestim = TRUE)
+plot(y, loo_m_stan_gen$mean)
+
+
+m_stan_gauss_gen <- km(~., design=X_level1a, response = y, optim.method = 'gen' )
+loo_m_stan_gauss_gen <- leaveOneOut.km(m_stan_gauss_gen, type = 'UK', trend.reestim = TRUE)
+plot(y, loo_m_stan_gauss_gen$mean)
+
+
+m_logy_gauss_gen <- km(~., design=X_level1a, response = log(y), covtype = 'gauss', optim.method = 'gen')
+loo_m_logy_gauss_gen <- leaveOneOut.km(m_logy_gauss_gen, trend.reestim = TRUE, type = 'UK')
+plot(y, exp(loo_m_logy_gauss_gen$mean))
+
+
+m_sqrt_gauss_gen <- km(~., design=X_level1a, response = sqrt(y), covtype = 'gauss', optim.method = 'gen')
+loo_m_sqrt_gauss_gen <- leaveOneOut.km(m_sqrt_gauss_gen, trend.reestim = TRUE, type = 'UK')
+plot(y, (loo_m_sqrt_gauss_gen$mean)^2)
+
+
+stopCluster(cl)
+
+
+```
+
+```{r}
+plot(y, loo_m_stan_gauss_gen$mean)
+abline(0,1)
+```
+
+
+```{r}
+plot(y, (loo_m_sqrt_gauss_gen$mean)^2)
+abline(0,1)
+```
+
+
+```{r}
+pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen[, 'cVeg_lnd_sum'] <- exp(loo_m_logy_gauss_gen$mean)
+
+pred_level2_logy_gauss_gen_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen, AW_const)
+
+
+emulator_logy_gauss_gen <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_logy_gauss_gen[pred_level2_logy_gauss_gen_ix] <- TRUE
+ver_logy_gauss_gen <- verify(obs = model, pred = emulator_logy_gauss_gen, frcst.type = 'binary')
+```
+
+
+
+
+
+```{r}
+
+pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen[, 'cVeg_lnd_sum'] <- exp(loo_m_logy_gauss_gen$mean)
+
+pred_level2_logy_gauss_gen_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen, AW_const)
+
+
+emulator_logy_gauss_gen <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_logy_gauss_gen[pred_level2_logy_gauss_gen_ix] <- TRUE
+ver_logy_gauss_gen <- verify(obs = model, pred = emulator_logy_gauss_gen, frcst.type = 'binary')
 
 
 ```
 
 
+
+```{r}
+pred_km_Y_const_level1a_scaled_cVeg_stan_gauss_gen <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_stan_gauss_gen[, 'cVeg_lnd_sum'] <- (loo_m_stan_gauss_gen$mean)
+
+pred_level2_stan_gauss_gen_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_stan_gauss_gen, AW_const)
+
+
+emulator_stan_gauss_gen <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_stan_gauss_gen[pred_level2_stan_gauss_gen_ix] <- TRUE
+ver_stan_gauss_gen <- verify(obs = model, pred = emulator_stan_gauss_gen, frcst.type = 'binary')
+```
+
+ 
+# How about truncating the design? 
+ 
+```{r}
+
+DM_const <- AW_const <- matrix(c(0, 1e12, 10, 120, 500, 5000, 100, 1000), byrow = FALSE, nrow = 2)
+
+level1b_ix <- withinConstraints(Y_const_level1a_scaled, DM_const) 
+
+X_level1b <- X_level1a[level1b_ix , ]
+
+y_level1b <- Y_const_level1a_scaled[level1b_ix, 'cVeg_lnd_sum']
+
+m_stan_level1b <- km(~., design = X_level1b, response = y_level1b, multistart = 4 )
+
+loo_m_stan_level1b <- leaveOneOut.km(m_stan_level1b, type = 'UK', trend.reestim = TRUE)
+
+pred_km_Y_const_level1a_scaled_cVeg_stan_level1b <- pred_km_Y_const_level1a_scaled[level1b_ix, ]
+pred_km_Y_const_level1a_scaled_cVeg_stan_level1b[, 'cVeg_lnd_sum'] <- (loo_m_stan_level1b$mean)
+
+pred_level2_stan_level1b_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_stan_level1b, AW_const)
+
+
+emulator_stan_level1b <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_stan_level1b[pred_level2_stan_level1b_ix] <- TRUE
+ver_stan_level1b <- verify(obs = model, pred = emulator_stan_level1b, frcst.type = 'binary')
+
+```
+ 
 ### Comparison of level 0 and level 1 emulators for NPP (modern value)
 
 ```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
