@@ -557,6 +557,8 @@ ver_stan_gauss_gen <- verify(obs = model, pred = emulator_stan_gauss_gen, frcst.
 
  
 # How about truncating the design? 
+
+(I don't think I have this right yet.)
  
 ```{r}
 
@@ -568,7 +570,7 @@ X_level1b <- X_level1a[level1b_ix , ]
 
 y_level1b <- Y_const_level1a_scaled[level1b_ix, 'cVeg_lnd_sum']
 
-m_stan_level1b <- km(~., design = X_level1b, response = y_level1b, multistart = 4 )
+m_stan_level1b <- km(~., design = X_level1b, response = y_level1b )
 
 loo_m_stan_level1b <- leaveOneOut.km(m_stan_level1b, type = 'UK', trend.reestim = TRUE)
 
@@ -584,6 +586,86 @@ ver_stan_level1b <- verify(obs = model, pred = emulator_stan_level1b, frcst.type
 
 ```
  
+## Modelling emulator error in cVeg
+
+```{r}
+cVeg_level1a <- Y_const_level1a_scaled[, 'cVeg_lnd_sum']
+
+
+require(foreach)
+
+# below an example for a computer with 2 cores, but also work with 1 core
+
+nCores <- 4
+require(doParallel)
+cl <-  makeCluster(nCores) 
+registerDoParallel(cl)
+
+m_cVeg_stan <- km(~., design = X_level1a, response = cVeg_level1a, multistart = 4   )
+
+stopCluster(cl)
+
+```
+
+First, plot and emulate the value of cVeg
+```{r}
+mins <- apply(X_level1a,2,FUN = min)
+maxes <- apply(X_level1a,2,FUN = max)
+  
+nsamp_unif <- 1000  
+X_unif <- samp_unif(nsamp_unif, mins = mins, maxes = maxes)
+
+pred_cVeg_stan_unif <- predict(m_cVeg_stan, newdata = X_unif, type = 'UK')
+```
+
+There is a really important threshold for cVeg in b_wl_io. This is actually picked up nicely in the History matching section, so I'm not worried that it's being missed.
+
+```{r, fig.width = 12, fig.height = 12, warning= FALSE, mesaage = FALSE}
+
+cVeg_level1a_trunc <- cVeg_level1a
+cVeg_level1a_trunc[cVeg_level1a > 800] <- 800
+par(oma = c(0,0,0,3), bg = 'white')
+pairs(X_level1a,
+      labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = cpoints,
+      z = cVeg_level1a_trunc,
+      col = byr,
+      cex.labels = 1,
+      col.axis = 'white',
+      pch = 20
+      )
+
+image.plot(legend.only = TRUE,
+           zlim = range(cVeg_level1a_trunc),
+           col = byr,
+           legend.args = list(text = 'cVeg', side = 3, line = 1),
+           horizontal = TRUE
+)
+
+  legend('left', legend = paste(1:d, colnames(lhs)), cex = 0.9, bty = 'n')
+
+```
+
+
+```{r, fig.width = 10, fig.height = 10}
+par(mfrow = c(2,2))
+plot(X_level1a[, 'b_wl_io'], cVeg_level1a)
+plot(X_level1a[, 'kaps_roth'], cVeg_level1a)
+plot(X_level1a[, 'lai_max_io'], cVeg_level1a)
+plot(X_level1a[, 'retran_l_io'], cVeg_level1a)
+
+```
+
+Then use the leave-one-out differences to get an idea of parameters where the emulator is going wrong. (these should be roughly the same)
+
+```{r}
+
+```
+
+
+
+
 ### Comparison of level 0 and level 1 emulators for NPP (modern value)
 
 ```{r, fig.width = 7, fig.height = 7, results = 'hide', warning=FALSE}
