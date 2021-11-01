@@ -26,20 +26,6 @@ source('JULES-ES-1p0-common.R')
 ## Specific helper functions
 ```{r}
 
-mat2list <- function(X){
-  
-  # Turns the p columns of a matrix into a p length list,
-  # with each column becoming an element of the list
-  
-  out <- vector(mode = 'list', length = ncol(X))
-  for(i in 1:ncol(X)){
-    out[[i]] <- X[ , i]
-  }
-  out
-  
-}
-
-
 # How about MAE over the range
 prop_mae <- function(Y, Ypred){
   # mean absolute error as a proportion of the range of output
@@ -95,30 +81,9 @@ AW_const <- matrix(c(0, 1e12, 35, 80, 750, 3000, 300, 800), byrow = FALSE, nrow 
 
 The leave-one-out section in a for loop can be replaced by using lapply (or mclapply for speed).  
 
+[move to core code]
+
 First, build a list of emulators and then perform a leave-one-out. 
-```{r, include = FALSE}
-# include = FALSE should run the code but supress all output.
-
-
-Y_sum_level1a <- Y_level1a[ , y_names_sum]
-YAnom_sum_level1a <- YAnom_level1a[ , y_names_sum]
-
-
-Y_sum_level1a_list <- mat2list(Y_sum_level1a)
-YAnom_sum_level1a_list <- mat2list(YAnom_sum_level1a)
-```
-
-
-Build the emulator lists
-```{r, include = FALSE}
-# Here, the list is a list version of the matrix Y_
-emlist_km_Y_level1a <- mclapply(X = Y_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
-
-```
-
-```{r, include = FALSE}
-emlist_km_YAnom_level1a <- mclapply(X = YAnom_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
-```
 
 
 Apply the leave-one-out test to each of the list members.

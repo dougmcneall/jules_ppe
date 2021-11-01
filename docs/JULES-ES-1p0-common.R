@@ -124,6 +124,19 @@ makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:20
   datmat
 }
 
+mat2list <- function(X){
+  
+  # Turns the p columns of a matrix into a p length list,
+  # with each column becoming an element of the list
+  
+  out <- vector(mode = 'list', length = ncol(X))
+  for(i in 1:ncol(X)){
+    out[[i]] <- X[ , i]
+  }
+  out
+  
+}
+
 
 ## Function to extract the "modern value" direct from the file (last 20 years of the timeseries)
 # for each of the variables in the file, average the last 20 years as the "modern" value,
@@ -409,6 +422,45 @@ Y_const_level1a_scaled <- sweep(Y_const_level1a, 2, STATS = scalevec, FUN = '/' 
 # This is a "normalisation vector", for making the output numbers more manageable.
 #cs_gb       cv    gpp_gb        nbp npp_n_gb    runoff
 norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
+
+
+## ---------------------------------------------------------------------------------------------
+# km emulator lists for Y and YAnom
+## ---------------------------------------------------------------------------------------------
+
+
+Y_sum_level1a <- Y_level1a[ , y_names_sum]
+YAnom_sum_level1a <- YAnom_level1a[ , y_names_sum]
+
+
+Y_sum_level1a_list <- mat2list(Y_sum_level1a)
+YAnom_sum_level1a_list <- mat2list(YAnom_sum_level1a)
+
+if (file.exists("emlist_km_Y_level1a.rdata")) {
+  load("emlist_km_Y_level1a.rdata")
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_Y_level1a <- mclapply(X = Y_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+  
+  save(emlist_km_Y_level1a, file = "emlist_km_Y_level1a.rdata")
+  
+}
+
+
+if (file.exists("emlist_km_YAnom_level1a.rdata")) {
+  load("emlist_km_YAnom_level1a.rdata")
+} else {
+  
+  
+  emlist_km_YAnom_level1a <- mclapply(X = YAnom_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+  
+  save(emlist_km_YAnom_level1a, file = "emlist_km_YAnom_level1a.rdata")
+  
+}
+
+
+
 
 
 
