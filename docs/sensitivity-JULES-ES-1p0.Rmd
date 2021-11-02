@@ -85,6 +85,26 @@ oaatSensvarKm <- function(X, y, n = 21, med = TRUE, hold = NULL,  formula = ~., 
   
 }
 
+oaatSensvarKmList <- function(X, em_list, n = 21, med = TRUE, hold = NULL,  formula = ~., predtype = 'UK', ...){
+  # one-at-a-time sensitivity summary with a standard dicekriging emulator
+  
+  d = ncol(X)
+  X_oaat <- oaat_design(X, n, med = med, hold = hold)
+  colnames(X_oaat) = colnames(X)
+  
+  em <- em_list[[i]]
+  
+  oaat_pred = predict(em, newdata = X_oaat, type = predtype)
+  
+  sens = sensvar(oaat_pred = oaat_pred, n=n, d=d)
+  out = sens
+  out
+  
+}
+
+
+
+
 
 oaatSensvarSummaryPlot <- function(oat_sens_mat){
   
@@ -207,6 +227,8 @@ X_standard <- matrix(rep(1,d), ncol = d, nrow = 1)
 
 X_standard_norm <- normalize(X_standard, wrt = lhs)
 
+X_level1a_unnorm <- unnormalize(X_level1a, un.mins = lhs_min, un.maxes = lhs_max)
+
 ```
 
 
@@ -217,9 +239,9 @@ Define constraint level 1a as those members that run, and have F0_io <0.9 & b_wl
 ## Modern value sensitivity
 
 ```{r}
-if (file.exists("oaat_level1a_Y.rdata")) {
-  load("oaat_level1a_Y.rdata")
-} else {
+#if (file.exists("oaat_level1a_Y.rdata")) {
+#  load("oaat_level1a_Y.rdata")
+#} else {
   
 oat_var_sensmat_level1a_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
 
@@ -227,12 +249,12 @@ for(i in 1:length(y_names_sum)){
   
   yname <- y_names_sum[i]
   y <- Y_level1a[, yname]
-  oat <- oaatSensvarKm(X = X_level1a, y = y, med = FALSE, hold = X_standard_norm)
+  oat <- oaatSensvarKmList(X = X_level1a, em_list = emlist_km_Y_level1a, med = FALSE, hold = X_standard_norm)
   oat_var_sensmat_level1a_Y[i, ] <- oat
 }
 
-save(y_names_sum, oat_var_sensmat_level1a_Y, file = "oaat_level1a_Y.rdata")
-}
+#save(y_names_sum, oat_var_sensmat_level1a_Y, file = "oaat_level1a_Y.rdata")
+#}
 
 rownames(oat_var_sensmat_level1a_Y) <- y_names_sum
 colnames(oat_var_sensmat_level1a_Y) <- colnames(X_level1a)
@@ -244,19 +266,19 @@ colnames(oat_var_sensmat_level1a_Y) <- colnames(X_level1a)
 
 ```{r, fig.width = 7, fig.height = 8}
 
-pdf(file = 'figs/oat_var_sensmat_level1a_Y.pdf', width = 7, height = 8)
+#pdf(file = 'figs/oat_var_sensmat_level1a_Y.pdf', width = 7, height = 8)
 oaatSensvarSummaryPlot(oat_var_sensmat_level1a_Y)
 
-dev.off()
+#dev.off()
 
 ```
 
 ## Anomaly (Change 1850 - 2013) sensitivities
 
 ```{r}
-if (file.exists("oaat_level1a_YAnom.rdata")) {
-  load("oaat_level1a_YAnom.rdata")
-} else {
+#if (file.exists("oaat_level1a_YAnom.rdata")) {
+#  load("oaat_level1a_YAnom.rdata")
+#} else {
   
 oat_var_sensmat_level1a_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
 
@@ -264,12 +286,12 @@ for(i in 1:length(y_names_sum)){
   
   yname <- y_names_sum[i]
   y <- YAnom_level1a[, yname]
-  oat <- oaatSensvarKm(X = X_level1a, y = y,  med = FALSE, hold = X_standard_norm)
+  oat <- oaatSensvarKmList(X = X_level1a, em_list = emlist_km_YAnom_level1a,  med = FALSE, hold = X_standard_norm)
   oat_var_sensmat_level1a_YAnom[i, ] <- oat
 }
 
-save(y_names_sum, oat_var_sensmat_level1a_YAnom, file = "oaat_level1a_YAnom.rdata")
-}
+#save(y_names_sum, oat_var_sensmat_level1a_YAnom, file = "oaat_level1a_YAnom.rdata")
+#}
 
 
 rownames(oat_var_sensmat_level1a_YAnom) <- y_names_sum
@@ -283,9 +305,9 @@ colnames(oat_var_sensmat_level1a_YAnom) <- colnames(X_level1a)
 
 ```{r, fig.width = 7, fig.height = 8}
 
-pdf(file = 'figs/oat_var_sensmat_level1a_YAnom.pdf', width = 7, height = 8)
+#pdf(file = 'figs/oat_var_sensmat_level1a_YAnom.pdf', width = 7, height = 8)
 oaatSensvarSummaryPlot(oat_var_sensmat_level1a_YAnom)
-dev.off()
+#dev.off()
 
 ```
 
@@ -303,7 +325,11 @@ Further idea: What parameter values might you choose to do this, and what might 
 
 
 ```{r}
-fit_list_const_level1a <- createKmFitList(X = X_level1a, Y = Y_const_level1a_scaled)
+#fit_list_const_level1a <- createKmFitList(X = X_level1a, Y = Y_const_level1a_scaled)
+
+Y_const_level1a_scaled_list <- mat2list(Y_const_level1a_scaled)
+fit_list_const_level1a <- mclapply(X = Y_const_level1a_scaled_list, FUN = km, formula = ~., design = X_level1a,
+                                   mc.cores = 4, control = list(trace = FALSE))
 
 ```
 
@@ -334,7 +360,6 @@ oaatLinePlot(X_oaat = X_oaat_level1a, y_oaat_mean = y_oaat$mean, y_oaat_sd = y_o
 ```
 
 
-
 ```{r}
 
 Y_oaat_const_level1a_scaled <- matrix(ncol = ncol(Y_const_level1a_scaled), nrow = nrow(X_oaat_level1a))
@@ -350,13 +375,12 @@ for(i in 1:ncol(Y_const_level1a_scaled)){
 
 What might be the trade-offs for a high (or accurate) vegetation carbon? are they acceptable? Plot the oaat sensitivity of the other 3 outputs we're calibrating on. 
 
+Plotting these graphs in the original input space (multiplication factors) and providing the standard has the pleasing side effect of showing what you could do to standard inputs to increase or decrease a particular output.
+
 ```{r, fig.width=10, fig.height = 10}
 Y_oaat_const_level1a_scaled_norm <- normalize(Y_oaat_const_level1a_scaled)
 
         oaatLinePlotMulti <- function(X_oaat, Y_oaat, n_oaat, nr, nc, cols, ...){
-  
-  
-  
   
           par(mfrow = c(nr,nc), oma = c(0.1,0.1,3,0.1), mar = c(2,2,3,1))
   
@@ -364,13 +388,14 @@ Y_oaat_const_level1a_scaled_norm <- normalize(Y_oaat_const_level1a_scaled)
             ix <- seq(from = ((i*n_oaat) - (n_oaat-1)), to =  (i*n_oaat), by = 1)
     
             plot(X_oaat[ix,i], Y_oaat[ix,1],
-                 xlim = c(0,1), ylim = c(0,1),
+                 ylim = c(0,1),
                  xlab = colnames(X_oaat)[i],
                  type= 'n',
                  bty = 'n')
   
             for(j in 1:ncol(Y_oaat)){
               lines(X_oaat[ix,i], Y_oaat[ix, j], lty = 'solid', col = cols[j], ...)
+              abline(v = 1, lty = 'dashed', col = 'grey')
               mtext(colnames(X_oaat)[i], side = 3, line = 0.5)
   
             }
@@ -379,8 +404,9 @@ Y_oaat_const_level1a_scaled_norm <- normalize(Y_oaat_const_level1a_scaled)
     
         }
 
+X_oaat_level1a_unnorm <- unnormalize(X_oaat_level1a, un.mins = lhs_min, un.maxes = lhs_max)        
 #pdf(file = 'figs/Y_oaat_const_level1a_scaled_norm.pdf', width = 10, height = 10)
-oaatLinePlotMulti(X_oaat = X_oaat_level1a, Y_oaat = Y_oaat_const_level1a_scaled_norm ,  n_oaat = 21, nr = 6, nc = 6,
+oaatLinePlotMulti(X_oaat = X_oaat_level1a_unnorm, Y_oaat = Y_oaat_const_level1a_scaled_norm ,  n_oaat = 21, nr = 6, nc = 6,
                   lwd = 3, col = cbPal[c(1,2,6,8)])
   
 reset()
@@ -392,11 +418,7 @@ legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = cbPal[c(1,2,6,8)], lty = '
 
 
 # FAST sensitivity analysis
-
-```{r}
-fit_list_Y_level1a <- createKmFitList(X = X_level1a, Y = Y_level1a)
-```
-
+(slow)
 
 ```{r}
 
@@ -416,11 +438,11 @@ bp_convert <- function(fastmodel){
 X_fast <- fast99(model = NULL, factors = colnames(X_level1a), n = 3000,
                  q = "qunif", q.arg = list(min = 0, max = 1))
 
-fast_tell_list <- vector(mode = 'list', length = ncol(Y_level1a))
+fast_tell_list <- vector(mode = 'list', length = length(emlist_km_Y_level1a))
 
 for(i in 1:ncol(Y_level1a)){
   
-  fit <- fit_list_Y_level1a[[i]]
+  fit <- emlist_km_Y_level1a[[i]]
   # Predict the response at the FAST99 design points using the emulator
   pred_fast <- predict(fit, newdata = X_fast$X, type = 'UK')
   
@@ -476,20 +498,25 @@ oaatSensvarSummaryPlot(FAST_total)
 ```{r}
 
 
-multiFAST<- function(X, Y){
-  
+multiFAST<- function(X, Y, fit_list = NULL){
   
   # Generate a design for the FAST99 analysis
   X_fast <- fast99(model = NULL, factors = colnames(X), n = 3000,
                    q = "qunif", q.arg = list(min = 0, max = 1))
   
-  fit_list <- createKmFitList(X = X, Y = Y)
+  
+  if(is.null(fit_list)){
+    fit_list <- createKmFitList(X = X, Y = Y)
+  }
+  
+  else{
+  fit_list <- fit_list
+  }
+  
   fast_tell_list <- vector(mode = 'list', length = ncol(Y))
   
   
   for(i in 1:ncol(Y)){
-    
-    
     
     fit <- fit_list[[i]]
     # Predict the response at the FAST99 design points using the emulator
@@ -512,39 +539,49 @@ multiFAST<- function(X, Y){
 
 ```{r}
 
-MF_YAnom <- multiFAST(X = X_level1a, Y = YAnom_level1a)
+MF_Y_sum_level1a <- multiFAST(X = X_level1a, Y = Y_sum_level1a, fit_list = emlist_km_Y_level1a)
 
 ```
 
+```{r, fig.width = 8, fig.height = 10}
 
+FAST_total_Y_sum_level1a <- matrix(nrow = length(MF_Y_sum_level1a$fast_tell_list), ncol = d)
 
-
-```{r, fig.width = 7, fig.height = 8}
-
-FAST_total_YAnom <- matrix(nrow = length(MF_YAnom$fast_tell_list), ncol = d)
-
-for(i in 1:length(MF_YAnom$fast_tell_list)){
+for(i in 1:length(MF_Y_sum_level1a$fast_tell_list)){
  
   # sum the direct effect and interaction terms to get a total
-  FAST_total_YAnom[i, ] <- apply(bp_convert(MF_YAnom$fast_tell_list[[i]]),2,sum)
+  FAST_total_Y_sum_level1a[i, ] <- apply(bp_convert(MF_Y_sum_level1a$fast_tell_list[[i]]),2,sum)
 }
 
-colnames(FAST_total_YAnom) <- colnames(X_level1a)
-rownames(FAST_total_YAnom) <- colnames(Y_level1a)
-#pdf(file = 'figs/FAST_sensmat_level1a.pdf', width = 7, height = 8)
-sensMatSummaryPlot(FAST_total_YAnom)
-#dev.off()
+colnames(FAST_total_Y_sum_level1a) <- colnames(X_level1a)
+rownames(FAST_total_Y_sum_level1a) <- colnames(Y_sum_level1a)
+pdf(file = 'figs/FAST_sensmat_Y_level1a.pdf', width = 7, height = 8)
+sensMatSummaryPlot(FAST_total_Y_sum_level1a)
+dev.off()
 
 ```
 
-```{r, fig.width = 7, fig.height = 8}
 
-pdf(file = 'figs/FAST_sensmat_Y_level1a.pdf', width = 7, height = 8)
-sensMatSummaryPlot(FAST_total)
-dev.off()
+```{r}
 
+MF_YAnom_sum_level1a <- multiFAST(X = X_level1a, Y = YAnom_sum_level1a, fit_list = emlist_km_YAnom_level1a)
+
+```
+
+```{r, fig.width = 8, fig.height = 10}
+
+FAST_total_YAnom_sum_level1a <- matrix(nrow = length(MF_YAnom_sum_level1a$fast_tell_list), ncol = d)
+
+for(i in 1:length(MF_YAnom_sum_level1a$fast_tell_list)){
+ 
+  # sum the direct effect and interaction terms to get a total
+  FAST_total_YAnom_sum_level1a[i, ] <- apply(bp_convert(MF_YAnom_sum_level1a$fast_tell_list[[i]]),2,sum)
+}
+
+colnames(FAST_total_YAnom_sum_level1a) <- colnames(X_level1a)
+rownames(FAST_total_YAnom_sum_level1a) <- colnames(YAnom_sum_level1a)
 pdf(file = 'figs/FAST_sensmat_YAnom_level1a.pdf', width = 7, height = 8)
-sensMatSummaryPlot(FAST_total_YAnom)
+sensMatSummaryPlot(FAST_total_YAnom_sum_level1a)
 dev.off()
 
 ```
@@ -590,8 +627,8 @@ SensRank <- function(sens_mat){
 sensrank_Y_level1a_oat <- SensRank(oat_var_sensmat_level1a_Y)
 sensrank_YAnom_level1a_oat <- SensRank(oat_var_sensmat_level1a_YAnom)
 
-sensrank_FAST <- SensRank(FAST_total)
-sensrank_FAST_YAnom <- SensRank(FAST_total_YAnom)
+sensrank_FAST <- SensRank(FAST_total_Y_sum_level1a)
+sensrank_FAST_YAnom <- SensRank(FAST_total_YAnom_sum_level1a)
 
   
 sens_ranks <- cbind(sensrank_Y_level1a_oat$rank,sensrank_FAST$rank,  sensrank_YAnom_level1a_oat$rank, sensrank_FAST_YAnom$rank )
@@ -607,9 +644,18 @@ all_ranks <- cbind(sens_ranks, min_rank)
 rank_ix <- sort(min_rank, decreasing = FALSE, index.return = TRUE)
 
 # All ranks is the table of rankings, with min_rank being the highest ranking
-all_ranks[rank_ix$ix, ]
+sens_table <- all_ranks[rank_ix$ix, ]
   
 ```
+
+```{r}
+sens_table
+```
+
+```{r}
+xtable(sens_table, digits = 0)
+```
+
 
 ```{r}
 

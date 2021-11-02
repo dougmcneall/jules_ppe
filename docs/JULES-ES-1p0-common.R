@@ -426,6 +426,8 @@ norm_vec = c(1e12, 1e12, 1e12/ysec , 1e12, 1e12, 1e9)
 
 ## ---------------------------------------------------------------------------------------------
 # km emulator lists for Y and YAnom
+# Standard emulator, the same for each of the 'sum' outputs, and the corresponding
+# anomaly. Uses a linear prior, normalised inputs.
 ## ---------------------------------------------------------------------------------------------
 
 
