@@ -578,7 +578,7 @@ These are inputs that match the level 2 constraints. Only 37 of the original 500
 # Pairs plot of inputs that match the NBP constraint.
 
 
-pdf(file = 'figs/pairs_level2_inputs.pdf', width = 10, height = 10)
+#pdf(file = 'figs/pairs_level2_inputs.pdf', width = 10, height = 10)
 pairs(X_level1a[level2_ix,],
       xlim = c(0,1), ylim = c(0,1),
       labels = 1:d,
@@ -595,7 +595,7 @@ reset()
 
 legend('left', legend = paste(1:d, colnames(lhs)), cex = 0.9, bty = 'n', inset = 0.05, 0.05)
 
-dev.off()
+#dev.off()
 
 
 ```
@@ -605,7 +605,7 @@ We find that adding a constraint to level 2 constrains the behaviour of the soil
 ```{r vegC-soilC-constrained, fig.width = 12, fig.height = 8}
 #cSoil_ens_anom [toplevel_to_level_1a_ix, ]
 
-pdf(file = 'figs/vegC-soilC-constrained.pdf', width = 12, height = 8)
+#pdf(file = 'figs/vegC-soilC-constrained.pdf', width = 12, height = 8)
 
 par(mfrow= c(1,4), las = 1)
 
@@ -640,12 +640,21 @@ matplot(years, t(cVeg_ens_anom), type = 'l', lty = 'solid',ylim = ylim, col = pl
         bty = 'n')
 matlines( years, t((cVeg_ens_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = overplotcol,lwd = 1.5, lty = 'solid')
 
-dev.off()
+#dev.off()
 
 ```
 
 
 ## Emulated density pairs plot of input space that matches level 2 constraints
+
+```{r, include = FALSE}
+# First build an emulator list for the Y
+
+list_Y_const_level1a_scaled <- mat2list(Y_const_level1a_scaled)
+emlist_Y_const_level1a_scaled <- mclapply(X = list_Y_const_level1a_scaled, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+
+```
+
 
 ```{r}
 
@@ -656,12 +665,11 @@ X_unif <- samp_unif(nsamp_unif, mins = (rep(0, d)), maxes = rep(1,d))
 Y_unif <- matrix(nrow = nsamp_unif, ncol = p)
 colnames(Y_unif) <- colnames(Y_const_level1a_scaled)
 
-level1a_emlist <- vector('list',p)
-
 # Build an emulator for each output individually
 for(i in 1:p){
-  em <- km(~., design = X_level1a, response = Y_const_level1a_scaled[,i])
-  level1a_emlist[[i]] <- em
+  #em <- km(~., design = X_level1a, response = Y_const_level1a_scaled[,i])
+  #level1a_emlist[[i]] <- em
+  em <- emlist_Y_const_level1a_scaled[[i]]
   pred <- predict(em, newdata = X_unif, type = 'UK')
   Y_unif[,i] <- pred$mean
 }
@@ -689,8 +697,8 @@ y_unif_ix_rejected = setdiff(1:nsamp_unif, y_unif_ix_kept)
 X_rejected = X_unif[y_unif_ix_kept, ]
 ```
 
-```{r, include = FALSE,  fig.width = 10, fig.height = 10}
-pdf(file = 'figs/pairs_dens_level1a_km.pdf', width = 10, height = 10)
+```{r,  fig.width = 10, fig.height = 10}
+pdf(file = 'figs/pairs_dens_level2_km.pdf', width = 10, height = 10)
 #dev.new(width = 10, height = 10)
 par(oma = c(0,0,0,3), bg = 'white')
 pairs(X_kept,
@@ -711,6 +719,8 @@ image.plot(legend.only = TRUE,
 reset()
 
 legend('left', legend = paste(1:d, colnames(lhs)), cex = 0.9, bty = 'n', inset = 0.05, 0.05)
+
+dev.off()
 ```
 
 
@@ -793,15 +803,15 @@ nbp_accum_ix <- which(nbp_modern_accum_level1a > -16.3 &  nbp_modern_accum_level
 
 ylim = range(c(-120, 200))
 
-pdf(file = 'figs/cumulative_nbp_constrained.pdf', width = 5, height = 7)
+#pdf(file = 'figs/cumulative_nbp_constrained.pdf', width = 5, height = 7)
 matplot(years, t(cumulative_nbp), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
         ylab = 'GtC', main = 'cumulative NBP',
-        bty = 'n')
-matlines( years, t((cumulative_nbp[toplevel_to_level_1a_ix, ])[nbp_accum_ix, ]),col = nbpcol,lwd = 1.5, lty = 'solid')
-matlines( years, t((cumulative_nbp[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = awcol,lwd = 1.5, lty = 'solid')
+        bty = 'n', lwd = 1.5)
+matlines( years, t((cumulative_nbp[toplevel_to_level_1a_ix, ])[nbp_accum_ix, ]),col = nbpcol,lwd = 2, lty = 'solid')
+matlines( years, t((cumulative_nbp[toplevel_to_level_1a_ix, ])[level2_ix, ]),col = awcol,lwd = 2, lty = 'solid')
 
-legend('topleft', legend  = c('Cumulative NBP constraint', 'AW constraint'), col = c(nbpcol, awcol) , lty = 'solid', lwd = 1.5)
-dev.off()
+legend('topleft', legend  = c('Cumulative NBP constraint', 'AW constraint'), col = c(nbpcol, awcol) , lty = 'solid', lwd = 2)
+#dev.off()
 
 
 ```
@@ -827,17 +837,175 @@ outcols <- rep(makeTransparent('black', 50), nrow(Y_const_level1a_scaled_nbp))
 outcols[nbp_accum_ix ] <- nbpcol
 outcols[level2_ix] <- awcol
 
-pdf(file = 'figs/cumulative_nbp_constrained_pairs.pdf', width = 9, height = 9)
+#pdf(file = 'figs/cumulative_nbp_constrained_pairs.pdf', width = 9, height = 9)
 
 pairs(Y_const_level1a_scaled_nbp, col = outcols, lower.panel = NULL, pch = 19)
 reset()
 legend('bottomleft', legend  = c('Cumulative NBP constraint', 'AW constraint'), col = c(nbpcol, awcol) , pch = 19, cex = 1.5,
        inset = 0.1)
-  dev.off()
+#  dev.off()
 
 ```
 
 
+## Augment the design.
+The function addNroyDesignPoints builds an emulator for each model output in Y. It compares the output of each emulator at a number of candidate desin points, and chooses a space-filling set of them that that are Not Ruled Out Yet (statistically close to the observation at Y_target).
+
+```{r, warning=FALSE, message=FALSE, results='hide'}
+# Final output needs to be expressed in terms of original LHS, then put back out to conf files.
+
+# This function adds n.aug potential design points, and finds their implausibility
+# score in X.nroy
+
+wave1 = addNroyDesignPoints(X = X_level1a, 
+                            Y = Y_const_level1a_scaled, 
+                            Y_target = Y_target,
+                            n_aug = 50000, 
+                            mins_aug = mins_aug,
+                            maxes_aug = maxes_aug,
+                            thres = 3,
+                            disc_list=disc_list,
+                            disc_sd_list = disc_sd_list,
+                            obs_sd_list = obs_sd_list,
+                            n_app = 500,
+                            nreps = 500)
+```
+
+
+
+
+## Write the augmented design
+The function write_jules_design here simply takes the points calculated by addNroyDesignPoints and writes them to configuration files.
+
+```{r}
+
+# this needs sorting
+source('~/myRpackages/julesR/vignettes/default_jules_parameter_perturbations.R')
+
+# Easiest way to generate a design of the right size is to have a "fac" which takes
+# the names from the parameter list, and then multiplies everything by 0.5 or 2
+
+tf <- 'l_vg_soil'
+# we don't want anything that is TRUE/FALSE to be in fac
+fac_init <- names(paramlist)
+not_tf_ix <- which(names(paramlist)!=tf)
+paramlist_trunc <-paramlist[not_tf_ix]
+
+fac <- names(paramlist_trunc)
+
+maxfac <-lapply(paramlist_trunc,function(x) x$max[which.max(x$max)] / x$standard[which.max(x$max)])
+minfac <- lapply(paramlist_trunc,function(x) x$min[which.max(x$max)] / x$standard[which.max(x$max)])
+
+
+```
+
+
+```{r}
+# create a directory for the configuration files
+confdir <- 'conf_files_augment_JULES-ES-1p0'
+
+dir.create(confdir)
+
+X_mm <- wave1$X_mm
+
+# This is the function that writes the configuration files.
+write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
+                    fac = fac, minfac = minfac, maxfac = maxfac,
+                    tf = tf,
+                    fnprefix = paste0(confdir,'/param-perturb-P'),
+                    lhsfn = paste0(confdir,'/lhs_example.txt'),
+                    stanfn = paste0(confdir,'/stanparms_example.txt'),
+                    allstanfn = paste0(confdir,'/allstanparms_example.txt'),
+                    rn = 12,
+                    startnum = 500)
+```
+
+## Check the design
+Check that the augmented design produces what we expect. New ensemble members should be somewhat constrained within the boundaries of the original design, if the comparison to data offers any constraint.
+
+```{r, fig.width = 15, fig.height = 15}
+
+
+X_mm <- wave1$X_mm
+
+pairs(rbind(X, X_mm), xlim = c(0,1), ylim = c(0,1), gap = 0, lower.panel = NULL, 
+      col = c(rep('grey', nrow(X)), rep('red', nrow(X_mm))),
+      pch = c(rep(21, nrow(X)), rep(20, nrow(X_mm)))
+      )
+
+par(xpd = NA)
+
+legend('bottom',
+       legend = c('Original design', 'New points'),
+       col = c('grey', 'red'),
+       inset = 0.15,
+       cex = 1.5,
+       pch = c(21,20)
+)
+
+```
+
+
+Visualise the predicted outputs at the NROY points of the old design, and the new suggested design.
+```{r}
+Y_mm_list <- vector(mode ='list', length = length(wave1$fit_list))
+
+for(i in 1:length(wave1$fit_list)){
+
+y_mm <- predict(object=wave1$fit_list[[i]], newdata = wave1$X_mm, type = 'UK')
+
+Y_mm_list[[i]] <- y_mm
+
+}
+```
+
+## Visualising the emulated outputs at the proposed new design points.
+
+Interestingly, these aren't perfectly within the original hard boundaries set by Andy, even though I've set those boundaries to be the +- 4 standard deviation threholds in the History Match. I suggest this is because there is model discrepancy, and that there is considerable wriggle room induced from emulator uncertainty.
+
+In particular, it appears that vegetation carbon is difficult to keep high, and that many NROY proposed members have a fairly low vegetation carbon. This might need a discrepancy term, or adjusting in some other way. It certainly needs exploring, and a OAAT plot might give clues as to the parameters to choose.
+
+```{r, fig.width = 10, fig.height = 10}
+# Histogram of level 1 constraints
+hcol = 'darkgrey'
+lcol = 'black'
+par(mfrow = c(2,2), fg = 'darkgrey', las = 1)
+
+discsd <- c(disc_sd_list, recursive = TRUE)
+
+hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], col = hcol, main = 'NBP', xlab = 'GtC/year')
+hist(Y_mm_list[[1]]$mean, add = TRUE, col = 'black')
+polygon(x = c(-10, 100, 100, -10), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[1], col = 'black')
+rug(c(Y_target[1] + 3*discsd[1],Y_target[1] - 3*discsd[1]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'], col = hcol , main = 'NPP', xlab = 'GtC/year')
+hist(Y_mm_list[[2]]$mean, add = TRUE, col = 'black')
+polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[2], col = 'black')
+rug(c(Y_target[2] + 3*discsd[2],Y_target[2] - 3*discsd[2]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'cSoil_lnd_sum'], col = hcol, main = 'Soil Carbon', xlab = 'GtC')
+hist(Y_mm_list[[3]]$mean, add = TRUE, col = 'black')
+polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+        border = makeTransparent('tomato2'))
+rug(Y_target[3], col = 'black')
+rug(c(Y_target[3] + 3*discsd[3],Y_target[3] - 3*discsd[3]) , col = 'red')
+
+hist(Y_const_level1a_scaled[,'cVeg_lnd_sum'], col = hcol, main = 'Vegetation Carbon', xlab = 'GtC')
+hist(Y_mm_list[[4]]$mean, add = TRUE, col = 'black')
+polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
+        col = makeTransparent('tomato2'),
+       border =  makeTransparent('tomato2'))
+rug(Y_target[4], col = 'black')
+rug(c(Y_target[4] + 3*discsd[4],Y_target[4] - 3*discsd[4]) , col = 'red')
+  
+```
 
 
 
@@ -940,44 +1108,13 @@ lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growt
 
 
 
-## Total land carbon change (incorrect)
 
-We plot the JULES total land carbon change from 1850, together with "observations" from the Global Carbon Budget (Friedligstein et al, 2020). The "observations are the cumulative sum of the 'land sink' column on the "historical observations tab of the data from the paper. It states "The land sink is the average of several dynamic global vegetation models that reproduce the observed mean total land sink of the 1990s."
-
-```{r total-land-carbon-change, message = FALSE, warning = FALSE, fig.width = 8, fig.height = 8}
-# This calculates total land carbon incorrectly
-
-par(mfrow= c(1,2), las = 1)
-
-ylim = range(total_land_carbon_ens)
-matplot(years, t(total_land_carbon_ens), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC', main = 'Total land carbon',
-        bty = 'n')
-matlines( years, t((total_land_carbon_ens[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = overplotcol, lty = 'solid', lwd = 1.5)
-
-ylim = range(total_land_carbon_anom)
-matplot(years, t(total_land_carbon_anom), type = 'l', lty = 'solid',ylim = ylim, col = plotcol,
-        ylab = 'GtC', main = 'Total land carbon anomaly',
-        bty = 'n')
-matlines( years, t((total_land_carbon_anom[toplevel_to_level_1a_ix, ])[level2_ix, ]), col = overplotcol, lty = 'solid', lwd = 1.5)
-
-#Anomalize historical observations to 1850 - 1870
-historical_total_land_carbon_obs <- cumsum(historical_carbon_budget$`land sink`)
-historical_total_land_carbon_obs_anom <- historical_total_land_carbon_obs - historical_total_land_carbon_obs[which(historical_carbon_budget$Year %in% 1850:1870)]
-
-lines(historical_carbon_budget$Year,historical_total_land_carbon_obs_anom, type = 'l',col = 'blue', lwd = 2)
-legend('topleft', legend = c('Ruled out', 'Level1a constraint', 'historical'), col = c('black', overplotcol, 'blue'),
-       lwd = c(1,1.5,2), lty = 'solid')
-
-
-```
 
 ### Land carbon Sink?
 
 I think to make a fair comparison, we might need to take the diff of the anomaly (or just the timeseries), as the above represents the total change since 1850, and I think all the "land sink" stuff looks at the year-to-year changes.
 
 ```{r total-land-carbon-sink, warning = FALSE, message = FALSE}
-
 
 landsink_ens <- matrix(NA, nrow = nrow(total_land_carbon_ens), ncol = ncol(total_land_carbon_ens)-1)
 
@@ -1159,164 +1296,6 @@ for(i in 1:d){
 
 
 
-## Augment the design.
-The function addNroyDesignPoints builds an emulator for each model output in Y. It compares the output of each emulator at a number of candidate desin points, and chooses a space-filling set of them that that are Not Ruled Out Yet (statistically close to the observation at Y_target).
-
-```{r, warning=FALSE, message=FALSE, results='hide'}
-# Final output needs to be expressed in terms of original LHS, then put back out to conf files.
-
-# This function adds n.aug potential design points, and finds their implausibility
-# score in X.nroy
-
-wave1 = addNroyDesignPoints(X = X_level1a, 
-                            Y = Y_const_level1a_scaled, 
-                            Y_target = Y_target,
-                            n_aug = 50000, 
-                            mins_aug = mins_aug,
-                            maxes_aug = maxes_aug,
-                            thres = 3,
-                            disc_list=disc_list,
-                            disc_sd_list = disc_sd_list,
-                            obs_sd_list = obs_sd_list,
-                            n_app = 500,
-                            nreps = 500)
-```
-
-
-
-
-## Write the augmented design
-The function write_jules_design here simply takes the points calculated by addNroyDesignPoints and writes them to configuration files.
-
-```{r}
-
-# this needs sorting
-source('~/myRpackages/julesR/vignettes/default_jules_parameter_perturbations.R')
-
-# Easiest way to generate a design of the right size is to have a "fac" which takes
-# the names from the parameter list, and then multiplies everything by 0.5 or 2
-
-tf <- 'l_vg_soil'
-# we don't want anything that is TRUE/FALSE to be in fac
-fac_init <- names(paramlist)
-not_tf_ix <- which(names(paramlist)!=tf)
-paramlist_trunc <-paramlist[not_tf_ix]
-
-fac <- names(paramlist_trunc)
-
-maxfac <-lapply(paramlist_trunc,function(x) x$max[which.max(x$max)] / x$standard[which.max(x$max)])
-minfac <- lapply(paramlist_trunc,function(x) x$min[which.max(x$max)] / x$standard[which.max(x$max)])
-
-
-```
-
-
-```{r}
-# create a directory for the configuration files
-confdir <- 'conf_files_augment_JULES-ES-1p0'
-
-dir.create(confdir)
-
-X_mm <- wave1$X_mm
-
-# This is the function that writes the configuration files.
-write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
-                    fac = fac, minfac = minfac, maxfac = maxfac,
-                    tf = tf,
-                    fnprefix = paste0(confdir,'/param-perturb-P'),
-                    lhsfn = paste0(confdir,'/lhs_example.txt'),
-                    stanfn = paste0(confdir,'/stanparms_example.txt'),
-                    allstanfn = paste0(confdir,'/allstanparms_example.txt'),
-                    rn = 12,
-                    startnum = 500)
-```
-
-## Check the design
-Check that the augmented design produces what we expect. New ensemble members should be somewhat constrained within the boundaries of the original design, if the comparison to data offers any constraint.
-
-```{r, fig.width = 15, fig.height = 15}
-
-
-X_mm <- wave1$X_mm
-
-pairs(rbind(X, X_mm), xlim = c(0,1), ylim = c(0,1), gap = 0, lower.panel = NULL, 
-      col = c(rep('grey', nrow(X)), rep('red', nrow(X_mm))),
-      pch = c(rep(21, nrow(X)), rep(20, nrow(X_mm)))
-      )
-
-par(xpd = NA)
-
-legend('bottom',
-       legend = c('Original design', 'New points'),
-       col = c('grey', 'red'),
-       inset = 0.15,
-       cex = 1.5,
-       pch = c(21,20)
-)
-
-```
-
-
-Visualise the predicted outputs at the NROY points of the old design, and the new suggested design.
-```{r}
-Y_mm_list <- vector(mode ='list', length = length(wave1$fit_list))
-
-for(i in 1:length(wave1$fit_list)){
-
-y_mm <- predict(object=wave1$fit_list[[i]], newdata = wave1$X_mm, type = 'UK')
-
-Y_mm_list[[i]] <- y_mm
-
-}
-```
-
-## Visualising the emulated outputs at the proposed new design points.
-
-Interestingly, these aren't perfectly within the original hard boundaries set by Andy, even though I've set those boundaries to be the +- 4 standard deviation threholds in the History Match. I suggest this is because there is model discrepancy, and that there is considerable wriggle room induced from emulator uncertainty.
-
-In particular, it appears that vegetation carbon is difficult to keep high, and that many NROY proposed members have a fairly low vegetation carbon. This might need a discrepancy term, or adjusting in some other way. It certainly needs exploring, and a OAAT plot might give clues as to the parameters to choose.
-
-```{r, fig.width = 10, fig.height = 10}
-# Histogram of level 1 constraints
-hcol = 'darkgrey'
-lcol = 'black'
-par(mfrow = c(2,2), fg = 'darkgrey', las = 1)
-
-discsd <- c(disc_sd_list, recursive = TRUE)
-
-hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], col = hcol, main = 'NBP', xlab = 'GtC/year')
-hist(Y_mm_list[[1]]$mean, add = TRUE, col = 'black')
-polygon(x = c(-10, 100, 100, -10), y = c(0, 0, 1000, 1000),
-        col = makeTransparent('tomato2'),
-        border = makeTransparent('tomato2'))
-rug(Y_target[1], col = 'black')
-rug(c(Y_target[1] + 3*discsd[1],Y_target[1] - 3*discsd[1]) , col = 'red')
-
-hist(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'], col = hcol , main = 'NPP', xlab = 'GtC/year')
-hist(Y_mm_list[[2]]$mean, add = TRUE, col = 'black')
-polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
-        col = makeTransparent('tomato2'),
-        border = makeTransparent('tomato2'))
-rug(Y_target[2], col = 'black')
-rug(c(Y_target[2] + 3*discsd[2],Y_target[2] - 3*discsd[2]) , col = 'red')
-
-hist(Y_const_level1a_scaled[,'cSoil_lnd_sum'], col = hcol, main = 'Soil Carbon', xlab = 'GtC')
-hist(Y_mm_list[[3]]$mean, add = TRUE, col = 'black')
-polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
-        col = makeTransparent('tomato2'),
-        border = makeTransparent('tomato2'))
-rug(Y_target[3], col = 'black')
-rug(c(Y_target[3] + 3*discsd[3],Y_target[3] - 3*discsd[3]) , col = 'red')
-
-hist(Y_const_level1a_scaled[,'cVeg_lnd_sum'], col = hcol, main = 'Vegetation Carbon', xlab = 'GtC')
-hist(Y_mm_list[[4]]$mean, add = TRUE, col = 'black')
-polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
-        col = makeTransparent('tomato2'),
-       border =  makeTransparent('tomato2'))
-rug(Y_target[4], col = 'black')
-rug(c(Y_target[4] + 3*discsd[4],Y_target[4] - 3*discsd[4]) , col = 'red')
-  
-```
 
 
 How good are the four emulators that we've built? Are there biases? (there's no real evidence of this)
