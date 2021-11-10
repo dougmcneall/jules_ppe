@@ -17,10 +17,12 @@ Load libraries, functions and data.
 ```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
 # Load helper functions
   
-knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
+knitr::opts_chunk$set(fig.path = "figs/", echo = TRUE, message = FALSE, warnings = FALSE)
 
 # load helper functions, data and do preliminary processing of the ensemble.
 source('JULES-ES-1p0-common.R')
+
+library(sensitivity)
 ```
 
 
@@ -189,8 +191,49 @@ sensMatSummaryPlot <- function(sens_mat, col = blues, maintext = 'Sensitivity Ma
 
 
 
+bp_convert <- function(fastmodel){
+  # get the FAST summary into an easier format for barplot
+  fast_summ <- print(fastmodel)
+  fast_diff <- fast_summ[ ,2] - fast_summ[ ,1]
+  fast_bp <- t(cbind(fast_summ[ ,1], fast_diff))
+  fast_bp
+}
 
 
+multiFAST<- function(X, Y, fit_list = NULL, n = 1000){
+  
+  # Generate a design for the FAST99 analysis
+  X_fast <- fast99(model = NULL, factors = colnames(X), n = n,
+                   q = "qunif", q.arg = list(min = 0, max = 1))
+  
+  
+  if(is.null(fit_list)){
+    fit_list <- createKmFitList(X = X, Y = Y)
+  }
+  
+  else{
+  fit_list <- fit_list
+  }
+  
+  fast_tell_list <- vector(mode = 'list', length = ncol(Y))
+  
+  
+  for(i in 1:ncol(Y)){
+    
+    fit <- fit_list[[i]]
+    # Predict the response at the FAST99 design points using the emulator
+    pred_fast <- predict(fit, newdata = X_fast$X, type = 'UK')
+    
+    # Calculate the sensitivity indices
+    fast_tell <- tell(X_fast, pred_fast$mean)
+    
+    fast_tell_list[[i]] <- fast_tell
+    
+  }
+  
+  return(list(fit_list = fit_list, fast_tell_list = fast_tell_list))
+  
+}
 
 ```
 
@@ -313,10 +356,6 @@ oaatSensvarSummaryPlot(oat_var_sensmat_level1a_YAnom)
 
 
 
-
-
-
-
 ## One-at-a-time sensitivity analysis of constraining variables for understanding model response
 "Constraining variables" being those we use to constrain the model (npp, nbp, cSoil and cVeg).
 It's hard to maintain a high vegetation carbon in particular.  
@@ -418,132 +457,28 @@ legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = cbPal[c(1,2,6,8)], lty = '
 
 
 # FAST sensitivity analysis
-(slow)
+We use a FAST99 algorithm by Saltelli et al (2000), from the R package "sensitivity"
 
 ```{r}
-
-library(sensitivity)
-
-bp_convert <- function(fastmodel){
-  # get the FAST summary into an easier format for barplot
-  fast_summ <- print(fastmodel)
-  fast_diff <- fast_summ[ ,2] - fast_summ[ ,1]
-  fast_bp <- t(cbind(fast_summ[ ,1], fast_diff))
-  fast_bp
-}
-
 # Need to think about how mins and maxes are dealt with - we have a truncated input design
 
 # Generate a design for the FAST99 analysis
 X_fast <- fast99(model = NULL, factors = colnames(X_level1a), n = 3000,
                  q = "qunif", q.arg = list(min = 0, max = 1))
-
-fast_tell_list <- vector(mode = 'list', length = length(emlist_km_Y_level1a))
-
-for(i in 1:ncol(Y_level1a)){
-  
-  fit <- emlist_km_Y_level1a[[i]]
-  # Predict the response at the FAST99 design points using the emulator
-  pred_fast <- predict(fit, newdata = X_fast$X, type = 'UK')
-  
-  # Calculate the sensitivity indices
-  fast_tell <- tell(X_fast, pred_fast$mean)
-  
-  fast_tell_list[[i]] <- fast_tell
-  
-}
-
-
 ```
 
 
+Create a list of sensitivity analyses, one for each column of the "sum" (modern) output matrix. 
 ```{r}
 
-
-for(i in 1:length(fast_tell_list)){
-  par(las = 2, mar = c(9,5,3,2))
-  barplot(bp_convert(fast_tell_list[[i]]), col = c('skyblue', 'grey'), ylab = 'relative sensitivity', main = 'FAST99 Sensitivity')
-}
-
-
-```
-
-```{r}
-
-
-FAST_total <- matrix(nrow = length(fast_tell_list), ncol = d)
-
-for(i in 1:length(fast_tell_list)){
- 
-  # sum the direct effect and interaction terms to get a total
-  FAST_total[i, ] <- apply(bp_convert(fast_tell_list[[i]]),2,sum)
-}
-
-
+MF_Y_sum_level1a <- multiFAST(X = X_level1a, Y = Y_sum_level1a, fit_list = emlist_km_Y_level1a, n = 1000)
 
 ```
 
 
-```{r, fig.width = 7, fig.height = 8}
+Create a sensitivity summary matrix from the list of sensitivity analyses.
+```{r, fig.width = 8, fig.height = 10, echo = TRUE, results = 'hide'}
 
-colnames(FAST_total) <- colnames(X_level1a)
-rownames(FAST_total) <- colnames(Y_level1a)
-#pdf(file = 'figs/FAST_sensmat_level1a.pdf', width = 7, height = 8)
-oaatSensvarSummaryPlot(FAST_total)
-#dev.off()
-
-```
-
-
-```{r}
-
-
-multiFAST<- function(X, Y, fit_list = NULL){
-  
-  # Generate a design for the FAST99 analysis
-  X_fast <- fast99(model = NULL, factors = colnames(X), n = 3000,
-                   q = "qunif", q.arg = list(min = 0, max = 1))
-  
-  
-  if(is.null(fit_list)){
-    fit_list <- createKmFitList(X = X, Y = Y)
-  }
-  
-  else{
-  fit_list <- fit_list
-  }
-  
-  fast_tell_list <- vector(mode = 'list', length = ncol(Y))
-  
-  
-  for(i in 1:ncol(Y)){
-    
-    fit <- fit_list[[i]]
-    # Predict the response at the FAST99 design points using the emulator
-    pred_fast <- predict(fit, newdata = X_fast$X, type = 'UK')
-    
-    # Calculate the sensitivity indices
-    fast_tell <- tell(X_fast, pred_fast$mean)
-    
-    fast_tell_list[[i]] <- fast_tell
-    
-  }
-  
-  return(list(fit_list = fit_list, fast_tell_list = fast_tell_list))
-  
-}
-
-
-```
-
-
-```{r}
-
-MF_Y_sum_level1a <- multiFAST(X = X_level1a, Y = Y_sum_level1a, fit_list = emlist_km_Y_level1a)
-
-```
-
-```{r, fig.width = 8, fig.height = 10}
 
 FAST_total_Y_sum_level1a <- matrix(nrow = length(MF_Y_sum_level1a$fast_tell_list), ncol = d)
 
@@ -555,20 +490,26 @@ for(i in 1:length(MF_Y_sum_level1a$fast_tell_list)){
 
 colnames(FAST_total_Y_sum_level1a) <- colnames(X_level1a)
 rownames(FAST_total_Y_sum_level1a) <- colnames(Y_sum_level1a)
-pdf(file = 'figs/FAST_sensmat_Y_level1a.pdf', width = 7, height = 8)
+```
+
+Plot the summary matrix
+```{r, fig.width = 8, fig.height = 10, message = FALSE, warning=FALSE}
+#pdf(file = 'figs/FAST_sensmat_Y_level1a.pdf', width = 7, height = 8)
 sensMatSummaryPlot(FAST_total_Y_sum_level1a)
-dev.off()
+#dev.off()
 
 ```
 
 
+Now create a list of sensitivity analyses for the anomaly at the end of the run.
 ```{r}
 
 MF_YAnom_sum_level1a <- multiFAST(X = X_level1a, Y = YAnom_sum_level1a, fit_list = emlist_km_YAnom_level1a)
 
 ```
 
-```{r, fig.width = 8, fig.height = 10}
+Create the sensitivity summary matrix for the anomaly
+```{r, include = FALSE}
 
 FAST_total_YAnom_sum_level1a <- matrix(nrow = length(MF_YAnom_sum_level1a$fast_tell_list), ncol = d)
 
@@ -580,16 +521,22 @@ for(i in 1:length(MF_YAnom_sum_level1a$fast_tell_list)){
 
 colnames(FAST_total_YAnom_sum_level1a) <- colnames(X_level1a)
 rownames(FAST_total_YAnom_sum_level1a) <- colnames(YAnom_sum_level1a)
-pdf(file = 'figs/FAST_sensmat_YAnom_level1a.pdf', width = 7, height = 8)
-sensMatSummaryPlot(FAST_total_YAnom_sum_level1a)
-dev.off()
 
 ```
 
 
+Plot the sensitivity summary matrix
+```{r, fig.width = 8, fig.height = 10}
+
+#pdf(file = 'figs/FAST_sensmat_YAnom_level1a.pdf', width = 7, height = 8)
+sensMatSummaryPlot(FAST_total_YAnom_sum_level1a)
+#dev.off()
+
+```
 
 ### Ranking sensitivity of the parameters.
 
+The idea here is to summarise the relative importance of the input parameters. The sensitivity measures are normalised
 ```{r}
 
 oaatSensvarRank <- function(oat_sens_mat){

@@ -867,8 +867,9 @@ wave1 = addNroyDesignPoints(X = X_level1a,
                             disc_list=disc_list,
                             disc_sd_list = disc_sd_list,
                             obs_sd_list = obs_sd_list,
-                            n_app = 500,
-                            nreps = 500)
+                            n_app = 1000,
+                            nreps = 500,
+                            mc.cores = 4)
 ```
 
 
@@ -923,24 +924,40 @@ write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
 ## Check the design
 Check that the augmented design produces what we expect. New ensemble members should be somewhat constrained within the boundaries of the original design, if the comparison to data offers any constraint.
 
-```{r, fig.width = 15, fig.height = 15}
+```{r, fig.width = 12, fig.height = 12}
 
 
 X_mm <- wave1$X_mm
 
-pairs(rbind(X, X_mm), xlim = c(0,1), ylim = c(0,1), gap = 0, lower.panel = NULL, 
-      col = c(rep('grey', nrow(X)), rep('red', nrow(X_mm))),
-      pch = c(rep(21, nrow(X)), rep(20, nrow(X_mm)))
-      )
+# pairs(rbind(X, X_mm), xlim = c(0,1), ylim = c(0,1), gap = 0, lower.panel = NULL, 
+#       col = c(rep('grey', nrow(X)), rep('red', nrow(X_mm))),
+#       pch = c(rep(21, nrow(X)), rep(20, nrow(X_mm)))
+#       )
+# 
+# par(xpd = NA)
+# 
+# legend('bottom',
+#        legend = c('Original design', 'New points'),
+#        col = c('grey', 'red'),
+#        inset = 0.15,
+#        cex = 1.5,
+#        pch = c(21,20)
+# )
 
-par(xpd = NA)
+par(oma = c(0,0,0,3), bg = 'white')
+pairs(X_mm,
+      labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc.col = rb)
 
-legend('bottom',
-       legend = c('Original design', 'New points'),
-       col = c('grey', 'red'),
-       inset = 0.15,
-       cex = 1.5,
-       pch = c(21,20)
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = rb,
+           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+           horizontal = TRUE
 )
 
 ```
@@ -965,11 +982,13 @@ Interestingly, these aren't perfectly within the original hard boundaries set by
 
 In particular, it appears that vegetation carbon is difficult to keep high, and that many NROY proposed members have a fairly low vegetation carbon. This might need a discrepancy term, or adjusting in some other way. It certainly needs exploring, and a OAAT plot might give clues as to the parameters to choose.
 
-```{r, fig.width = 10, fig.height = 10}
+```{r, fig.width = 8, fig.height = 8}
 # Histogram of level 1 constraints
+
+pdf(file = 'figs/emulated_design_points.pdf', width = 8, height = 8)
 hcol = 'darkgrey'
 lcol = 'black'
-par(mfrow = c(2,2), fg = 'darkgrey', las = 1)
+par(mfrow = c(2,2), fg = 'darkgrey', las = 1, oma = c(1,1,4,1))
 
 discsd <- c(disc_sd_list, recursive = TRUE)
 
@@ -1004,6 +1023,13 @@ polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
        border =  makeTransparent('tomato2'))
 rug(Y_target[4], col = 'black')
 rug(c(Y_target[4] + 3*discsd[4],Y_target[4] - 3*discsd[4]) , col = 'red')
+
+reset()
+
+legend('top', horiz = TRUE, fill = c(hcol, makeTransparent('tomato2'), 'black'), legend = c('runs', 'constraint', 'emulated design outputs'), text.col = 'black', cex = 1, bty = 'n')
+
+dev.off()
+
   
 ```
 
