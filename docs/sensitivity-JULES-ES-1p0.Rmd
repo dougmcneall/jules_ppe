@@ -14,7 +14,7 @@ output:
 ## Preliminaries
 Load libraries, functions and data.
 
-```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
+```{r, echo = TRUE, message = FALSE, warning=FALSE, results = 'hide'}
 # Load helper functions
   
 knitr::opts_chunk$set(fig.path = "figs/", echo = TRUE, message = FALSE, warnings = FALSE)
@@ -610,321 +610,564 @@ knit_exit()
 
 ```
 
+# Monte Carlo Filtering
+```{r}
+# ---------------------------------------------------------------------------------
+# Monte carlo filtering for sensitivity analysis
+# ---------------------------------------------------------------------------------
 
+# Uniform sample from across parameter space
+# Split the sample into 'behavioural' (NROY) and 'Non behavioural (Ruled Out)
+# Build cdfs of the marginal distributions in each case
+# Perform a KS test to see if the smaples are drawn from different distributions
+# The KS statistic is an indicator of the importance of the parameter in splitting the
+# samples.
 
+# "Not in" function
+'%!in%' <- function(x,y)!('%in%'(x,y))
 
-```{r, fig.height = 8, fig.width = 4}
+mcf = function(X, nroy_ix){
 
-# Summarise the sensitivity summaries per parameter
+  ## Monte Carlo Filtering function
+  ## X   ............... Complete sample from input space
+  ## nroy.ix ........... index of cases of X which are NROY (Not Ruled Out Yet), or 'behavioural'.
 
-normsens_mean_Y <- apply(normsens_level1a_Y ,1, mean)
-normsens_mean_YAnom <- apply(normsens_level1a_YAnom ,1, mean)
-  
-sort_ix <- sort(normsens_mean_Y, decreasing = FALSE, index.return = TRUE)
+  ## produces ks statistic for each column of the input matrix X
+  ## A larger ks statistic means that input is more important for
+  ## determining if a sample is NROY or not
 
-dotchart(normsens_mean_Y[sort_ix$ix], labels = colnames(X_level1a)[sort_ix$ix], bg = zissou5[5] , xlim = c(0,0.8), pch = 19)
-points(normsens_mean_YAnom[sort_ix$ix], 1:32, col = zissou5[1], pch = 19)
-         
-dotchart(normsens_mean_Y, labels = colnames(X_level1a), bg = zissou5[5] , xlim = c(0,0.8), pch = 19)
-points(normsens_mean_YAnom, 1:32, col = zissou5[1], pch = 19)
+  X_nroy = X[nroy_ix, ]
 
+  ref = 1:nrow(X)
+  ro_ix = which(ref %!in% nroy_ix)
+  X_ro = X[ro_ix, ]
 
-#dotchart(data$sold, pch = 21, labels = data$month, bg = "green",
-#         pt.cex = 1.5, xlim = range(data$expected, data$sold) + c(-2, 2))
-#points(data$expected, 1:nrow(data), col = "red", pch = 19, cex = 1.5)
+  kss = rep(NA, length = ncol(X))
+  for(i in 1:ncol(X)){
 
+    ks = ks.test(X_ro[,i], X_nroy[,i])
+    kss[i] = ks$statistic
+
+  }
+
+  out = kss
+  out
+}
 ```
 
+This repeats some code from the constraint analysis in order to do MCF using the observations (constraints) we have.
+
+```{r}
+
+# nbp  npp  csoil  cveg
+Y_lower <- c(-10, 35, 750, 300)
+Y_upper <- c(10, 80, 3000, 800)
+
+# I'm going to set it so that + 4sd aligns approximately with the original limits
+# given by Andy Wiltshire. This gives room for uncertainty from the emulator
+Y_target = Y_upper - (abs(Y_upper - (Y_lower)) / 2 )# abs() to fix the problem with negative numbers
 
 
-
-```{r, fig.width = 7, fig.height = 8}
-
-sort_ix <- sort(normsens_mean_Y, decreasing = TRUE, index.return = TRUE)
-# Now put the charts together
-par(mar = c(15,12,5,1), mfrow = c(1,2))
-
-layout(matrix(c(1,1,2), ncol = 3, nrow = 1))
-
-image(rotate(normsens_level1a_Y[sort_ix$ix, ]), axes = FALSE, col = blues)
-
-axis(1, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 3, cex.axis = 1.2)
-axis(2, at = seq(from = 1, to = 0, length.out = p), labels = colnames(X_level1a)[sort_ix$ix], las = 1, cex.axis = 1.2)
-mtext('One-at-a-time sensitivity, variance across level 1a ensemble', side = 3, adj = 0, line = 2, cex = 1)
-
-lab_ix <- 0.5:31.5
-
-par(yaxs = 'i', mar = c(15,1,5,5))
-plot(rev(normsens_mean_Y[sort_ix$ix]), lab_ix, xlab = 'mean oaat variance (normalized)', ylab = '', ylim = c(0,32), type = 'n', yaxt = 'n')
-abline(h = 0.5:31.5, col = 'grey', lty = 'dashed')
-points( rev(normsens_mean_Y[sort_ix$ix]),lab_ix, col = zissou5[1], pch = 19, cex = 1.5)
-
-image.plot(legend.only = TRUE,
-           zlim = c(0,1),
-           col = blues,
-           legend.args = list(text = 'Relative sensitivity', side = 3, line = 1),
-           horizontal = TRUE
-)
-
-```
+# standard deviation is derived from the limits and the central target
+# (this distance is assumed to be 4 standard deviations.
+Y_sd = (Y_upper - Y_target) / 4
+names(Y_sd) = colnames(Y_const_level1a_scaled)
 
 
-```{r, fig.width = 7, fig.height = 8}
+p = ncol(Y_const_level1a_scaled)
 
-sort_ix <- sort(normsens_mean_YAnom, decreasing = TRUE, index.return = TRUE)
-# Now put the charts together
-par(mar = c(15,12,5,1), mfrow = c(1,2))
+obs_sd_list = as.list(rep(0.01,p))
+disc_list =  as.list(rep(0,p)) 
+disc_sd_list =  as.list(Y_sd)
+thres = 3
 
-layout(matrix(c(1,1,2), ncol = 3, nrow = 1))
+mins_aug = apply(X_level1a, 2, FUN = min)
+maxes_aug =apply(X_level1a, 2, FUN = max)
 
-image(rotate(normsens_level1a_YAnom[sort_ix$ix, ]), axes = FALSE, col = blues)
-
-axis(1, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 3, cex.axis = 1.2)
-axis(2, at = seq(from = 1, to = 0, length.out = p), labels = colnames(X_level1a)[sort_ix$ix], las = 1, cex.axis = 1.2)
-mtext('One-at-a-time sensitivity, variance across level 1a ensemble', side = 3, adj = 0, line = 2, cex = 1)
-
-lab_ix <- 0.5:31.5
-
-par(yaxs = 'i', mar = c(15,1,5,5))
-plot(rev(normsens_mean_YAnom[sort_ix$ix]), lab_ix, xlab = 'mean oaat variance (normalized)', ylab = '', ylim = c(0,32), type = 'n', yaxt = 'n')
-abline(h = 0.5:31.5, col = 'grey', lty = 'dashed')
-points( rev(normsens_mean_YAnom[sort_ix$ix]),lab_ix, col = zissou5[1], pch = 19, cex = 1.5)
-
-image.plot(legend.only = TRUE,
-           zlim = c(0,1),
-           col = blues,
-           legend.args = list(text = 'Relative sensitivity', side = 3, line = 1),
-           horizontal = TRUE
-)
+# convert Y_target for ingestion into function
+Y_target = matrix(Y_target, nrow = 1)
 
 ```
 
 ```{r}
+# First build an emulator list for the Y
 
-
-
-```
-
-
-
-```{r, fig.width = 12, fig.height = 12}
-
-p <- ncol(X_level1a)
-
-y_level1a <- Y_level1a[,'npp_nlim_lnd_sum']
-
-par(mfrow = c(5,7), mar = c(3,1,3,1))
-for(i in 1:p){
-  plot(X_level1a[,i], y_level1a, xlab = '', ylab = '', main = colnames(X_level1a)[i], xlim = c(0,1))
-}
-
-```
-
-# comparision of sensitivities level1 vs level1a
-With b_wl truncated, we can clearly see the sensitivities change.
-
-```{r, fig.width= 10, fig.height = 6}
-# normalize the sensitivity matrix
-colnames(oat_var_sensmat_level1a_Y) <- colnames(X_level1a)
-rownames(oat_var_sensmat_level1a_Y) <- y_names_sum
-
-#test <- normalize(t(oat.var.sensmat))
-
-#image(test)
-#par()
-heatmap(oat_var_sensmat_level1a_Y, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
-heatmap(oat_var_sensmat_level1a_Y, mar = c(10,10), scale = 'row')
-
-```
-
-
-```{r, fig.width =12, fig.height = 7}
-
-normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
-
-par(mar = c(12,12,5,2))
-image(normsens_level1a_Y, axes = FALSE, col = blues)
-axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1a), las = 2)
-axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
-mtext('One-at-a-time sensitivity, variance across level 1a ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
+list_Y_const_level1a_scaled <- mat2list(Y_const_level1a_scaled)
+emlist_Y_const_level1a_scaled <- mclapply(X = list_Y_const_level1a_scaled, FUN = km, formula = ~., design = X_level1a, mc.cores = 4,
+                                          control = list(trace = FALSE)) 
 
 ```
 
 
 
 ```{r}
-# This fails for "cVeg_lnd_sum"
-# The result will be that some of the columns are repeated.
+# Samples from a uniform distribution across all of input space
+nsamp_unif <- 10000  
+X_unif <- samp_unif(nsamp_unif, mins = (rep(0, d)), maxes = rep(1,d))
 
-if (file.exists("oaat_YAnom.rdata")) {
-  load("oaat_YAnom.rdata")
-} else {
+Y_unif <- matrix(nrow = nsamp_unif, ncol = ncol(Y_const_level1a_scaled))
+colnames(Y_unif) <- colnames(Y_const_level1a_scaled)
 
-oat_var_sensmat_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1))
-
-for(i in 1:length(y_names_sum)){
-  
-  yname <- y_names_sum[i]
-  y <- YAnom_level1[, yname]
-  try(oat <- twoStep_sens(X = X_level1, y = y))
-  oat_var_sensmat_YAnom[i, ] <- oat
+# Build an emulator for each output individually
+for(i in 1:ncol(Y_const_level1a_scaled)){
+  em <- emlist_Y_const_level1a_scaled[[i]]
+  pred <- predict(em, newdata = X_unif, type = 'UK')
+  Y_unif[,i] <- pred$mean
 }
 
-save(y_names_sum, oat_var_sensmat_YAnom, file = "oaat_YAnom.rdata")
-
-}
 ```
-
-
-
-```{r, fig.width= 10, fig.height = 6}
-# normalize the sensitivity matrix
-colnames(oat_var_sensmat_YAnom) <- colnames(X_level1)
-rownames(oat_var_sensmat_YAnom) <- y_names_sum
-
-#test <- normalize(t(oat.var.sensmat))
-
-#image(test)
-#par()
-heatmap(oat_var_sensmat_YAnom, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
-heatmap(oat_var_sensmat_YAnom, mar = c(10,6), scale = 'row')
-
-```
-
-
-```{r, fig.width =12, fig.height = 7}
-
-normsens_YAnom <- normalize(t(oat_var_sensmat_YAnom))
-
-par(mar = c(12,12,5,2))
-image(normsens_YAnom, axes = FALSE, col = blues)
-axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
-axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
-mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
-
-```
-
-
-# Plot both sensitivity matrices on top of one another.
-It looks as though both the absolute value and the change over time are controlled by the same parameters.
-```{r, fig.width =12, fig.height = 12}
-par(mfrow = c(2,1), mar = c(12,12,5,2))
-
-image(normsens_Y, axes = FALSE, col = blues)
-axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
-axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
-mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
-
-
-image(normsens_YAnom, axes = FALSE, col = blues)
-axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
-axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
-mtext('One-at-a-time sensitivity, variance of historical change across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
-
-
-```
-
-
-Need Y and Yanom sensitivities at level 1a
 
 ```{r}
-# This fails for "cVeg_lnd_sum"
-# The result will be that some of the columns are repeated.
+# This uses MCF with the constraints set by AW, rather than with a formal history match.
 
-if (file.exists("oaat_level1a_YAnom.rdata")) {
-  load("oaat_level1a_YAnom.rdata")
-} else {
+mcf_nbp = mcf(X_unif, which(Y_unif[,'nbp_lnd_sum'] > 0))
+mcf_npp = mcf(X_unif, which(Y_unif[,'npp_nlim_lnd_sum'] > 35 & Y_unif[,'npp_nlim_lnd_sum'] < 80))
+mcf_cSoil = mcf(X_unif, which(Y_unif[,'cSoil_lnd_sum'] > 750 & Y_unif[,'cSoil_lnd_sum'] < 3000))
+mcf_cVeg <- mcf(X_unif, which(Y_unif[,'cVeg_lnd_sum'] > 300 & Y_unif[,'cVeg_lnd_sum'] < 800))
 
-oat_var_sensmat_level1a_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
 
-for(i in 1:length(y_names_sum)){
-  
-  yname <- y_names_sum[i]
-  y <- YAnom_level1a[, yname]
-  try(oat <- twoStep_sens(X = X_level1a, y = y))
-  oat_var_sensmat_level1a_YAnom[i, ] <- oat
-}
+mcf_summary <- matrix(rbind(mcf_nbp, mcf_npp, mcf_cSoil, mcf_cVeg), nrow = ncol(Y_const_level1a_scaled))
+colnames(mcf_summary) <- colnames(X_level1a)
+rownames(mcf_summary) <- c('nbp', 'npp', 'cSoil', 'cVeg')
 
-save(y_names_sum, oat_var_sensmat_level1a_YAnom, file = "oaat_level1a_YAnom.rdata")
-
-}
 ```
 
 
+```{r, fig.width = 5, fig.height = 8}
 
+sensMatSummaryPlot(mcf_summary)
 
-
-## twoStep sensitivity analysis
-
-It seems clear from the emulator testing that the twoStep emulator in't performing any better than the regular km emulator.  
-Given that, this section probably shouldn't be in the main analysis.
-
-```{r, warning=FALSE, message = FALSE}
-
-if (file.exists("oat_twostep.rdata")) {
-  load("oat_twostep.rdata")
-} else {
-oat_test <- twoStep_sens(X = X_level1, y = y_level1)
-
-
-save(oat_test, file = "oat_twostep.rdata")
-}
 
 ```
 
 
 ```{r}
+knit_exit()
 
-if (file.exists("oaat_Y.rdata")) {
-  load("oaat_Y.rdata")
-} else {
-  
-  
-oat_var_sensmat_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1))
+```
 
-for(i in 1:length(y_names_sum)){
+code from here is only for reference (to be amended)
+
+```{r}
+
+
+# First, use MCF on the design
+#
+# Calculate the implausibility of each input point for
+# each set of observations
+
+run.impl.amaz = impl(em = Y_tropics,
+  em.sd = 0,
+  disc = 0,
+  disc.sd = 0,
+  obs = obs_amazon,
+  obs.sd = 0.075)
+
+run.nroy.ix.amaz = which(run.impl.amaz < 3)
+
+run.impl.seasia = impl(em = Y_tropics,
+  em.sd = 0,
+  disc = 0,
+  disc.sd = 0,
+  obs = obs_seasia,
+  obs.sd = 0.075)
+
+run.nroy.ix.seasia = which(run.impl.seasia < 3)
+
+run.impl.congo = impl(em = Y_tropics,
+  em.sd = 0,
+  disc = 0,
+  disc.sd = 0,
+  obs = obs_congo,
+  obs.sd = 0.075)
+
+run.nroy.ix.congo = which(run.impl.congo < 3)
+
+
+mcf.amaz = mcf(X_tropics, run.nroy.ix.amaz)
+mcf.seasia = mcf(X_tropics, run.nroy.ix.seasia)
+mcf.congo = mcf(X_tropics, run.nroy.ix.congo)
+
+dev.new(width = 6, height = 6)
+par(mar = c(8,4,3,1))
+plot(1:ncol(X_tropics), mcf.amaz, col = col.amaz, pch = 19,
+     ylim = c(0,0.4),
+     ylab = 'MCF sensitivity', xlab = '',
+     axes = FALSE,
+     pty = 'n'
+     )
+abline(v = 1:ncol(X_tropics), lty = 'dashed', col = 'lightgrey')
+points(1:ncol(X_tropics), mcf.amaz, col = col.amaz, pch = 19)
+points(1:ncol(X_tropics), mcf.seasia, col = col.seasia, pch = 19)
+points(1:ncol(X_tropics), mcf.congo, col = col.congo, pch = 19)
+
+axis(side = 1, labels = colnames(X_tropics), las = 2, at = 1:ncol(X_tropics))
+axis(side = 2)
+
+# -------------------------------------------------------------------------
+# Generate uncertainty estimates on the MCF by emulating and
+# bootstrapping the samples.
+# -------------------------------------------------------------------------
+
+mcf.emboot = function(X, emfit, bootcol = c(8,9),
+  disc, disc.sd, obs, obs.sd, thres = 3, n.mcf = 1000, n.reps = 3000){
   
-  yname <- y_names_sum[i]
-  y <- Y_level1[, yname]
-  oat <- twoStep_sens(X = X_level1, y = y)
-  oat_var_sensmat_Y[i, ] <- oat
+  ## Function that does Monte Carlo Filtering using an emulated sample.
+  ## Inputs for emulation are sampled from the unit cube apart from
+  ## those in columns bootcol, which are bootstrapped from the design.
+  ##
+
+  em.mcfmat = matrix(nrow = n.reps, ncol = ncol(X))
+
+  for(i in 1:n.reps){
+
+                                        # Sample from uniform distributions for the
+                                        # standard input parameters
+    X.mcf = samp.unif(n = n.mcf, mins = rep(0, ncol(X)), maxes = rep(1, ncol(X)))
+    
+                                        # Sample from the model run inputs for the temp and precip
+                                        # (here indicated by bootcol columns)
+    X.tp.ix = sample(1:nrow(X), size = n.mcf, replace = TRUE)
+    X.tp.runsamp = X[X.tp.ix , bootcol]
+    
+                                        # bind the samples together
+    X.mcf[, bootcol] = X.tp.runsamp
+    colnames(X.mcf) <- colnames(X)
+
+    # Predict model output at the sampled inputs
+    pred.mcf = predict(emfit, newdata = X.mcf, type = 'UK')
+
+    # find the implausibility of the predicted inputs
+    em.impl.mcf = impl(em = pred.mcf$mean,
+    em.sd = pred.mcf$sd,
+      disc = disc,
+      disc.sd = disc.sd,
+      obs = obs,
+      obs.sd = obs.sd)
+
+    # Which part of the sample is NROY (or "behavioural")
+    em.nroy.ix = which(em.impl.mcf < thres)
+    
+    em.mcf= mcf(X.mcf, em.nroy.ix)
+    em.mcfmat[i, ] = em.mcf
+    
+  }
+  
+  mcf.mean = apply(em.mcfmat, 2, mean)
+  mcf.sd = apply(em.mcfmat, 2, sd)
+
+
+  return(list(mean = mcf.mean, sd = mcf.sd))
 }
 
-save(y_names_sum, oat_var_sensmat_Y, file = "oaat_Y.rdata")
+
+# How big might the uncertainty bounds be if we use just 300 points
+# (as in the ensemble) to estimate the MCF sensitivity analysis indices?
+
+n.mcf.seq = c(seq(from = 100, to = 1000, by = 100), 1500, 2000, 3000)
+mcf.seq.mean = matrix(NA, nrow = length(n.mcf.seq), ncol = ncol(X_tropics_norm))
+mcf.seq.sd = matrix(NA, nrow = length(n.mcf.seq), ncol = ncol(X_tropics_norm))
+
+for(i in 1:length(n.mcf.seq)){
+
+mcf.em.amaz.seq = mcf.emboot(X = X_tropics_norm, em = tropics_fit,
+  bootcol = c(8,9), disc = 0, disc.sd = 0, obs = obs_amazon, obs.sd = 0.05,
+  thres = 3, n.mcf = n.mcf.seq[i], n.reps = 1000)
+
+mcf.seq.mean[i, ] = mcf.em.amaz.seq$mean
+mcf.seq.sd[i, ] = mcf.em.amaz.seq$sd
+
 }
+
+# What is our estimate of MCF uncertainty when we have 300 ensemble members?
+mcf.em.amaz.300 = mcf.emboot(X = X_tropics_norm, em = tropics_fit,
+  bootcol = c(8,9), disc = 0, disc.sd = 0, obs = obs_amazon, obs.sd = 0.05,
+  thres = 3, n.mcf = 300, n.reps = 1000)
+
+mcf.em.seasia.300 = mcf.emboot(X = X_tropics_norm, em = tropics_fit,
+  bootcol = c(8,9), disc = 0, disc.sd = 0, obs = obs_seasia, obs.sd = 0.05,
+  thres = 3, n.mcf = 300, n.reps = 1000)
+
+mcf.em.congo.300 = mcf.emboot(X = X_tropics_norm, em = tropics_fit,
+  bootcol = c(8,9), disc = 0, disc.sd = 0, obs = obs_congo, obs.sd = 0.05,
+  thres = 3, n.mcf = 300, n.reps = 1000)
+
+
+
+cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+# The Mean and the Standard deviation of the estimate
+# of MCF sensitivity both drop as the number of MCF samples increases.
+
+#dev.new(width = 10, height = 8)
+pdf(width = 10, height = 8, file = 'graphics/mcf_mean_sd_vs_n.pdf')
+par(mfrow = c(1,2), las = 1)
+
+matplot(n.mcf.seq, mcf.seq.mean, main = 'Mean', xlab = 'Emulated Ensemble members', ylab = 'KS statistic Mean', type = 'o', col = cbPal)
+
+matplot(n.mcf.seq, mcf.seq.sd, main = 'Standard deviation', xlab = 'Emulated Ensemble members', ylab = 'KS statistic standard deviation', type = 'o', col = cbPal)
+
+legend('topright', pch = as.character(1:9), legend = colnames(X_tropics_norm), col = cbPal, text.col = cbPal)
+dev.off()
+
+
+# This puts the mean and estimate MCF sensitivity indices in context with their
+# estimated uncertainty.
+dev.new(width = 6, height = 10)
+matplot(n.mcf.seq, mcf.seq.mean, main = 'Mean', xlab = 'Ensemble members', ylab = 'MCF Sensitivity Index', type = 'o', col = rep(cbPal,2), ylim = c(0,0.35), pch = 19, lwd = 1.2, lty = 'solid')
+
+for(i in 1: ncol(mcf.seq.mean)){
+  
+arrows(x0 = n.mcf.seq, y0 = mcf.seq.mean[,i] - (mcf.seq.sd[,i]),
+         x1 = n.mcf.seq, y1 = mcf.seq.mean[,i] + (mcf.seq.sd[, i]),
+         length=0.05, angle=90, code=3, col = rep(cbPal,2)[i],lwd = 1.2
+         )
+}
+
+
+# Calculate MCF indices with 5000 emulated ensemble members.
+# Bootstrap uncertainty estimates.
+mcf.em.amaz = mcf.emboot(X = X_tropics_norm, em = tropics_fit,
+  bootcol = c(8,9), disc = 0, disc.sd = 0, obs = obs_amazon, obs.sd = 0.05,
+  thres = 3, n.mcf = 5000, n.reps = 1000)
+
+mcf.em.seasia = mcf.emboot(X = X_tropics_norm, em = tropics_fit,
+  bootcol = c(8,9), disc = 0, disc.sd = 0, obs = obs_seasia, obs.sd = 0.05,
+  thres = 3, n.mcf = 5000, n.reps = 1000)
+
+mcf.em.congo = mcf.emboot(X = X_tropics_norm, em = tropics_fit,
+  bootcol = c(8,9), disc = 0, disc.sd = 0, obs = obs_congo, obs.sd = 0.05,
+  thres = 3, n.mcf = 5000, n.reps = 1000)
+
+
+#dev.new(width = 9, height = 6)
+pdf(file = 'graphics/mcf.pdf', width = 9, height = 6)
+par(las = 1, mar = c(8,4,3,1))
+
+ylim = c(0,0.27)
+xlim = c(0.5,9.5)
+
+plot((1:length(mcf.em.amaz$mean))-0.15, mcf.em.amaz$mean,
+     pch = 19, col = col.amaz, ylim = ylim, xlim = xlim,
+     pty = 'n', xaxs = 'i', yaxs = 'i',
+     xlab = '', ylab = 'KS statistic',
+     axes = FALSE)
+
+i = seq(from = 1, to = 10, by = 2)
+rect(i-0.5, ylim[1], i+0.5, ylim[2], col = "grey92", border=NA)
+
+points((1:length(mcf.em.amaz$mean))-0.15, mcf.em.amaz$mean, pch = 19, col = col.amaz)
+
+arrows(x0 = (1:length(mcf.em.amaz$mean))-0.15, y0 = mcf.em.amaz$mean - (2*mcf.em.amaz$sd ),
+         x1 = (1:length(mcf.em.amaz$mean))-0.15, y1 = mcf.em.amaz$mean + (2*mcf.em.amaz$sd),
+         col = col.amaz, length=0.05, angle=90, code=3)
+
+points((1:length(mcf.em.seasia$mean)), mcf.em.seasia$mean, pch = 19, col = col.seasia)
+
+arrows(x0 = 1:length(mcf.em.seasia$mean), y0 = mcf.em.seasia$mean - (2*mcf.em.seasia$sd ),
+         x1 = 1:length(mcf.em.seasia$mean), y1 = mcf.em.seasia$mean + (2*mcf.em.seasia$sd),
+         col = col.seasia, length=0.05, angle=90, code=3)
+
+points((1:length(mcf.em.congo$mean))+0.15, mcf.em.congo$mean, pch = 19, col = col.congo)
+
+arrows(x0 = (1:length(mcf.em.congo$mean))+0.15, y0 = mcf.em.congo$mean - (2*mcf.em.congo$sd ),
+         x1 = (1:length(mcf.em.congo$mean))+0.15, y1 = mcf.em.congo$mean + (2*mcf.em.congo$sd),
+         col = col.congo,length=0.05, angle=90, code=3)
+
+
+axis(1, labels = colnames(X_tropics_norm), at = 1:9, las = 2)
+axis(2)
+
+legend('topleft',legend = c('Amazon','SE Asia', 'C Africa'),
+       col = c(col.amaz, col.seasia, col.congo), pch = 19, bty = 'n')
+text(0.5, 0.20, 'Error bars indicate \n \u00B1 2 standard deviations',
+     pos  = 4, col = 'black',cex = 0.8 )
+
+dev.off()
+
+
+# Plot both the run-generated and emulated MCF sensitivity
+#dev.new(width = 8, height = 6)
+pdf(file = 'graphics/mcf_300_5000.pdf', width = 8, height = 6)
+par(las = 1, mar = c(8,4,4,2))
+ylim = c(0,0.43)
+plot((1:length(mcf.em.amaz$mean))-0.2, mcf.em.amaz$mean,
+     pch = 19, col = col.amaz, ylim = ylim, xlim = c(0.5,9.5),
+     pty = 'n', xaxs = 'i', yaxs = 'i',
+     xlab = '', ylab = 'KS statistic',
+     axes = FALSE)
+
+i = seq(from = 1, to = 10, by = 2)
+rect(i-0.5, ylim[1], i+0.5, ylim[2], col = "lightgrey", border=NA)
+
+points((1:length(mcf.em.amaz$mean))-0.2, mcf.em.amaz$mean, pch = 19, col = col.amaz)
+
+arrows(x0 = (1:length(mcf.em.amaz$mean)) - 0.2, y0 = mcf.em.amaz$mean - (2*mcf.em.amaz$sd ),
+         x1 = (1:length(mcf.em.amaz$mean)) - 0.2, y1 = mcf.em.amaz$mean + (2*mcf.em.amaz$sd),
+         col = col.amaz, length=0.05, angle=90, code=3)
+
+points((1:length(mcf.em.amaz$mean))-0.2, mcf.amaz, pch = 21, col = col.amaz)
+
+arrows(x0 = 1:length(mcf.em.amaz$mean)-0.2, y0 = mcf.amaz - (2*mcf.em.amaz.300$sd ),
+       x1 = 1:length(mcf.em.amaz$mean)-0.2, y1 = mcf.amaz + (2*mcf.em.amaz.300$sd),
+       lty = 'dotted',
+       col = col.amaz, length=0.05, angle=90, code=3)
+
+
+points(1:length(mcf.em.seasia$mean), mcf.em.seasia$mean, pch = 19, col = col.seasia)
+
+arrows(x0 = 1:length(mcf.em.seasia$mean), y0 = mcf.em.seasia$mean - (2*mcf.em.seasia$sd ),
+         x1 = 1:length(mcf.em.seasia$mean), y1 = mcf.em.seasia$mean + (2*mcf.em.seasia$sd),
+         col = col.seasia, length=0.05, angle=90, code=3)
+
+
+points((1:length(mcf.em.amaz$mean)), mcf.seasia, pch = 21, col = col.seasia)
+
+arrows(x0 = 1:length(mcf.em.amaz$mean), y0 = mcf.seasia - (2*mcf.em.seasia.300$sd ),
+       x1 = 1:length(mcf.em.amaz$mean), y1 = mcf.seasia + (2*mcf.em.seasia.300$sd),
+       lty = 'dotted',
+       col = col.seasia, length=0.05, angle=90, code=3)
+
+
+points((1:length(mcf.em.congo$mean))+0.2, mcf.em.congo$mean, pch = 19, col = col.congo)
+
+arrows(x0 = (1:length(mcf.em.congo$mean))+0.2, y0 = mcf.em.congo$mean - (2*mcf.em.congo$sd ),
+         x1 = (1:length(mcf.em.congo$mean))+0.2, y1 = mcf.em.congo$mean + (2*mcf.em.congo$sd),
+         col = col.congo,length=0.05, angle=90, code=3)
+
+points((1:length(mcf.em.congo$mean))+0.2, mcf.congo, pch = 21, col = col.congo)
+
+arrows(x0 = 1:length(mcf.em.amaz$mean)+0.2, y0 = mcf.congo - (2*mcf.em.congo.300$sd ),
+       x1 = 1:length(mcf.em.amaz$mean) +0.2, y1 = mcf.congo + (2*mcf.em.congo.300$sd),
+       lty = 'dotted',
+       col = col.congo, length=0.05, angle=90, code=3)
+
+axis(1, labels = colnames(X_tropics_norm), at = 1:9, las = 2)
+axis(2)
+
+legend('topleft',legend = c('Amazon','SE Asia', 'C Africa'),
+       col = c(col.amaz, col.seasia, col.congo), pch = 19, bty = 'n')
+text(0.5, 0.32, 'Error bars indicate \n \u00B1 2 standard deviations',
+     pos  = 4, col = 'black',cex = 0.8 )
+text(0.5, 0.29, 'Open points & dotted lines indicate ensemble-only results',
+     pos  = 4, col = 'black',cex = 0.8 )
+dev.off()
+
+
+# How does this sensitivity analysis measure up to the FAST99 version?
+pdf(width = 12, height = 7, file = 'graphics/fast99_vs_mcf2.pdf')
+#dev.new(width = 12, height = 7)
+par(mfrow = c(1,2), mar = c(5,5,3,2), las = 1)
+
+plot(print(fast.tell)[,1], mcf.amaz, col = col.amaz, pch = as.character(1:9),
+     ylim = c(0,0.42), xlim = c(0,0.32),
+     xlab = 'FAST99 first-order sensitivity',
+     ylab = 'MCF sensitivity (KS statistic)',
+     main = 'MCF using 300 ensemble members',
+     pty = 'n'
+     )
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.amaz - (2*mcf.em.amaz.300$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.amaz + (2*mcf.em.amaz.300$sd),
+         col = col.amaz, length=0.05, angle=90, code=3,
+       lty = 'solid', lwd = 0.8)
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.seasia - (2*mcf.em.seasia.300$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.seasia + (2*mcf.em.seasia.300$sd),
+         col = col.seasia, length=0.05, angle=90, code=3,
+       lty = 'solid', lwd = 0.8)
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.congo - (2*mcf.em.congo.300$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.congo + (2*mcf.em.congo.300$sd),
+         col = col.congo, length=0.05, angle=90, code=3,
+       lty = 'solid', lwd = 0.8)
+
+
+points(print(fast.tell)[,1], mcf.amaz, col = col.amaz, pch = as.character(1:9), font = 2)
+points(print(fast.tell)[,1], mcf.seasia, col = col.seasia, pch = as.character(1:9), font = 2)
+points(print(fast.tell)[,1], mcf.congo, col = col.congo, pch = as.character(1:9), font = 2)
+
+legend('topleft', pch = as.character(1:9), legend = colnames(X_tropics_norm), cex = 0.8, bty = 'n')
+
+legend('top', lty = 'solid', legend = c('Amazon', 'SE Asia', 'C Africa'),
+       text.col = c(col.amaz,col.seasia, col.congo),
+       col = c(col.amaz,col.seasia, col.congo)
+       , cex = 0.8, bty = 'n')
+
+abline(0,1, lty = 'dashed')
+
+
+plot(print(fast.tell)[,1], mcf.em.amaz$mean, col = col.amaz, pch = as.character(1:9),
+     ylim = c(0,0.42), xlim = c(0,0.32),
+     xlab = 'FAST99 first-order sensitivity',
+     ylab = 'MCF sensitivity (KS statistic)',
+     pty = 'n',
+     main = 'MCF using 5000 emulated ensemble members'
+     )
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.em.amaz$mean - (2*mcf.em.amaz$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.em.amaz$mean + (2*mcf.em.amaz$sd),
+         col = col.amaz,length=0.05, angle=90, code=3)
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.em.seasia$mean - (2*mcf.em.seasia$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.em.seasia$mean + (2*mcf.em.seasia$sd),
+         col = col.seasia,length=0.05, angle=90, code=3)
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.em.congo$mean - (2*mcf.em.congo$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.em.congo$mean + (2*mcf.em.congo$sd),
+         col = col.congo,length=0.05, angle=90, code=3)
+
+points(print(fast.tell)[,1], mcf.em.amaz$mean, col = col.amaz, pch = as.character(1:9), font = 2)
+points(print(fast.tell)[,1], mcf.em.seasia$mean, col = col.seasia, pch = as.character(1:9), font = 2)
+points(print(fast.tell)[,1], mcf.em.congo$mean, col = col.congo, pch = as.character(1:9), font = 2)
+
+abline(0,1, lty = 'dashed')
+
+dev.off()
+
+# Just use the 5000 ensemble member example for the paper.
+pdf(width = 7, height = 7, file = 'graphics/fast99_vs_mcf3.pdf')
+#dev.new(width = 12, height = 7)
+par(mar = c(5,5,3,2), las = 1)
+
+plot(print(fast.tell)[,1], mcf.em.amaz$mean, col = col.amaz, pch = as.character(1:9),
+     ylim = c(0,0.32), xlim = c(0,0.32),
+     xlab = 'FAST99 first-order sensitivity',
+     ylab = 'MCF sensitivity (KS statistic)',
+     pty = 'n'
+     )
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.em.amaz$mean - (2*mcf.em.amaz$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.em.amaz$mean + (2*mcf.em.amaz$sd),
+         col = col.amaz,length=0.05, angle=90, code=3)
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.em.seasia$mean - (2*mcf.em.seasia$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.em.seasia$mean + (2*mcf.em.seasia$sd),
+         col = col.seasia,length=0.05, angle=90, code=3)
+
+arrows(x0 = print(fast.tell)[,1], y0 =  mcf.em.congo$mean - (2*mcf.em.congo$sd),
+         x1 = print(fast.tell)[,1], y1 =  mcf.em.congo$mean + (2*mcf.em.congo$sd),
+         col = col.congo,length=0.05, angle=90, code=3)
+
+points(print(fast.tell)[,1], mcf.em.amaz$mean, col = col.amaz, pch = as.character(1:9), font = 2)
+points(print(fast.tell)[,1], mcf.em.seasia$mean, col = col.seasia, pch = as.character(1:9), font = 2)
+points(print(fast.tell)[,1], mcf.em.congo$mean, col = col.congo, pch = as.character(1:9), font = 2)
+
+abline(0,1, lty = 'dashed')
+
+legend('topleft', pch = as.character(1:9), legend = colnames(X_tropics_norm), cex = 0.8, bty = 'n')
+
+legend('top', lty = 'solid', legend = c('Amazon', 'SE Asia', 'C Africa'),
+       text.col = c(col.amaz,col.seasia, col.congo),
+       col = c(col.amaz,col.seasia, col.congo)
+       , cex = 0.8, bty = 'n')
+
+dev.off()
+
+
+
 ```
 
-
-
-## Sensitivity at level1 constraint (truncated f0_io)
-bwl_io becomes very influential across a number of variables
-
-```{r, fig.width= 10, fig.height = 6}
-# normalize the sensitivity matrix
-colnames(oat_var_sensmat_Y) <- colnames(X_level1)
-rownames(oat_var_sensmat_Y) <- y_names_sum
-
-#test <- normalize(t(oat.var.sensmat))
-
-#image(test)
-#par()
-heatmap(oat_var_sensmat_Y, Rowv = NA, Colv = NA, mar = c(10,10), scale = 'row')
-heatmap(oat_var_sensmat_Y, mar = c(10,10), scale = 'row')
-
-```
-
-
-```{r, fig.width =12, fig.height = 7}
-
-
-normsens_Y <- normalize(t(oat_var_sensmat_Y))
-
-par(mar = c(12,12,5,2))
-image(normsens_Y, axes = FALSE, col = blues)
-axis(1, at = seq(from = 0, to = 1, length.out = p), labels = colnames(X_level1), las = 2)
-axis(2, at = seq(from = 0, to = 1, length.out = length(y_names_sum)), labels = y_names_sum, las = 1)
-mtext('One-at-a-time sensitivity, variance across level 1 ensemble', side = 3, adj = 0, line = 2, cex = 1.8)
-
-```
 
 
