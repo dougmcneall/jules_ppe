@@ -534,74 +534,6 @@ sensMatSummaryPlot(FAST_total_YAnom_sum_level1a)
 
 ```
 
-### Ranking sensitivity of the parameters.
-
-The idea here is to summarise the relative importance of the input parameters. The sensitivity measures are normalised
-```{r}
-
-oaatSensvarRank <- function(oat_sens_mat){
-  
-  ynames <- rownames(oat_sens_mat)
-  xnames <- colnames(oat_sens_mat)
-  
-  normsens <- normalize(t(oat_sens_mat))
-  normsens_mean <- apply(normsens,1, mean)
-  
-  rank <- rank(-normsens_mean)
-  
-  
-  return(list(mean = normsens_mean, rank = rank))
-  
-}
-
-SensRank <- function(sens_mat){
-  
-  # summarising and ranking parameters in a sensitivity matrix
-  
-  ynames <- rownames(sens_mat)
-  xnames <- colnames(sens_mat)
-  
-  normsens <- normalize(t(sens_mat))
-  normsens_mean <- apply(normsens,1, mean)
-  
-  rank <- rank(-normsens_mean)
-  
-  return(list(mean = normsens_mean, rank = rank))
-  
-}
-
-
-sensrank_Y_level1a_oat <- SensRank(oat_var_sensmat_level1a_Y)
-sensrank_YAnom_level1a_oat <- SensRank(oat_var_sensmat_level1a_YAnom)
-
-sensrank_FAST <- SensRank(FAST_total_Y_sum_level1a)
-sensrank_FAST_YAnom <- SensRank(FAST_total_YAnom_sum_level1a)
-
-  
-sens_ranks <- cbind(sensrank_Y_level1a_oat$rank,sensrank_FAST$rank,  sensrank_YAnom_level1a_oat$rank, sensrank_FAST_YAnom$rank )
-colnames(sens_ranks) <- c('OAT_modern_value', 'FAST_modern_value', 'OAT_anomaly', 'FAST_anomaly')
-
-min_rank <- apply(sens_ranks,1, min)
-
-all_ranks <- cbind(sens_ranks, min_rank)
-
-#plot(sens_ranks[,1], sens_ranks[,2], xlab = 'modern value rank', ylab = 'anomaly rank')
-
-
-rank_ix <- sort(min_rank, decreasing = FALSE, index.return = TRUE)
-
-# All ranks is the table of rankings, with min_rank being the highest ranking
-sens_table <- all_ranks[rank_ix$ix, ]
-  
-```
-
-```{r}
-sens_table
-```
-
-```{r}
-xtable(sens_table, digits = 0)
-```
 
 
 ```{r}
@@ -733,12 +665,92 @@ rownames(mcf_summary) <- c('nbp', 'npp', 'cSoil', 'cVeg')
 ```
 
 
-```{r, fig.width = 5, fig.height = 8}
-
+```{r, fig.width = 6, fig.height = 8}
+#pdf(file = 'figs/MCF_sensmat_Yconst_level1a.pdf', width = 6, height = 8 )
 sensMatSummaryPlot(mcf_summary)
-
+#dev.off()
 
 ```
+
+
+```{r}
+
+
+sensrank_Y_level1a_mcf <- SensRank(mcf_summary)
+
+```
+
+### Ranking sensitivity of the parameters.
+
+The idea here is to summarise the relative importance of the input parameters. The sensitivity measures are normalised
+```{r}
+
+oaatSensvarRank <- function(oat_sens_mat){
+  
+  ynames <- rownames(oat_sens_mat)
+  xnames <- colnames(oat_sens_mat)
+  
+  normsens <- normalize(t(oat_sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
+SensRank <- function(sens_mat){
+  
+  # summarising and ranking parameters in a sensitivity matrix
+  
+  ynames <- rownames(sens_mat)
+  xnames <- colnames(sens_mat)
+  
+  normsens <- normalize(t(sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
+
+sensrank_Y_level1a_oat <- SensRank(oat_var_sensmat_level1a_Y)
+sensrank_YAnom_level1a_oat <- SensRank(oat_var_sensmat_level1a_YAnom)
+
+sensrank_FAST <- SensRank(FAST_total_Y_sum_level1a)
+sensrank_FAST_YAnom <- SensRank(FAST_total_YAnom_sum_level1a)
+
+  
+sens_ranks <- cbind(sensrank_Y_level1a_oat$rank,sensrank_FAST$rank,  sensrank_YAnom_level1a_oat$rank, sensrank_FAST_YAnom$rank, sensrank_Y_level1a_mcf$rank)
+colnames(sens_ranks) <- c('OAT_modern_value', 'FAST_modern_value', 'OAT_anomaly', 'FAST_anomaly', 'MCF_modern_value')
+
+min_rank <- apply(sens_ranks,1, min)
+
+all_ranks <- cbind(sens_ranks, min_rank)
+
+#plot(sens_ranks[,1], sens_ranks[,2], xlab = 'modern value rank', ylab = 'anomaly rank')
+
+
+rank_ix <- sort(min_rank, decreasing = FALSE, index.return = TRUE)
+
+# All ranks is the table of rankings, with min_rank being the highest ranking
+sens_table <- all_ranks[rank_ix$ix, ]
+  
+```
+
+```{r}
+sens_table
+```
+
+```{r}
+
+library(xtable)
+xtable(sens_table, digits = 0)
+```
+
 
 
 ```{r}
