@@ -918,7 +918,7 @@ write_jules_design(X_mm = X_mm, paramlist=paramlist, n = nrow(X_mm),
                     stanfn = paste0(confdir,'/stanparms_example.txt'),
                     allstanfn = paste0(confdir,'/allstanparms_example.txt'),
                     rn = 12,
-                    startnum = 500)
+                    startnum = 499)
 ```
 
 ## Check the design
