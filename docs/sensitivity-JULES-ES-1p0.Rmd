@@ -235,6 +235,37 @@ multiFAST<- function(X, Y, fit_list = NULL, n = 1000){
   
 }
 
+oaatSensvarRank <- function(oat_sens_mat){
+  
+  ynames <- rownames(oat_sens_mat)
+  xnames <- colnames(oat_sens_mat)
+  
+  normsens <- normalize(t(oat_sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
+SensRank <- function(sens_mat){
+  
+  # summarising and ranking parameters in a sensitivity matrix
+  
+  ynames <- rownames(sens_mat)
+  xnames <- colnames(sens_mat)
+  
+  normsens <- normalize(t(sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
 ```
 
 # Visualising the ensemble range
@@ -685,36 +716,7 @@ sensrank_Y_level1a_mcf <- SensRank(mcf_summary)
 The idea here is to summarise the relative importance of the input parameters. The sensitivity measures are normalised
 ```{r}
 
-oaatSensvarRank <- function(oat_sens_mat){
-  
-  ynames <- rownames(oat_sens_mat)
-  xnames <- colnames(oat_sens_mat)
-  
-  normsens <- normalize(t(oat_sens_mat))
-  normsens_mean <- apply(normsens,1, mean)
-  
-  rank <- rank(-normsens_mean)
-  
-  
-  return(list(mean = normsens_mean, rank = rank))
-  
-}
 
-SensRank <- function(sens_mat){
-  
-  # summarising and ranking parameters in a sensitivity matrix
-  
-  ynames <- rownames(sens_mat)
-  xnames <- colnames(sens_mat)
-  
-  normsens <- normalize(t(sens_mat))
-  normsens_mean <- apply(normsens,1, mean)
-  
-  rank <- rank(-normsens_mean)
-  
-  return(list(mean = normsens_mean, rank = rank))
-  
-}
 
 
 sensrank_Y_level1a_oat <- SensRank(oat_var_sensmat_level1a_Y)

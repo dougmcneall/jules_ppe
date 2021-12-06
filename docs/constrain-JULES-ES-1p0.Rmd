@@ -867,7 +867,7 @@ wave1 = addNroyDesignPoints(X = X_level1a,
                             disc_list=disc_list,
                             disc_sd_list = disc_sd_list,
                             obs_sd_list = obs_sd_list,
-                            n_app = 1000,
+                            n_app = 500,
                             nreps = 500,
                             mc.cores = 4)
 ```
