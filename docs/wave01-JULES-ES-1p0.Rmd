@@ -3,6 +3,12 @@ title: "Analysis of JULES1p0 ensemble wave1"
 output: html_notebook
 ---
 
+## Introduction
+
+A comparison of wave 01 members against the original ensemble.
+Wave 01 was picked to fall within Andy's basic constraints. How many did so?
+How good is the emulator? Does it get better overall with the new ensemble members added? Does it get better for those members within the AW constraints?
+Does the sensitivity analysis change?
 
 ## Preliminaries
 Load libraries, functions and data.
@@ -23,37 +29,419 @@ source('JULES-ES-1p0-common.R')
 
 ensloc <- '/scratch/hadaw/jules_postprocess/u-ck006/'
 
-if (file.exists("ensemble_wave01.rdata")) {
-  load("ensemble_wave01.rdata")
+```
+
+
+```{r}
+
+makeJulesEnsembleModernValue <- function(ensloc, varlist, nstart, nend, ix = 144:164){
+  
+  nens <- (nend - nstart) + 1
+  datmat <- matrix(nrow = nens, ncol = length(varlist))
+  colnames(datmat) <- varlist
+  
+  enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
+  
+  for(i in 1:nens){
+    
+    vec <- rep(NA, length(varlist))
+    
+    ensmember <- enslist[i] 
+    
+    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    
+    try(nc <- nc_open(paste0(fn)))
+    try(vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = ix))
+    datmat[i, ] <- vec
+    nc_close(nc)
+  }
+  return(list(datmat = datmat, enslist = enslist))
+}
+  
+```
+
+
+```{r}
+nstart <- 499
+nend <- 798
+
+#if (file.exists("ensemble_wave01.rdata")) {
+#  load("ensemble_wave01.rdata")
+#} else {
+  
+ens_wave01_mv <- makeJulesEnsembleModernValue(ensloc = '/scratch/hadaw/jules_postprocess/u-ck006/', 
+                                              varlist = y_names_sum,
+                                              nstart = nstart,
+                                              nend = nend, 
+                                              ix = 144:164) 
+  
+#  save(ens_wave01_mv, file ="ensemble_wave01.rdata")
+#}
+  
+```
+
+```{r}
+
+lhs_wave01 <- read.table( '../conf_files_augment_JULES-ES-1p0/lhs_example.txt', header = TRUE)
+
+X_wave01 = normalize(lhs_wave01, wrt = rbind(lhs_i, lhs_ii, lhs_wave01))
+colnames(X_wave01) = colnames(lhs_wave01)
+
+```
+
+```{r}
+Y_const_wave01 <- ens_wave01_mv$datmat[, ynames_const]
+
+Y_const_wave01_scaled <- sweep(Y_const_wave01, 2, STATS = scalevec, FUN = '/' )
+
+
+```
+
+How many run failures were there?
+There are no NAs but some relative humidity values are infinite.
+There are no "low NPP" ensemble members
+
+```{r}
+
+low_npp_ix_wave01 <- which(ens_wave01_mv$datmat[,'npp_nlim_lnd_sum'] < 1e5)
+
+min(ens_wave01_mv$datmat[,'npp_nlim_lnd_sum'])
+
+Y_wave01_nlevel0_ix <- which(is.na(ens_wave01_mv$datmat[,'nbp_lnd_sum']))
+
+all(is.finite(ens_wave01_mv$datmat))
+
+which(!is.finite(ens_wave01_mv$datmat), arr.ind = TRUE)
+
+ens_wave01_mv$datmat[which(!is.finite(ens_wave01_mv$datmat), arr.ind = TRUE)]
+
+colnames(ens_wave01_mv$datmat)[9]
+
+
+```
+
+## Behaves as we hoped, with a significant low bias on cVeg
+
+```{r, fig.width = 8, fig.height = 8}
+
+wave00col <- 'skyblue3'
+wave01col <- 'tomato2'
+rangecol <- 'grey'
+
+
+# Histogram of level 1 constraints
+hcol = 'darkgrey'
+lcol = 'black'
+
+#pdf(file = 'figs/level_2_constraints_hists.pdf', width = 6, height = 5)
+par(mfrow = c(2,2), fg = 'darkgrey', las = 1, oma = c(0.1, 0.1, 4, 0.1))
+
+trunc <- function(x, vec){
+  
+  dat <- x[x < max(vec) & x > min(vec)  ]
+  
+  dat
+  
+}
+
+
+h <- hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], main = 'NBP', xlab = 'GtC/year', col = makeTransparent(wave00col,150))
+hist(trunc(Y_const_wave01_scaled [,'nbp_lnd_sum'], h$breaks) ,
+     col = makeTransparent(wave01col,150) , breaks = h$breaks, add = TRUE)
+
+polygon(x = c(0, 100, 100, 0), y = c(0, 0, 1000, 1000),
+        col = makeTransparent(rangecol, 60),
+        border = makeTransparent(rangecol))
+
+h <- hist(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'],col = makeTransparent(wave00col,150), main = 'NPP', xlab = 'GtC/year')
+hist(trunc(Y_const_wave01_scaled [,'npp_nlim_lnd_sum'], h$breaks) , 
+     col = makeTransparent(wave01col) , breaks = h$breaks, add = TRUE)
+
+polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
+        col = makeTransparent(rangecol, 60),
+        border = makeTransparent(rangecol))
+
+
+h <- hist(Y_const_level1a_scaled[,'cSoil_lnd_sum'], col = makeTransparent(wave00col,150), main = 'Soil Carbon', xlab = 'GtC')
+hist(trunc(Y_const_wave01_scaled [,'cSoil_lnd_sum'], h$breaks) , 
+     col = makeTransparent(wave01col,150) , breaks = h$breaks, add = TRUE)
+
+polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
+        col = makeTransparent(rangecol, 60),
+        border = makeTransparent(rangecol))
+
+h <- hist(Y_const_level1a_scaled[,'cVeg_lnd_sum'], col = makeTransparent(wave00col,150), main = 'Vegetation Carbon', xlab = 'GtC')
+hist(trunc(Y_const_wave01_scaled [,'cVeg_lnd_sum'], h$breaks) , 
+   col = makeTransparent(wave01col,150)  , breaks = h$breaks, add = TRUE)
+
+polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
+        col = makeTransparent(rangecol, 60),
+       border =  makeTransparent(rangecol))
+
+#dev.off()
+
+reset()
+
+legend('top', horiz = TRUE, fill = c(makeTransparent(wave00col, 150), makeTransparent(wave01col, 150), makeTransparent(rangecol, 60)), legend = c('Wave00', 'Wave01', 'AW range'))
+```
+### What proportion of models *now* fall within Andy's constraints?
+A third! Better than before, but still not great. Pointing at a significant model discrepency in cVeg
+
+```{r}
+AW_constraints <- matrix(nrow = 2, ncol = length(ynames_const))
+
+AW_constraints[1,] <- c(0, 35, 750, 300)
+AW_constraints[2,] <- c(100, 80, 3000, 800)
+
+colnames(AW_constraints) <- ynames_const
+rownames(AW_constraints) <- c('min', 'max')
+
+
+# conform to Andy's basic constraints
+#level2_ix_wave01 <- which(apply(Y_const_wave01_scaled, 1, FUN = withinRange, maxes  = AW_constraints[2,], mins = AW_constraints[1,] ))
+
+#nlevel2_ix_wave01 <- which(apply(Y_const_wave01_scaled, 1, FUN = withinRange, maxes  = AW_constraints[2,], mins = AW_constraints[1,] ) == FALSE)
+
+level2_ix_wave01 <- which(Y_const_wave01_scaled[,'nbp_lnd_sum'] > 0 &
+                    Y_const_wave01_scaled[,'npp_nlim_lnd_sum'] > 35 & Y_const_wave01_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_wave01_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_wave01_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_wave01_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_wave01_scaled[,'cVeg_lnd_sum'] < 800
+                  )
+
+
+```
+
+Pairs plot wrt the original ensemble
+
+```{r, fig.width = 10, fig.height = 10}
+
+pairs(X_wave01[level2_ix_wave01, ],
+      xlim = c(0,1),
+      ylim = c(0,1),
+      gap = 0,
+      lower.panel = NULL
+      )
+
+```
+
+
+
+
+
+## ----------------------------------------------------------------------
+## Load ensemble
+## ----------------------------------------------------------------------
+
+```{r}
+if (file.exists("ensemble_timeseries_wave01.rdata")) {
+  load("ensemble_timeseries_wave01.rdata")
 } else {
   
+  # primary carbon cycle outputs
+  npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+  nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
+  cSoil_ens <-  makeTimeseriesEnsemble(variable = "cSoil_lnd_sum") / 1e12
+  cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
   
-  nstart <- 499
-  nend <- 798
+  
+  lai_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "lai_lnd_mean")
+  
+  # fluxes
+  rh_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "rh_lnd_sum") / (1e12/ysec)
+  fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fLuc_lnd_sum") / (1e12/ysec)
+  fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fHarvest_lnd_sum") / (1e12/ysec)
+  
+  
+  # fractions
+  treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "treeFrac_lnd_mean")
+  shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "shrubFrac_lnd_mean")
+  baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "baresoilFrac_lnd_mean")
+  #c3PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c3PftFrac_lnd_mean_ens")
+  #c4PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c4PftFrac_lnd_mean_ens")
+  
+  save(npp_ens, nbp_ens, cSoil_ens, cVeg_ens, lai_lnd_mean_ens, rh_lnd_sum_ens, fLuc_lnd_sum_ens, fHarvest_lnd_sum_ens,
+       treeFrac_lnd_mean_ens, shrubFrac_lnd_mean_ens, baresoilFrac_lnd_mean_ens, file = "ensemble_timeseries_wave01.rdata" )
+  
+}
+
+total_land_carbon_ens <- cSoil_ens + cVeg_ens
+
+```
+
+```{r}
+
+
+makeTimeseriesEnsemble <- function(ensloc, variable, nstart, nend, nts = 164, cn = 1850:2013){
+  
   nens <- (nend - nstart) + 1
-  datmat_wave01 <- matrix(nrow = nens, ncol = length(y_names_sum))
-  colnames(datmat_wave01) <- y_names_sum
+  # nens is number of ensemble members
+  # nts length of timeseries
+  # cn is colnames()
+  datmat <- matrix(NA, nrow = nens, ncol = nts)
+  colnames(datmat) <- cn
   
   enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
   #floc <- paste0(ensloc,ensmember,subdir)
   
   for(i in 1:nens){
     
-    vec <- rep(NA, length(y_names_sum))
+    vec <- rep(NA,nts)
     
     ensmember <- enslist[i] 
     
     fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
-    #print(fn)
+    
     
     try(nc <- nc_open(paste0(fn)))
-    try(vec <- sapply(y_names_sum, FUN = modernValue, nc = nc, ix = 144:164))
-    datmat_wave01[i, ] <- vec
+    try(dat <- extractTimeseries(nc, variable))
+    
+    datmat[i, ] <- dat
     nc_close(nc)
   }
-  
-  save(nens, datmat_wave01, enslist, floc, file ="ensemble_wave01.rdata")
+  datmat
 }
 
 ```
 
+
+```{r}
+
+nstart <- 499
+nend <- 798
+
+if (file.exists("ensemble_timeseries_wave01.rdata")) {
+  load("ensemble_timeseries_wave01.rdata")
+} else {
+  
+  # primary carbon cycle outputs
+   npp_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+   nbp_ens_wave01 <-  makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend,variable = "nbp_lnd_sum") / (1e12/ysec)
+   cSoil_ens_wave01 <-  makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend,variable = "cSoil_lnd_sum") / 1e12
+   cVeg_ens_wave01 <-  makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend,variable = "cVeg_lnd_sum") / 1e12
+  # 
+  # 
+   lai_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend,variable = "lai_lnd_mean")
+  # 
+  # # fluxes
+   rh_lnd_sum_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend, variable = "rh_lnd_sum") / (1e12/ysec)
+   fLuc_lnd_sum_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend, variable = "fLuc_lnd_sum") / (1e12/ysec)
+   fHarvest_lnd_sum_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend, variable = "fHarvest_lnd_sum") / (1e12/ysec)
+  # 
+  # 
+  # # fractions
+   treeFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend,  variable = "treeFrac_lnd_mean")
+   shrubFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend,  variable = "shrubFrac_lnd_mean")
+   baresoilFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc,nstart = nstart, nend = nend,  variable = "baresoilFrac_lnd_mean")
+  
+   save(npp_ens_wave01,
+        nbp_ens_wave01,
+        cSoil_ens_wave01,
+        cVeg_ens_wave01,
+        lai_lnd_mean_ens_wave01,
+        rh_lnd_sum_ens_wave01,
+        fLuc_lnd_sum_ens_wave01,
+        fHarvest_lnd_sum_ens_wave01,
+        treeFrac_lnd_mean_ens_wave01,
+        shrubFrac_lnd_mean_ens_wave01,
+        baresoilFrac_lnd_mean_ens_wave01,
+       file = "ensemble_timeseries_wave01.rdata" )
+   
+}
+
+#total_land_carbon_ens_wave01 <- cSoil_ens_wave01 + cVeg_ens_wave01
+
+```
+
+Plot Wave00 and Wave01 on top of one another.
+
+```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
+
+lcol_wave0 <- makeTransparent('skyblue3',  120)
+lcol_wave01 <- makeTransparent('tomato2',  100)
+
+linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = NULL){
+  # Plot wave00 and wave01 timeseries on top of one another
+  
+  nt <- length(years) 
+  if(is.null(ylim)){
+    
+  ylim = range(c(ens1[,1], ens1[,nt], ens2[,1], ens2[ ,nt]))
+  }
+  
+  else ylim <- ylim
+  
+  matplot(years, t(ens1), type = 'l', lty = 'solid',ylim = ylim, col = col1,
+        ylab = ylab, main = main, xlab = '',
+        bty = 'n')
+  matlines(years, t(ens2), col = col2, lty = 'solid')
+}
+
+
+par(mfrow= c(3,4), las = 1)
+
+linePlotMultiEns(years = years, ens1 = npp_ens, ens2 = npp_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'NPP')
+
+linePlotMultiEns(years = years, ens1 =  nbp_ens, ens2 = nbp_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'NBP', ylim = c(-10,10))
+
+linePlotMultiEns(years = years, ens1 = cSoil_ens, ens2 = cSoil_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'cSoil', ylim = range(c(cSoil_ens[,1], cSoil_ens[,164])))
+
+linePlotMultiEns(years = years, ens1 = cVeg_ens, ens2 = cVeg_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'cVeg')
+
+linePlotMultiEns(years = years, ens1 = lai_lnd_mean_ens, ens2 = lai_lnd_mean_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'Lai')
+
+
+linePlotMultiEns(years = years, ens1 = rh_lnd_sum_ens, ens2 = rh_lnd_sum_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'RH')
+
+
+linePlotMultiEns(years = years, ens1 = fLuc_lnd_sum_ens, ens2 = fLuc_lnd_sum_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'fLuc')
+
+linePlotMultiEns(years = years, ens1 = fHarvest_lnd_sum_ens, ens2 = fHarvest_lnd_sum_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'fHarvest')
+
+linePlotMultiEns(years = years, ens1 = treeFrac_lnd_mean_ens, ens2 = treeFrac_lnd_mean_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'treefrac')
+
+linePlotMultiEns(years = years, ens1 = shrubFrac_lnd_mean_ens, ens2 = shrubFrac_lnd_mean_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'shrubfrac')
+
+
+linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens, ens2 = baresoilFrac_lnd_mean_ens_wave01,
+                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ylab = 'GtC', main = 'baresoilfrac')
+
+
+
+
+```
+
+
+
+
+
+```{r}
+## ----------------------------------------------------------------------
+## Anomalize ensemble
+## ----------------------------------------------------------------------
+
+npp_ens_anom <- anomalizeTSmatrix(npp_ens, 1:20)
+nbp_ens_anom <- anomalizeTSmatrix(nbp_ens, 1:20)
+cSoil_ens_anom <- anomalizeTSmatrix(cSoil_ens, 1:20)
+cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
+total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)

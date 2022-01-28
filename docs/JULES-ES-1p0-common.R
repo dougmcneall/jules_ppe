@@ -95,7 +95,7 @@ extractTimeseries <- function(nc, variable){
   out
 }
 
-makeTimeseriesEnsemble <- function(variable, nens = 499, nts = 164, cn = 1850:2013){
+makeTimeseriesEnsemble <- function(ensloc, variable, nens = 499, nts = 164, cn = 1850:2013){
   
   # nens is number of ensemble members
   # nts length of timeseries
@@ -191,24 +191,24 @@ if (file.exists("ensemble_timeseries.rdata")) {
 } else {
   
   # primary carbon cycle outputs
-  npp_ens <- makeTimeseriesEnsemble(variable = "npp_nlim_lnd_sum") / (1e12/ysec)
-  nbp_ens <-  makeTimeseriesEnsemble(variable = "nbp_lnd_sum") / (1e12/ysec)
-  cSoil_ens <-  makeTimeseriesEnsemble(variable = "cSoil_lnd_sum") / 1e12
-  cVeg_ens <-  makeTimeseriesEnsemble(variable = "cVeg_lnd_sum") / 1e12
+  npp_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+  nbp_ens <-  makeTimeseriesEnsemble(ensloc = ensloc,variable = "nbp_lnd_sum") / (1e12/ysec)
+  cSoil_ens <-  makeTimeseriesEnsemble(ensloc = ensloc,variable = "cSoil_lnd_sum") / 1e12
+  cVeg_ens <-  makeTimeseriesEnsemble(ensloc = ensloc,variable = "cVeg_lnd_sum") / 1e12
   
   
-  lai_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "lai_lnd_mean")
+  lai_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc,variable = "lai_lnd_mean")
   
   # fluxes
-  rh_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "rh_lnd_sum") / (1e12/ysec)
-  fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fLuc_lnd_sum") / (1e12/ysec)
-  fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(variable = "fHarvest_lnd_sum") / (1e12/ysec)
+  rh_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "rh_lnd_sum") / (1e12/ysec)
+  fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "fLuc_lnd_sum") / (1e12/ysec)
+  fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "fHarvest_lnd_sum") / (1e12/ysec)
   
   
   # fractions
-  treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "treeFrac_lnd_mean")
-  shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "shrubFrac_lnd_mean")
-  baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "baresoilFrac_lnd_mean")
+  treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "treeFrac_lnd_mean")
+  shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "shrubFrac_lnd_mean")
+  baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "baresoilFrac_lnd_mean")
   #c3PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c3PftFrac_lnd_mean_ens")
   #c4PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c4PftFrac_lnd_mean_ens")
   
