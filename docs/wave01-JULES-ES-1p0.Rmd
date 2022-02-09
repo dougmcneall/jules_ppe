@@ -1,13 +1,22 @@
 ---
 title: "Analysis of JULES1p0 ensemble wave1"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ## Introduction
 
-A comparison of wave 01 members against the original ensemble.
-Wave 01 was picked to fall within Andy's basic constraints. How many did so?
-How good is the emulator? Does it get better overall with the new ensemble members added? Does it get better for those members within the AW constraints?
+A comparison of JULES-ES-1p0 wave01 members against the original ensemble (wave00).
+
+Wave 01 input parameter sets were picked using History matching to fall within Andy Wiltshires basic constraints on NBP, NPP, cSoil and cVeg stocks at the end of the 20th century. We use 300 of the 500 members, keeping back 2/5ths for emulator validation later.
+
+We answer some basic questions.
+
+What proportion of the new ensemble match AW's constraints?
+
+How good is a GP emulator? Does it get better overall with the new ensemble members added? In particular, does it get better for those members within the AW constraints?
+
 Does the sensitivity analysis change?
 
 ## Preliminaries
@@ -87,6 +96,9 @@ lhs_wave01 <- read.table( '../conf_files_augment_JULES-ES-1p0/lhs_example.txt', 
 X_wave01 = normalize(lhs_wave01, wrt = rbind(lhs_i, lhs_ii, lhs_wave01))
 colnames(X_wave01) = colnames(lhs_wave01)
 
+# Match the 300 outputs we're using in the training data
+X_wave01_train <- X_wave01[1:300,]
+
 ```
 
 ```{r}
@@ -97,7 +109,8 @@ Y_const_wave01_scaled <- sweep(Y_const_wave01, 2, STATS = scalevec, FUN = '/' )
 
 ```
 
-How many run failures were there?
+## How many run failures were there?  
+
 There are no NAs but some relative humidity values are infinite.
 There are no "low NPP" ensemble members
 
@@ -120,11 +133,13 @@ colnames(ens_wave01_mv$datmat)[9]
 
 ```
 
-## Behaves as we hoped, with a significant low bias on cVeg
+## Ensemble behaviour in key (constraining) outputs. 
+
+Global mean for the 20 years at the end of the 20th Century. There is still a significant low bias on cVeg output.
 
 ```{r, fig.width = 8, fig.height = 8}
 
-wave00col <- 'skyblue3'
+wave00col <- 'skyblue2'
 wave01col <- 'tomato2'
 rangecol <- 'grey'
 
@@ -185,6 +200,7 @@ reset()
 legend('top', horiz = TRUE, fill = c(makeTransparent(wave00col, 150), makeTransparent(wave01col, 150), makeTransparent(rangecol, 60)), legend = c('Wave00', 'Wave01', 'AW range'))
 ```
 ### What proportion of models *now* fall within Andy's constraints?
+
 A third! Better than before, but still not great. Pointing at a significant model discrepency in cVeg
 
 ```{r}
@@ -211,7 +227,15 @@ level2_ix_wave01 <- which(Y_const_wave01_scaled[,'nbp_lnd_sum'] > 0 &
 
 ```
 
-Pairs plot wrt the original ensemble
+Of the 300 members of the wave01 ensemble, 100 pass Andy Wiltshire's Level 2 constraints.
+
+```{r}
+
+length(level2_ix_wave01)
+
+```
+
+Pairs plot of the inputs that pass the constraints with respect to the limits of the original ensemble.
 
 ```{r, fig.width = 10, fig.height = 10}
 
@@ -219,20 +243,23 @@ pairs(X_wave01[level2_ix_wave01, ],
       xlim = c(0,1),
       ylim = c(0,1),
       gap = 0,
-      lower.panel = NULL
+      lower.panel = NULL,
+      pch = 20,
+      col = makeTransparent(wave01col,200)
       )
 
 ```
 
+## Timeseries of mean carbon cycle properties over whole run.
 
+Wave00 in blue and wave01 in red.
 
-
+```{r}
 
 ## ----------------------------------------------------------------------
 ## Load ensemble
 ## ----------------------------------------------------------------------
 
-```{r}
 if (file.exists("ensemble_timeseries_wave01.rdata")) {
   load("ensemble_timeseries_wave01.rdata")
 } else {
@@ -431,17 +458,354 @@ linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens, ens2 = baresoi
 
 ```
 
+## Emulator fits
+
+We hope that running the new ensemble gives us a better emulator, and allows us to rule out more input space.
+We particularly hope that the emulator is better for those members that are inside AW's constraints.
+
+First, we can look at the emulator errors in two cases: The level1a data (a basic carbon cycle), and then with the Wave01 data, which should have similar characteristics. (We should have eliminated really bad simulations, but wave01 is not constrained the data perfectly to be within AW constraints.)
+
+# Emulator fit list of level 1a ensemble
+```{r}
+#fit_list_const_level1a <- createKmFitList(X = X_level1a, Y = Y_const_level1a_scaled)
+
+Y_const_level1a_scaled_list <- mat2list(Y_const_level1a_scaled)
+
+fit_list_const_level1a <- mclapply(X = Y_const_level1a_scaled_list, FUN = km, formula = ~., design = X_level1a,
+                                   mc.cores = 4, control = list(trace = FALSE))
 
 
+
+
+```
+
+# Remove an outlier from the new wave and build emulators
+
+```{r}
+
+# Bind together the input matrices and scaled output data
+X_level1a_wave01 <- rbind(X_level1a, X_wave01_train)[-440, ]
+
+Y_const_level1a_wave01_scaled <- rbind(Y_const_level1a_scaled, Y_const_wave01_scaled)[-440, ]
+
+
+apply(Y_const_level1a_wave01_scaled ,2, which.max)
+apply(Y_const_level1a_wave01_scaled ,2, which.min)
+```
+
+
+Found the outlier - looks like it's 440
+```{r}
+
+findOutliers <- function(x, sds = 6){
+  
+  ix <- which(abs(x - mean(x)) > (sds * sd(x)))
+  
+}
+
+apply(Y_const_level1a_wave01_scaled ,2, findOutliers, sds = 10)
+```
 
 
 ```{r}
-## ----------------------------------------------------------------------
-## Anomalize ensemble
-## ----------------------------------------------------------------------
+# Create fit lists for the combined data
+Y_const_level1a_wave01_scaled_list <- mat2list(Y_const_level1a_wave01_scaled)
 
-npp_ens_anom <- anomalizeTSmatrix(npp_ens, 1:20)
-nbp_ens_anom <- anomalizeTSmatrix(nbp_ens, 1:20)
-cSoil_ens_anom <- anomalizeTSmatrix(cSoil_ens, 1:20)
-cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
-total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
+fit_list_const_level1a_wave01 <- mclapply(X = Y_const_level1a_wave01_scaled_list , FUN = km, formula = ~., design = X_level1a_wave01,
+                                   mc.cores = 4, control = list(trace = FALSE))
+
+
+```
+
+## Leave-one-out analyses of emulator prediction accuracy
+
+```{r}
+
+loolist_km_Y_level1a <- mclapply(X = fit_list_const_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+loolist_km_Y_level1a_wave01 <- mclapply(X = fit_list_const_level1a_wave01, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+```
+
+
+```{r}
+
+loostats_km_Y_level1a <- lapply(fit_list_const_level1a, FUN = kmLooStats)
+loostats_km_Y_level1a_wave01 <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStats)
+
+```
+
+
+The top row shows the leave-one-out prediction accuracy of the original wave00 ensemble, and the lower row the entire wave00 AND wave01 ensemble combined.
+
+```{r, fig.width = 12, fig.height = 6}
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_const_level1a_scaled[, i]
+  loo <- loolist_km_Y_level1a[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave00col, 50))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+#dev.off()
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_const_level1a_wave01_scaled[, i]
+  loo <- loolist_km_Y_level1a_wave01[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave01col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave01col, 100))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a_wave01[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+```
+
+```{r}
+# remove to level 1a Relative to toplevel_ix - useful for plotting etc.
+#toplevel_to_level_1a_ix <-(toplevel_ix[-Y_nlevel0_ix])[level1a_ix]
+
+# So further constraining to level 2 can be associated back to the top level.
+
+level2_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > 0 &
+                    Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
+                  
+  )
+
+level2_ix_level1a_wave01 <- which(Y_const_level1a_wave01_scaled[,'nbp_lnd_sum'] > 0 &
+                    Y_const_level1a_wave01_scaled[,'npp_nlim_lnd_sum'] > 35 & Y_const_level1a_wave01_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_level1a_wave01_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_wave01_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_level1a_wave01_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_wave01_scaled[,'cVeg_lnd_sum'] < 800
+                  )
+
+```
+
+## Emulator accuracy of members from wave 00 and wave 01 that pass level 2 (AW's) constraints
+
+We see that the error stats for some of the outputs from wave01 are worse, but there are many more ensemble members that lie within the constraints for wave 01.
+
+"pmae" is "proportional mean absolue error", which is the mean absolute error expressed as a percentage of the original (minimally constrained) ensemble range in that output. 
+
+```{r, fig.width = 12, fig.height = 6}
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_const_level1a_scaled[level2_ix, i]
+  loo <- loolist_km_Y_level1a[[i]]
+  ylim <- range(c(loo$mean[level2_ix] - (2*loo$sd[level2_ix]), loo$mean[level2_ix] + (2*loo$sd[level2_ix])) )
+  plot(y, loo$mean[level2_ix], xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean[level2_ix] - (2*loo$sd[level2_ix])  , x1 = y , y1 = loo$mean[level2_ix] + (2*loo$sd[level2_ix]), col = makeTransparent(wave00col, 100))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+#dev.off()
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_const_level1a_wave01_scaled[level2_ix_level1a_wave01, i]
+  loo <- loolist_km_Y_level1a_wave01[[i]]
+  ylim <- range(c(loo$mean[level2_ix_level1a_wave01] - (2*loo$sd[level2_ix_level1a_wave01]), loo$mean[level2_ix_level1a_wave01] + (2*loo$sd[level2_ix_level1a_wave01])) )
+  plot(y, loo$mean[level2_ix_level1a_wave01], xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave01col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean[level2_ix_level1a_wave01] - (2*loo$sd[level2_ix_level1a_wave01])  , x1 = y , y1 = loo$mean[level2_ix_level1a_wave01] + (2*loo$sd[level2_ix_level1a_wave01]), col = makeTransparent(wave01col, 50))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a_wave01[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 2 constrained ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+```
+
+## Does the emulator improve is you look at only the 37 members that pass level 2 constraints in wave 00?
+This gives us an idea of how good the emulator is where it really matters, and as the members are consistent, gives us a fairer idea of whether the emulators have improved with more members.
+
+Good news is, the emulators are more accurate for wave01.
+
+```{r}
+
+
+kmLooStatsSubset <- function (km, ix, type = "UK") 
+{
+  # Calculate summary statistics for a subset of the members of a km fit list
+    loo <- leaveOneOut.km(km, type = type, trend.reestim = TRUE)
+    preddiff <- loo$mean[ix] - km@y[ix]
+    mae <- mean(abs(preddiff))
+    rmse <- sqrt(mean(preddiff^2))
+    maxerr <- max(preddiff)
+    absdiff <- abs(diff(range(km@y)))
+    pmae <- (mae/absdiff) * 100
+    return(list(loo = loo, mae = mae, pmae = pmae, maxerr = maxerr))
+}
+
+
+```
+
+
+```{r}
+
+loolist_km_Y_level1a_level2 <- rapply(loolist_km_Y_level1a, f = function(x) x[level2_ix], how = "list")
+
+loolist_km_Y_level1a_wave01_level2 <- rapply(loolist_km_Y_level1a_wave01, f = function(x) x[level2_ix], how = "list")
+
+
+```
+
+```{r, fig.width = 12, fig.height = 12}
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(2,2), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a_level2)){
+  
+  y <- Y_const_level1a_scaled[level2_ix, i]
+  
+  loo <- loolist_km_Y_level1a_level2[[i]]
+  ylim <- range(c(loo$mean- (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00col, 250),
+       pch = 19)
+  arrows(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave00col, 150) ,  angle = 90, code = 3, length = 0.03)
+  
+  y1 <- Y_const_level1a_wave01_scaled[level2_ix, i]
+  loo <- loolist_km_Y_level1a_wave01_level2[[i]]
+  
+    points(y1, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave01col, 250),
+       pch = 19)
+  arrows(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave01col, 250),  angle = 90, code = 3, length = 0.03)
+  
+  
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 2 wave 00 ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+reset()
+legend('topleft', pch = 19, legend = c('wave00', 'wave01'), col = c(wave00col, wave01col ), horiz = TRUE)
+
+
+```
+
+These leave-one-out prediction accuracy plots rank the ensemble members from largest underprediction to largest overprediction using the wave00 predictions. A perfect prediction would appear on the horizontal "zero" line.
+
+Many of the wave01 predictions are closer to the horizontal line, and therefore more accurate predictions.  
+
+None of the predictions are outside the uncertainty bounds, which suggests they are overconservative (should be smaller).
+
+
+```{r, fig.width = 10, fig.height = 10}
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(4,1), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a_level2)){
+  
+  y <- Y_const_level1a_scaled[level2_ix, i]
+
+  loo_00 <- loolist_km_Y_level1a_level2[[i]]
+  loo_01 <- loolist_km_Y_level1a_wave01_level2[[i]]
+  
+  preddiff_wave00 <- y - loo_00$mean
+  preddiff_wave01 <- y - loo_01$mean
+  
+    # rank by the original wave 00 predictions
+  loo_rank_ix <- sort(preddiff_wave00 , index.return = TRUE)
+  
+   ylim <- range(c(preddiff_wave00[loo_rank_ix$ix] - (2*loo_00$sd[loo_rank_ix$ix]),
+                   preddiff_wave00[loo_rank_ix$ix] + (2*loo_00$sd[loo_rank_ix$ix]),
+                   preddiff_wave01[loo_rank_ix$ix] - (2*loo_01$sd[loo_rank_ix$ix]),
+                   preddiff_wave01[loo_rank_ix$ix] + (2*loo_01$sd[loo_rank_ix$ix])
+                   )
+                 )
+   
+   plot(preddiff_wave00[loo_rank_ix$ix], xlab = '', ylab = '', main = '' , col = makeTransparent(wave00col, 255),
+        pch = 19, ylim = ylim)
+   
+   abline(h = 0)
+   
+  arrows(x0 = 1:length(y), y0 = preddiff_wave00[loo_rank_ix$ix] - (2*loo_00$sd[loo_rank_ix$ix])  , x1 = 1:length(y) , y1 = preddiff_wave00[loo_rank_ix$ix] + (2*loo_00$sd[loo_rank_ix$ix]), col = makeTransparent(wave00col, 150),  angle = 90, code = 3, length = 0.03)
+   
+  points(preddiff_wave01[loo_rank_ix$ix], xlab = '', ylab = '', main = '' , col = makeTransparent(wave01col, 255),
+        pch = 19)
+  
+    arrows(x0 = 1:length(y), y0 = preddiff_wave01[loo_rank_ix$ix] - (2*loo_01$sd[loo_rank_ix$ix])  , x1 = 1:length(y) , y1 = preddiff_wave01[loo_rank_ix$ix] + (2*loo_01$sd[loo_rank_ix$ix]), col = makeTransparent(wave01col, 150), angle = 90, code = 3, length = 0.03)
+   
+   mtext(colnames(Y_const_level1a_scaled)[i], side = 3, adj = 0, line = 1)
+  
+
+}
+
+
+ reset()
+ legend('topleft', pch = 19, legend = c('wave00', 'wave01'), col = c(wave00col, wave01col ), horiz = TRUE)
+
+```
+
+
+```{r}
+
+loostats_km_Y_level1a_sub <- lapply(fit_list_const_level1a, FUN = kmLooStatsSubset, ix = level2_ix)
+loostats_km_Y_level1a_wave01_sub <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStatsSubset, ix = level2_ix)
+
+```
+
+Looking at the proportional mean absolute error (pmae), expressed in percent, we can see that it doesn't improve much for the whole ensemble, but *does* improve significantly for the subset of ensemble members that fall within AW's constraints from the first ensemble (marked "_sub").
+
+```{r, echo = TRUE}
+
+pmae_wave00 <- lapply(loostats_km_Y_level1a, FUN = function(x) x$pmae )
+pmae_wave01 <- lapply(loostats_km_Y_level1a_wave01, FUN = function(x) x$pmae )
+
+pmae_wave00_sub <- lapply(loostats_km_Y_level1a_sub, FUN = function(x) x$pmae )
+pmae_wave01_sub <- lapply(loostats_km_Y_level1a_wave01_sub, FUN = function(x) x$pmae )
+
+pmae_table <- cbind(pmae_wave00, pmae_wave01, pmae_wave00_sub, pmae_wave01_sub)
+
+print(pmae_table)
+
+```
+
+
+
+
+
+
+
+
+

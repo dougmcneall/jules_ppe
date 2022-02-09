@@ -1086,7 +1086,7 @@ level3_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > -0.4 & Y_const_level
 
 
 ## Atmospheric growth
-We can calculate the atmospheric growth as Fossil fule emissions (GCB) - Ocean uptake  (GCB) - net land flux (JULES NBP)
+We can calculate the atmospheric growth as Fossil fuel emissions (GCB) - Ocean uptake  (GCB) - net land flux (JULES NBP)
 
 Conversely, we can calculate the land uptake as NBP = FF - ocean - ag (Do we have AG in JULES?)
 
