@@ -124,6 +124,24 @@ makeTimeseriesEnsemble <- function(ensloc, variable, nens = 499, nts = 164, cn =
   datmat
 }
 
+getStandardMember <- function(ensloc, variable, nts = 164, cn = 1850:2013){
+  
+  datmat <- matrix(NA, nrow = 1, ncol = nts)
+  colnames(datmat) <- cn
+  
+  ensmember <- 'S3'
+  fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+  
+  try(nc <- nc_open(paste0(fn)))
+  try(dat <- extractTimeseries(nc, variable))
+  
+  datmat[1, ] <- dat
+  nc_close(nc)
+  datmat
+  
+}
+
+
 mat2list <- function(X){
   
   # Turns the p columns of a matrix into a p length list,
@@ -219,6 +237,29 @@ if (file.exists("ensemble_timeseries.rdata")) {
 
 total_land_carbon_ens <- cSoil_ens + cVeg_ens
 
+# ------------------------------------------------------------------------------
+# Get standard members
+#
+# ------------------------------------------------------------------------------
+
+npp_stan <- getStandardMember(ensloc = ensloc, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+nbp_stan <- getStandardMember(ensloc = ensloc, variable = "nbp_lnd_sum") / (1e12/ysec)
+cSoil_stan <- getStandardMember(ensloc = ensloc, variable = "cSoil_lnd_sum") / 1e12
+cVeg_stan <- getStandardMember(ensloc = ensloc, variable = "cVeg_lnd_sum") / 1e12
+lai_lnd_mean_stan <- getStandardMember(ensloc = ensloc, variable = "lai_lnd_mean")
+
+
+# fluxes
+rh_lnd_sum_stan <- getStandardMember(ensloc = ensloc, variable = "rh_lnd_sum") / (1e12/ysec)
+fLuc_lnd_sum_stan <- getStandardMember(ensloc = ensloc, variable = "fLuc_lnd_sum") / (1e12/ysec)
+fHarvest_lnd_sum_stan <- getStandardMember(ensloc = ensloc, variable = "fHarvest_lnd_sum") / (1e12/ysec)
+
+
+# fractions
+treeFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc, variable = "treeFrac_lnd_mean")
+shrubFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc, variable = "shrubFrac_lnd_mean")
+baresoilFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc, variable = "baresoilFrac_lnd_mean")
+
 ## ----------------------------------------------------------------------
 ## Anomalize ensemble
 ## ----------------------------------------------------------------------
@@ -228,14 +269,6 @@ nbp_ens_anom <- anomalizeTSmatrix(nbp_ens, 1:20)
 cSoil_ens_anom <- anomalizeTSmatrix(cSoil_ens, 1:20)
 cVeg_ens_anom <- anomalizeTSmatrix(cVeg_ens, 1:20)
 total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
-
-
-
-#144:164 is the 1993:2013
-#modernValue(nc = nc, variable = "npp_nlim_lnd_mean", ix = 144:164)
-
-# apply to the test file to check it works
-#vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164)
 
 
 ## --------------------------------------------------------------------------------------
@@ -250,15 +283,15 @@ if (file.exists("ensemble.rdata")) {
 } else {
   
   nens = 499
-  datmat <- matrix(nrow = nens, ncol = length(varlist))
-  colnames(datmat) <- varlist
+  datmat <- matrix(nrow = nens, ncol = length(y_names_sum))
+  colnames(datmat) <- y_names_sum
   
   enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
   floc <- paste0(ensloc,ensmember,subdir)
   
   for(i in 1:nens){
     
-    vec <- rep(NA, length(varlist))
+    vec <- rep(NA, length(y_names_sum))
     
     ensmember <- enslist[i] 
     
@@ -266,7 +299,7 @@ if (file.exists("ensemble.rdata")) {
     #print(fn)
     
     try(nc <- nc_open(paste0(fn)))
-    try(vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = 144:164))
+    try(vec <- sapply(y_names_sum, FUN = modernValue, nc = nc, ix = 144:164))
     datmat[i, ] <- vec
     nc_close(nc)
   }
@@ -274,6 +307,16 @@ if (file.exists("ensemble.rdata")) {
   save(nens, datmat,enslist,floc, file ="ensemble.rdata")
 }
 
+
+# -------------------------------------------------------------------------------
+# Standard Member modern value
+  
+ensmember <- 'S3'
+fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+try(nc <- nc_open(paste0(fn)))
+try(standard_modern_value <- sapply(y_names_sum, FUN = modernValue, nc = nc, ix = 144:164))
+  
+  
 
 ## --------------------------------------------------------------------------------------
 ## Calculate an ensemble of anomalies for all variables
@@ -301,15 +344,15 @@ if (file.exists("anomaly_ensemble.rdata")) {
 } else {
   
   nens = 499
-  datmatAnom <- matrix(nrow = nens, ncol = length(varlist))
-  colnames(datmatAnom) <- varlist
+  datmatAnom <- matrix(nrow = nens, ncol = length(y_names_sum))
+  colnames(datmatAnom) <- y_names_sum
   
   enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
   floc <- paste0(ensloc,ensmember,subdir)
   
   for(i in 1:nens){
     
-    vec <- rep(NA, length(varlist))
+    vec <- rep(NA, length(y_names_sum))
     
     ensmember <- enslist[i] 
     
@@ -317,7 +360,7 @@ if (file.exists("anomaly_ensemble.rdata")) {
     #print(fn)
     
     try(nc <- nc_open(paste0(fn)))
-    try(vec <- sapply(varlist, FUN = tsAnomaly, nc = nc))
+    try(vec <- sapply(y_names_sum, FUN = tsAnomaly, nc = nc))
     datmatAnom[i, ] <- vec
     nc_close(nc)
   }
@@ -325,6 +368,9 @@ if (file.exists("anomaly_ensemble.rdata")) {
   save(nens, datmatAnom, enslist,floc, file ="anomaly_ensemble.rdata")
 }
 
+
+
+#npp_stan_anom <- anomalizeTSmatrix(npp_stan, 1:20)
 
 ## ---------------------------------------------------------------------------------------------
 ## Clean data sets to "level 0"
@@ -415,9 +461,13 @@ p <- ncol(X_level0)
 ynames_const <- c('nbp_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_sum', 'cVeg_lnd_sum')
 yunits_const <- c('GtC/year', 'GtC/year', 'GtC', 'GtC')
 Y_const_level1a <- Y_level1a[, ynames_const]
+Y_const_stan <- standard_modern_value[ynames_const]
+
 
 scalevec <- c(1e12/ysec, 1e12/ysec, 1e12, 1e12)
 Y_const_level1a_scaled <- sweep(Y_const_level1a, 2, STATS = scalevec, FUN = '/' )
+Y_const_stan_scaled <- Y_const_stan / scalevec
+
 
 # This is a "normalisation vector", for making the output numbers more manageable.
 #cs_gb       cv    gpp_gb        nbp npp_n_gb    runoff

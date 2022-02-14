@@ -164,6 +164,8 @@ h <- hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], main = 'NBP', xlab = 'GtC/year
 hist(trunc(Y_const_wave01_scaled [,'nbp_lnd_sum'], h$breaks) ,
      col = makeTransparent(wave01col,150) , breaks = h$breaks, add = TRUE)
 
+rug(Y_const_stan_scaled['nbp_lnd_sum'], lwd = 2)
+
 polygon(x = c(0, 100, 100, 0), y = c(0, 0, 1000, 1000),
         col = makeTransparent(rangecol, 60),
         border = makeTransparent(rangecol))
@@ -171,6 +173,8 @@ polygon(x = c(0, 100, 100, 0), y = c(0, 0, 1000, 1000),
 h <- hist(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'],col = makeTransparent(wave00col,150), main = 'NPP', xlab = 'GtC/year')
 hist(trunc(Y_const_wave01_scaled [,'npp_nlim_lnd_sum'], h$breaks) , 
      col = makeTransparent(wave01col) , breaks = h$breaks, add = TRUE)
+
+rug(Y_const_stan_scaled['npp_nlim_lnd_sum'], lwd = 2)
 
 polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
         col = makeTransparent(rangecol, 60),
@@ -181,6 +185,8 @@ h <- hist(Y_const_level1a_scaled[,'cSoil_lnd_sum'], col = makeTransparent(wave00
 hist(trunc(Y_const_wave01_scaled [,'cSoil_lnd_sum'], h$breaks) , 
      col = makeTransparent(wave01col,150) , breaks = h$breaks, add = TRUE)
 
+rug(Y_const_stan_scaled['cSoil_lnd_sum'], lwd = 2)
+
 polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
         col = makeTransparent(rangecol, 60),
         border = makeTransparent(rangecol))
@@ -188,6 +194,8 @@ polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
 h <- hist(Y_const_level1a_scaled[,'cVeg_lnd_sum'], col = makeTransparent(wave00col,150), main = 'Vegetation Carbon', xlab = 'GtC')
 hist(trunc(Y_const_wave01_scaled [,'cVeg_lnd_sum'], h$breaks) , 
    col = makeTransparent(wave01col,150)  , breaks = h$breaks, add = TRUE)
+
+rug(Y_const_stan_scaled['cVeg_lnd_sum'], lwd = 2)
 
 polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
         col = makeTransparent(rangecol, 60),
@@ -384,7 +392,8 @@ Plot Wave00 and Wave01 on top of one another.
 ```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
 
 lcol_wave0 <- makeTransparent('skyblue3',  120)
-lcol_wave01 <- makeTransparent('tomato2',  100)
+lcol_wave01 <- makeTransparent('tomato2',  120)
+stancol = 'black'
 
 linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = NULL){
   # Plot wave00 and wave01 timeseries on top of one another
@@ -410,50 +419,67 @@ linePlotMultiEns(years = years, ens1 = npp_ens, ens2 = npp_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'NPP')
 
+lines(years,npp_stan, col = stancol, lty = 'solid', lwd = 2)
+
 linePlotMultiEns(years = years, ens1 =  nbp_ens, ens2 = nbp_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'NBP', ylim = c(-10,10))
+
+lines(years, nbp_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = cSoil_ens, ens2 = cSoil_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'cSoil', ylim = range(c(cSoil_ens[,1], cSoil_ens[,164])))
 
+lines(years, cSoil_stan, col = stancol, lty = 'solid', lwd = 2)
+
 linePlotMultiEns(years = years, ens1 = cVeg_ens, ens2 = cVeg_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'cVeg')
+
+lines(years, cVeg_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = lai_lnd_mean_ens, ens2 = lai_lnd_mean_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'Lai')
 
+lines(years, lai_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = rh_lnd_sum_ens, ens2 = rh_lnd_sum_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'RH')
 
+lines(years, rh_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = fLuc_lnd_sum_ens, ens2 = fLuc_lnd_sum_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'fLuc')
 
+lines(years, fLuc_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
+
 linePlotMultiEns(years = years, ens1 = fHarvest_lnd_sum_ens, ens2 = fHarvest_lnd_sum_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'fHarvest')
+
+lines(years, fHarvest_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = treeFrac_lnd_mean_ens, ens2 = treeFrac_lnd_mean_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'treefrac')
 
+lines(years, treeFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
 linePlotMultiEns(years = years, ens1 = shrubFrac_lnd_mean_ens, ens2 = shrubFrac_lnd_mean_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'shrubfrac')
 
+lines(years, shrubFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens, ens2 = baresoilFrac_lnd_mean_ens_wave01,
                  col1 = lcol_wave0, col2 = lcol_wave01,
                  ylab = 'GtC', main = 'baresoilfrac')
 
-
+lines(years, baresoilFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
 
 
 ```
@@ -801,9 +827,69 @@ print(pmae_table)
 
 ```
 
+## Comparing atmospheric growth in wave00, wave01 and observations
+
+```{r, include = FALSE}
+historical_carbon_budget <- read_excel('Global_Carbon_Budget_2020v1.0.xlsx', sheet = "Historical Budget", skip = 15, n_max = 270)
+
+resid <- historical_carbon_budget$`ocean sink` - historical_carbon_budget$`fossil emissions excluding carbonation`
+
+resid_ix <- which(historical_carbon_budget$Year %in% years)
+
+neg_ag <- sweep(nbp_ens, 2, resid[resid_ix], FUN = '+')
+
+
+matplot(years, t(-neg_ag), type = 'l', lty = 'solid',ylim = c(0, 8), col = wave00col, 
+         ylab = 'GtC', main = 'atmospheric growth', xlab = '',
+         bty = 'n', xlim = c(1960, 2020))
+
+lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growth`, col = 'red')
+
+
+```
 
 
 
+```{r, fig.width = 12, fig.height = 6}
+
+obscol = 'gold'
+
+
+ag <- matrix(nrow = nrow(nbp_ens), ncol = ncol(nbp_ens))
+
+ag01 <- matrix(nrow = nrow(nbp_ens_wave01), ncol = ncol(nbp_ens_wave01))
+
+for(i in 1:nrow(nbp_ens)){
+  
+ag[i, ] <- historical_carbon_budget$`fossil emissions excluding carbonation`[resid_ix] - historical_carbon_budget$`ocean sink`[resid_ix] -  nbp_ens[i, ]
+  
+}
+
+
+for(i in 1:nrow(nbp_ens_wave01)){
+ag01[i, ] <- historical_carbon_budget$`fossil emissions excluding carbonation`[resid_ix] - historical_carbon_budget$`ocean sink`[resid_ix] -  nbp_ens_wave01[i, ]
+  
+  
+}
+
+ag_stan <- historical_carbon_budget$`fossil emissions excluding carbonation`[resid_ix] - historical_carbon_budget$`ocean sink`[resid_ix] -  nbp_stan
+
+#pdf(width = 8, height = 6, file = 'ag.pdf')
+matplot(years, t(ag), type = 'l', lty = 'solid',ylim = c(0, 8), col = makeTransparent(wave00col,50), 
+         ylab = 'GtC', main = 'atmospheric growth', xlab = '',
+         bty = 'n', xlim = c(1960, 2020))
+
+matlines(years, t(ag01), col = makeTransparent(wave01col,50), lty = 'solid')
+
+lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growth`, col = obscol, lwd =2)
+
+lines(years, ag_stan, col = stancol, lwd =2)
+
+
+legend('topleft', legend = c('wave00', 'wave01', 'standard', 'GCB'), col = c(wave00col, wave01col, stancol, obscol), lty = 'solid', lwd = 2)
+#dev.off()
+
+```
 
 
 
