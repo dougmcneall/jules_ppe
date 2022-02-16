@@ -141,6 +141,9 @@ Global mean for the 20 years at the end of the 20th Century. There is still a si
 
 wave00col <- 'skyblue2'
 wave01col <- 'tomato2'
+
+wave00col <- 'dodgerblue2'
+wave01col <- 'firebrick'
 rangecol <- 'grey'
 
 
@@ -391,8 +394,8 @@ Plot Wave00 and Wave01 on top of one another.
 
 ```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
 
-lcol_wave0 <- makeTransparent('skyblue3',  120)
-lcol_wave01 <- makeTransparent('tomato2',  120)
+lcol_wave0 <- makeTransparent('dodgerblue2',  120)
+lcol_wave01 <- makeTransparent('firebrick',  120)
 stancol = 'black'
 
 linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = NULL){
@@ -852,8 +855,8 @@ lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growt
 
 ```{r, fig.width = 12, fig.height = 6}
 
-obscol = 'gold'
-
+obscol = 'purple'
+wave01_level2col <- 'gold'
 
 ag <- matrix(nrow = nrow(nbp_ens), ncol = ncol(nbp_ens))
 
@@ -869,25 +872,119 @@ ag[i, ] <- historical_carbon_budget$`fossil emissions excluding carbonation`[res
 for(i in 1:nrow(nbp_ens_wave01)){
 ag01[i, ] <- historical_carbon_budget$`fossil emissions excluding carbonation`[resid_ix] - historical_carbon_budget$`ocean sink`[resid_ix] -  nbp_ens_wave01[i, ]
   
-  
 }
 
 ag_stan <- historical_carbon_budget$`fossil emissions excluding carbonation`[resid_ix] - historical_carbon_budget$`ocean sink`[resid_ix] -  nbp_stan
 
 #pdf(width = 8, height = 6, file = 'ag.pdf')
-matplot(years, t(ag), type = 'l', lty = 'solid',ylim = c(0, 8), col = makeTransparent(wave00col,50), 
+matplot(years, t(ag), type = 'l', lty = 'solid',ylim = c(-2, 10), col = makeTransparent(wave00col,100), 
          ylab = 'GtC', main = 'atmospheric growth', xlab = '',
-         bty = 'n', xlim = c(1960, 2020))
+         bty = 'n', xlim = c(1960, 2013))
 
-matlines(years, t(ag01), col = makeTransparent(wave01col,50), lty = 'solid')
+matlines(years, t(ag01), col = makeTransparent(wave01col,100), lty = 'solid')
+
+matlines(years, t(ag01[level2_ix_wave01, ]), col = makeTransparent(wave01_level2col, 100) , lty = 'solid')
 
 lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growth`, col = obscol, lwd =2)
 
 lines(years, ag_stan, col = stancol, lwd =2)
 
 
-legend('topleft', legend = c('wave00', 'wave01', 'standard', 'GCB'), col = c(wave00col, wave01col, stancol, obscol), lty = 'solid', lwd = 2)
+legend('topleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard', 'GCB'), col = c(wave00col, wave01col, wave01_level2col, stancol, obscol), lty = 'solid', lwd = 2)
 #dev.off()
+
+```
+
+
+## Andy asks - what constraint does that give us in cumulative NBP?
+
+```{r, fig.width = 7, fig.height = 7}
+
+cumulative_nbp_ens <- t(apply(nbp_ens, 1, cumsum))
+
+cumulative_nbp_ens_wave01 <- t(apply(nbp_ens_wave01, 1, cumsum))
+
+cumulative_nbp_stan <- cumsum(nbp_stan)
+
+matplot(years, t(cumulative_nbp_ens), type = 'l', lty = 'solid',ylim = c(-130, 250), col = makeTransparent(wave00col,150), 
+         ylab = 'GtC', main = 'cumulative NBP', xlab = '',
+         bty = 'n', xlim = c(1850, 2020))
+
+matlines(years, t(cumulative_nbp_ens_wave01),
+         col = makeTransparent(wave01col,150),
+         lty = 'solid')
+
+matlines(years, t(cumulative_nbp_ens_wave01[level2_ix_wave01, ]),
+         col = makeTransparent(wave01_level2col, 150),
+         lty = 'solid')
+
+
+lines(years, cumulative_nbp_stan, col = makeTransparent(stancol, 200), lty = 'solid', lwd = 1.5 )
+
+
+legend('topleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard'), col = c(wave00col, wave01col, wave01_level2col, stancol), lty = 'solid', lwd = 1.5)
+
+```
+
+## Eddy suggests measuring cumulative NBP against atmospheric growth rate
+
+```{r}
+
+# Cumulative NBP at the end of the run
+cnbp_modern_ens <- apply(cumulative_nbp_ens[, 135:164], 1, mean)
+
+cnbp_modern_wave01 <- apply(cumulative_nbp_ens_wave01[, 135:164], 1, mean)
+
+cnbp_modern_stan <- mean(cumulative_nbp_stan[135:164])
+
+
+
+```
+
+Calculate the atmospheric growth rate of 1984- 2013 using a simple linear fit
+
+```{r}
+
+agr_modern_ens <- rep(NA, length = nrow(ag))
+
+for(i in 1:nrow(ag)){
+  
+  dat <- data.frame(t =1:30, ag =  ag[i, 135:164])
+  fit <- lm(ag ~ t, data = dat)
+  agr_modern_ens[i] <- coef(fit)['t']
+}
+
+
+agr_modern_wave01 <- rep(NA, length = nrow(ag01))
+
+for(i in 1:nrow(ag01)){
+  
+  dat <- data.frame(t =1:30, ag =  ag01[i, 135:164])
+  fit <- lm(ag ~ t, data = dat)
+  agr_modern_wave01[i] <- coef(fit)['t']
+}
+
+dat <- data.frame(t =1:30, ag =  ag_stan[135:164])
+agr_stan_fit <- lm(ag ~ t, data = dat) 
+agr_stan <- coef(agr_stan_fit)['t']
+  
+  
+```
+
+```{r, fig.width = 7, fig.height = 7}
+
+plot(cnbp_modern_ens, agr_modern_ens, col = makeTransparent(wave00col,150),
+     xlim = c(-120,220), pch = 19,
+     xlab = 'Cumulative NBP from preindustrial by 1984-2013',
+     ylab = 'Atmospheric growth rate 1984-2014')
+
+cnbp_wave01_cols <- rep(wave01col, length(cnbp_modern_wave01))
+cnbp_wave01_cols[level2_ix_wave01] <- wave01_level2col 
+
+points(cnbp_modern_wave01, agr_modern_wave01, col = makeTransparent(cnbp_wave01_cols, 150), pch = 19)
+points(cnbp_modern_stan, agr_stan, col = stancol, pch = 19, cex = 1.5)
+
+legend('topleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard'), col = c(wave00col, wave01col, wave01_level2col, stancol), pch = 19)
 
 ```
 
