@@ -944,51 +944,95 @@ cnbp_modern_stan <- mean(cumulative_nbp_stan[135:164])
 Calculate the atmospheric growth rate of 1984- 2013 using a simple linear fit
 
 ```{r}
+# agr = atmospheric growth rate
+# agiav = atmospheric growth interannual variability
 
 agr_modern_ens <- rep(NA, length = nrow(ag))
+agiav_modern_ens <- rep(NA, length = nrow(ag))
 
 for(i in 1:nrow(ag)){
   
   dat <- data.frame(t =1:30, ag =  ag[i, 135:164])
   fit <- lm(ag ~ t, data = dat)
   agr_modern_ens[i] <- coef(fit)['t']
+  agiav_modern_ens[i] <- sd(fit$residuals)
 }
 
 
 agr_modern_wave01 <- rep(NA, length = nrow(ag01))
+agiav_modern_wave01 <- rep(NA, length = nrow(ag01))
 
 for(i in 1:nrow(ag01)){
   
   dat <- data.frame(t =1:30, ag =  ag01[i, 135:164])
   fit <- lm(ag ~ t, data = dat)
   agr_modern_wave01[i] <- coef(fit)['t']
+  agiav_modern_wave01[i] <- sd(fit$residuals)
 }
 
 dat <- data.frame(t =1:30, ag =  ag_stan[135:164])
 agr_stan_fit <- lm(ag ~ t, data = dat) 
 agr_stan <- coef(agr_stan_fit)['t']
+agiav_stan <- sd(agr_stan_fit$residuals)
   
   
 ```
 
 ```{r, fig.width = 7, fig.height = 7}
 
-plot(cnbp_modern_ens, agr_modern_ens, col = makeTransparent(wave00col,150),
-     xlim = c(-120,220), pch = 19,
-     xlab = 'Cumulative NBP from preindustrial by 1984-2013',
-     ylab = 'Atmospheric growth rate 1984-2014')
+plot(agr_modern_ens, cnbp_modern_ens,  col = makeTransparent(wave00col,150),
+     ylim = c(-120,220), pch = 19,
+     xlab = 'Atmospheric growth rate 1984-2014',
+     ylab = 'Cumulative NBP from preindustrial by 1984-2013'
+     )
 
 cnbp_wave01_cols <- rep(wave01col, length(cnbp_modern_wave01))
 cnbp_wave01_cols[level2_ix_wave01] <- wave01_level2col 
 
-points(cnbp_modern_wave01, agr_modern_wave01, col = makeTransparent(cnbp_wave01_cols, 150), pch = 19)
-points(cnbp_modern_stan, agr_stan, col = stancol, pch = 19, cex = 1.5)
+points( agr_modern_wave01,cnbp_modern_wave01, col = makeTransparent(cnbp_wave01_cols, 150), pch = 19)
+points( agr_stan,cnbp_modern_stan, col = stancol, pch = 19, cex = 1.5)
 
 legend('topleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard'), col = c(wave00col, wave01col, wave01_level2col, stancol), pch = 19)
+
+print(c('correlation agr vs cnbp (all members)', cor(agr_modern_ens, cnbp_modern_ens)))
+
+print(c('correlation agr vs cnbp (wave01)', cor(agr_modern_wave01, cnbp_modern_wave01)))
+
+fit_wave00 <- lm(agr_modern_ens ~ cnbp_modern_ens)
+fit_wave01 <- lm(agr_modern_wave01 ~ cnbp_modern_wave01)
+
+print(summary(fit_wave00))
+print(summary(fit_wave01))
+
+```
+Interannual variability and cumulative NBP  
+
+(correlations are close to zero, especially in the later wave)
+
+
+```{r, fig.width = 7, fig.height = 7}
+
+plot(agiav_modern_ens, cnbp_modern_ens,  col = makeTransparent(wave00col,150),
+     ylim = c(-120,220), pch = 19,
+     xlab = 'Atmospheric growth IAV 1984-2014',
+     ylab = 'Cumulative NBP from preindustrial by 1984-2013'
+     )
+
+points( agiav_modern_wave01, cnbp_modern_wave01, col = makeTransparent(cnbp_wave01_cols, 150), pch = 19)
+points( agiav_stan,cnbp_modern_stan, col = stancol, pch = 19, cex = 1.5)
+
+legend('bottomright', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard'), col = c(wave00col, wave01col, wave01_level2col, stancol), pch = 19)
 
 ```
 
 
+```{r}
+
+
+print(cor(agiav_modern_ens, cnbp_modern_ens))
+print(cor( agiav_modern_wave01, cnbp_modern_wave01))
+
+```
 
 
 
