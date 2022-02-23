@@ -1867,4 +1867,3 @@ direct.pred = function (form, X, Y, Xnew, ...){
 
 
 
-

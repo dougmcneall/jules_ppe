@@ -1035,4 +1035,228 @@ print(cor( agiav_modern_wave01, cnbp_modern_wave01))
 ```
 
 
+# How close can we get the model to reality?
+
+Using Atmospheric Growth Rate as an example, how close can we get the model to observations? Can we do better than standard? What are the trade offs of doing so? How does getting close in AGR affect performance in other outputs?
+
+```{r}
+# Define the observed atmospheric growth rate.
+
+ag_obs <- historical_carbon_budget$`atmospheric growth`[which(historical_carbon_budget$Year %in% years)]
+
+# Model departure from observations of atmospheric growth
+ag_err <- sweep(ag, 2, ag_obs, FUN = '-')
+ag01_err <- sweep(ag01, 2, ag_obs, FUN = '-')
+
+
+long_modern_years <- 1960:2013
+ag_modern_ix <- which( years %in% long_modern_years)
+
+ag_err_modern <- ag_err[, ag_modern_ix]
+ag01_err_modern <- ag01_err[, ag_modern_ix]
+
+
+ag_err_stan <- ag_stan - ag_obs
+ag_err_stan_modern <- ag_err_stan[ag_modern_ix]
+
+```
+
+```{r}
+matplot(long_modern_years, t(ag_err_modern), type = 'l', lty = 'solid', col = makeTransparent(wave00col, 100), main = 'Amospheric Growth Error')
+
+errcol <- rep(wave01col, nrow(ag01))
+#errcol[level2_ix_wave01] <- wave01_level2col
+matlines(long_modern_years, t(ag01_err_modern), col = makeTransparent(errcol, 100), lty = 'solid')
+matlines(long_modern_years, t(ag01_err_modern[level2_ix_wave01, ]), col = makeTransparent(wave01_level2col,100), lty = 'solid')
+
+lines(long_modern_years, ag_err_stan_modern, col = stancol)
+
+legend('bottomleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard'), col = c(wave00col, wave01col, wave01_level2col, stancol), lty = 'solid', lwd = 1.5)
+
+abline(h=0)
+
+```
+
+
+```{r, fig.width = 7, fig.height = 7}
+
+# Atmospheric growth mean error
+ag_modern_me <- apply(ag_err_modern,1,mean)
+ag01_modern_me <- apply(ag01_err_modern,1, mean)
+ag_modern_me_stan <- mean(ag_err_stan[ag_modern_ix])
+
+
+# Mean absolute error
+ag_modern_mae <- apply(abs(ag_err_modern),1,mean)
+ag01_modern_mae <- apply(abs(ag01_err_modern),1, mean)
+ag_modern_mae_stan <- mean(abs(ag_err_stan[ag_modern_ix]))
+
+
+
+# Root mean square error
+ag_modern_rmse <- apply(ag_err_modern,1, function(x) sqrt(mean(x^2)))
+ag01_modern_rmse <- apply(ag01_err_modern,1, function(x) sqrt(mean(x^2)))
+ag_modern_rmse_stan <- sqrt(mean(ag_err_stan[ag_modern_ix]^2))
+
+# There are some big outliers 
+outlier_ix_wave01 <- which(abs(ag01_modern_me )> 100)
+
+par(mfrow = c(2,1))
+hist(ag_modern_me, main = 'Atmospheric growth mean error', col = wave00col, xlim = c(-3, 3))
+rug(ag_modern_me_stan, col = stancol, lwd = 2)
+hist(ag01_modern_me[-outlier_ix_wave01], col = wave01col, xlim = c(-3,3), main = '')
+rug(ag_modern_me_stan, col = stancol, lwd = 2)
+
+par(mfrow = c(2,1))
+hist(ag_modern_mae, main = 'Atmospheric growth mean absolute error', col = wave00col, xlim = c(0, 3))
+rug(ag_modern_mae_stan, col = stancol, lwd = 2)
+hist(ag01_modern_mae[-outlier_ix_wave01], col = wave01col, lwd = 2, xlim = c(0,3), main = '')
+rug(ag_modern_mae_stan, col = stancol, lwd = 2)
+
+par(mfrow = c(2,1))
+hist(ag_modern_rmse, xlim = c(0,3), col = wave00col, main = 'Atmospheric growth RMSE')
+rug(ag_modern_rmse_stan, col = stancol, lwd = 2 )
+hist(ag01_modern_rmse[-outlier_ix_wave01], col = wave01col, xlim = c(0,3), main = '')
+rug(ag_modern_rmse_stan, col = stancol, lwd = 2 )
+
+
+
+```
+
+
+We've established that most of the original ensemble have an ME/MAE/RMSE larger than the standard run. More (but few) of the wave01 perform better than standard. 
+
+```{r}
+
+
+better_ix_ag_rmse <- which(ag_modern_rmse < ag_modern_rmse_stan)
+better_ix_ag01_rmse <- which(ag01_modern_rmse < ag_modern_rmse_stan)
+
+
+X_better_ag <- rbind(X[better_ix_ag_rmse, ], X_wave01_train[better_ix_ag01_rmse, ])
+
+```
+
+
+A map of the 2D projections of parameter space where the ensemble member performs better than standard.  
+
+The blue part is the first wave, and not subject to constraint so may be removed in the second wave (wave01).
+
+
+```{r, fig.width = 12, fig.height = 12}
+
+better_ix <- 1:nrow(X_better_ag)
+
+better_cols <- c(rep(wave00col, length(better_ix_ag_rmse)), rep(wave01col,length(better_ix_ag01_rmse)))
+
+pairs(X_better_ag,
+      col = better_cols,
+      gap = 0,
+      xlim = c(0,1), ylim = c(0,1),
+      pch = 19,
+      cex= 0.8,
+      lower.panel = NULL)
+
+
+
+```
+
+# Build emulators and find parts of parameter space that to better than standard at atmospheric growth.
+
+Having trouble fitting RMSE, to trying mean error.
+
+Why is there an odd collection at just under 1?
+
+```{r, fig.width = 12, fig.height = 12}
+
+better_ix_ag_me <- which(abs(ag_modern_me) < abs(ag_modern_me_stan))
+better_ix_ag01_me <- which(abs(ag01_modern_me) < abs(ag_modern_me_stan))
+
+
+X_better_ag <- rbind(X[better_ix_ag_me, ], X_wave01_train[better_ix_ag01_me, ])
+
+better_ix <- 1:nrow(X_better_ag)
+
+better_cols <- c(makeTransparent(rep(wave00col, length(better_ix_ag_me)), 100), makeTransparent(rep(wave01col,length(better_ix_ag01_me)), 100))
+
+pairs(X_better_ag,
+      col = better_cols,
+      gap = 0,
+      xlim = c(0,1), ylim = c(0,1),
+      pch = 19,
+      cex= 0.8,
+      lower.panel = NULL)
+```
+
+```{r}
+library(DiceKriging)
+
+ag01_outlier_ix <- which(ag01_modern_me > 10)
+
+fit_ag_me <- km(~., design = X_wave01_train[-ag01_outlier_ix, ], response = ag01_modern_me[-ag01_outlier_ix], 
+                  control = list(maxit = 200))
+
+```
+
+```{r}
+
+plot(fit_ag_me)
+
+
+
+
+```
+
+```{r}
+library(emtools)
+library(imptools)
+library(viztools)
+X_unif <- samp_unif(100000, mins = rep(0,32), maxes = rep(1, 32))
+colnames(X_unif) <- colnames(X)
+
+pred_unif <- predict.km(fit_ag_me, newdata = X_unif, type = 'UK' ) 
+
+# Keeps about 20%
+X_kept_ix <- which(abs(pred_unif$mean) < abs(ag_modern_me_stan))
+
+# this is 8%
+#X_kept_ix <- which(abs(pred_unif$mean) < 0.1)
+
+
+```
+
+```{r, fig.width = 12, fig.height = 12, warning = FALSE}
+#pairs(X_unif[X_kept_ix, ][1:50,],
+#      col = makeTransparent('black',50),
+#      gap = 0,
+#      xlim = c(0,1), ylim = c(0,1),
+#      pch = 19,
+#      cex= 0.8,
+#      lower.panel = NULL)
+
+par(oma = c(0,0,0,3), bg = 'white')
+
+panel.hist <- function(x, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+pairs(X_unif[X_kept_ix, ],
+    #  labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up,
+      diag.panel = panel.hist,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc.col = rb)
+
+```
+
+
+
 
