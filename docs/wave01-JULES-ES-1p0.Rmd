@@ -1241,19 +1241,23 @@ plot(fit_ag_me)
 library(emtools)
 library(imptools)
 library(viztools)
-X_unif <- samp_unif(200000, mins = rep(0,32), maxes = rep(1, 32))
+X_unif <- samp_unif(100000, mins = rep(0,32), maxes = rep(1, 32))
 colnames(X_unif) <- colnames(X)
 
-pred_unif <- predict.km(fit_ag_me, newdata = X_unif, type = 'UK' ) 
+pred_unif_ag <- predict.km(fit_ag_me, newdata = X_unif, type = 'UK' ) 
 
 # Keeps about 20%
-X_kept_ix <- which(abs(pred_unif$mean) < abs(ag_modern_me_stan))
+X_kept_ix <- which(abs(pred_unif_ag$mean) < abs(ag_modern_me_stan))
 
 # this is 8%
 #X_kept_ix <- which(abs(pred_unif$mean) < 0.1)
 
 
 ```
+
+This pairs plot shows the 2d and marginal density of emulated input points where the emulated atmospheric growth is closer to the observations than the standard model.
+
+This technique might provide a useful set of points for optimising the model (at least to atmospheric growth).
 
 ```{r, fig.width = 12, fig.height = 12, warning = FALSE}
 #pairs(X_unif[X_kept_ix, ][1:50,],
@@ -1274,6 +1278,7 @@ panel.hist <- function(x, ...)
     breaks <- h$breaks; nB <- length(breaks)
     y <- h$counts; y <- y/max(y)
     rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+    lines(density(y))
 }
 
 pairs(X_unif[X_kept_ix, ],
@@ -1287,6 +1292,70 @@ pairs(X_unif[X_kept_ix, ],
 
 ```
 
+Next, check emulators of all the other outputs and apply the constraints to them. See how the constraints change.
+
+```{r, fig.width = 12, fig.height = 12}
 
 
+# First, try the emulators built using just wave01
+#fit_list_const_level1a
+
+
+Y_const_pred_unif_mean <- matrix(NA, ncol = ncol(Y_const_level1a_scaled), nrow = nrow(X_unif))
+colnames(Y_const_pred_unif_mean) <- colnames(Y_const_level1a_scaled)
+
+Y_const_pred_unif_sd <- matrix(NA, ncol = ncol(Y_const_level1a_scaled), nrow = nrow(X_unif)) 
+colnames(Y_const_pred_unif_sd) <- colnames(Y_const_level1a_scaled)
+
+for(i in 1:length(fit_list_const_level1a)){
+  
+  pred_unif <- predict.km(object=fit_list_const_level1a[[i]], newdata = X_unif, type = 'UK')
+  
+  Y_const_pred_unif_mean[,i ] <- pred_unif$mean
+  Y_const_pred_unif_sd[,i ] <- pred_unif$sd
+}
+
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12, warning = FALSE}
+
+level2_ix_em <- which(Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
+                    Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_pred_unif_mean[,'cSoil_lnd_sum'] > 750 & Y_const_pred_unif_mean[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_pred_unif_mean[,'cVeg_lnd_sum'] > 300 & Y_const_pred_unif_mean[,'cVeg_lnd_sum'] < 800
+                  )
+
+pairs(X_unif[level2_ix_em, ],
+    #  labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up,
+      diag.panel = panel.hist,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc.col = rb)
+```
+
+This is all constraints
+
+```{r, fig.width = 12, fig.height = 12, warning = FALSE}
+
+level2_and_ag_ix_em <- which(Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
+                    Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_pred_unif_mean[,'cSoil_lnd_sum'] > 750 & Y_const_pred_unif_mean[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_pred_unif_mean[,'cVeg_lnd_sum'] > 300 & Y_const_pred_unif_mean[,'cVeg_lnd_sum'] < 800 &
+                    abs(pred_unif_ag$mean) < abs(ag_modern_me_stan)
+                  )
+
+pairs(X_unif[level2_and_ag_ix_em, ],
+    #  labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up,
+      diag.panel = panel.hist,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc.col = rb)
+
+```
 
