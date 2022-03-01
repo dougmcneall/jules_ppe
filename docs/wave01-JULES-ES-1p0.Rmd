@@ -1241,7 +1241,9 @@ plot(fit_ag_me)
 library(emtools)
 library(imptools)
 library(viztools)
-X_unif <- samp_unif(100000, mins = rep(0,32), maxes = rep(1, 32))
+
+nunif <- 100000
+X_unif <- samp_unif(nunif, mins = rep(0,32), maxes = rep(1, 32))
 colnames(X_unif) <- colnames(X)
 
 pred_unif_ag <- predict.km(fit_ag_me, newdata = X_unif, type = 'UK' ) 
@@ -1249,12 +1251,16 @@ pred_unif_ag <- predict.km(fit_ag_me, newdata = X_unif, type = 'UK' )
 # Keeps about 20%
 X_kept_ix <- which(abs(pred_unif_ag$mean) < abs(ag_modern_me_stan))
 
+
+(length(X_kept_ix) / nunif) * 100
 # this is 8%
 #X_kept_ix <- which(abs(pred_unif$mean) < 0.1)
 
 
 ```
 
+
+## Input space with low Atmospheric Growth Error
 This pairs plot shows the 2d and marginal density of emulated input points where the emulated atmospheric growth is closer to the observations than the standard model.
 
 This technique might provide a useful set of points for optimising the model (at least to atmospheric growth).
@@ -1270,15 +1276,12 @@ This technique might provide a useful set of points for optimising the model (at
 
 par(oma = c(0,0,0,3), bg = 'white')
 
-panel.hist <- function(x, ...)
-{
-    usr <- par("usr"); on.exit(par(usr))
-    par(usr = c(usr[1:2], 0, 1.5) )
-    h <- hist(x, plot = FALSE)
-    breaks <- h$breaks; nB <- length(breaks)
-    y <- h$counts; y <- y/max(y)
-    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
-    lines(density(y))
+
+panel.hist = function(x, ...) {
+  usr = par("usr"); on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5))
+  hist(x, freq = FALSE, col="cyan", add=TRUE) 
+  lines(density(x))
 }
 
 pairs(X_unif[X_kept_ix, ],
@@ -1288,7 +1291,7 @@ pairs(X_unif[X_kept_ix, ],
       diag.panel = panel.hist,
       cex.labels = 1,
       col.axis = 'white',
-      dfunc.col = rb)
+      dfunc_col = rb)
 
 ```
 
@@ -1318,6 +1321,7 @@ for(i in 1:length(fit_list_const_level1a)){
 
 ```
 
+## Input space with emulated members passing Level 2 constraints.
 
 ```{r, fig.width = 12, fig.height = 12, warning = FALSE}
 
@@ -1334,12 +1338,19 @@ pairs(X_unif[level2_ix_em, ],
       diag.panel = panel.hist,
       cex.labels = 1,
       col.axis = 'white',
-      dfunc.col = rb)
+      dfunc_col = rb)
+
+(length(level2_ix_em) / nunif) * 100
 ```
 
-This is all constraints
+## Input space with emulated members passing Level 2 constraints AND low atmospheric growth error
+Emulated members passing level2 constraints AND having lower error in atmospheric growth than standard. 
+
+Red point indicates the standard input.
 
 ```{r, fig.width = 12, fig.height = 12, warning = FALSE}
+
+X_stan_norm <- normalize(matrix(rep(1, 32), nrow = 1), wrt = lhs)
 
 level2_and_ag_ix_em <- which(Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
                     Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
@@ -1348,14 +1359,21 @@ level2_and_ag_ix_em <- which(Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
                     abs(pred_unif_ag$mean) < abs(ag_modern_me_stan)
                   )
 
-pairs(X_unif[level2_and_ag_ix_em, ],
+
+
+pairs(rbind(X_unif[level2_and_ag_ix_em, ], X_stan_norm),
     #  labels = 1:d,
       gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
-      panel = dfunc_up,
+      panel = dfunc_up_truth,
       diag.panel = panel.hist,
       cex.labels = 1,
       col.axis = 'white',
-      dfunc.col = rb)
+      dfunc_col = rb)
 
+
+(length(level2_and_ag_ix_em) / nunif) * 100
 ```
+
+
+
 
