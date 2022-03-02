@@ -266,7 +266,7 @@ pairs(X_wave01[level2_ix_wave01, ],
 
 ## Timeseries of mean carbon cycle properties over whole run.
 
-Wave00 in blue and wave01 in red.
+
 
 ```{r}
 
@@ -393,21 +393,22 @@ if (file.exists("ensemble_timeseries_wave01.rdata")) {
 
 ```
 
-Plot Wave00 and Wave01 on top of one another.
+
 
 ```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
 
 lcol_wave0 <- makeTransparent('dodgerblue2',  120)
 lcol_wave01 <- makeTransparent('firebrick',  120)
+lcol_wave01_level2 <- 'gold'
 stancol = 'black'
 
-linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = NULL){
+linePlotMultiEns <- function(years, ens1, ens2, ens3, col1, col2, col3, ylab, main, ylim = NULL){
   # Plot wave00 and wave01 timeseries on top of one another
   
   nt <- length(years) 
   if(is.null(ylim)){
     
-  ylim = range(c(ens1[,1], ens1[,nt], ens2[,1], ens2[ ,nt]))
+  ylim = range(c(ens1[,1], ens1[,nt], ens2[,1], ens2[ ,nt], ens3[,1], ens3[, nt]))
   }
   
   else ylim <- ylim
@@ -416,79 +417,96 @@ linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = N
         ylab = ylab, main = main, xlab = '',
         bty = 'n')
   matlines(years, t(ens2), col = col2, lty = 'solid')
+    matlines(years, t(ens3), col = col3, lty = 'solid')
 }
 
 
 par(mfrow= c(3,4), las = 1)
 
-linePlotMultiEns(years = years, ens1 = npp_ens, ens2 = npp_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+linePlotMultiEns(years = years, ens1 = npp_ens, ens2 = npp_ens_wave01, ens3 = npp_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'NPP')
 
 lines(years,npp_stan, col = stancol, lty = 'solid', lwd = 2)
 
-linePlotMultiEns(years = years, ens1 =  nbp_ens, ens2 = nbp_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+linePlotMultiEns(years = years, ens1 =  nbp_ens, ens2 = nbp_ens_wave01, ens3 = nbp_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01,col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'NBP', ylim = c(-10,10))
 
 lines(years, nbp_stan, col = stancol, lty = 'solid', lwd = 2)
 
-linePlotMultiEns(years = years, ens1 = cSoil_ens, ens2 = cSoil_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+linePlotMultiEns(years = years, ens1 = cSoil_ens, ens2 = cSoil_ens_wave01, ens3 = cSoil_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'cSoil', ylim = range(c(cSoil_ens[,1], cSoil_ens[,164])))
 
 lines(years, cSoil_stan, col = stancol, lty = 'solid', lwd = 2)
 
-linePlotMultiEns(years = years, ens1 = cVeg_ens, ens2 = cVeg_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+linePlotMultiEns(years = years, ens1 = cVeg_ens, ens2 = cVeg_ens_wave01, ens3 = cVeg_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'cVeg')
 
 lines(years, cVeg_stan, col = stancol, lty = 'solid', lwd = 2)
 
-linePlotMultiEns(years = years, ens1 = lai_lnd_mean_ens, ens2 = lai_lnd_mean_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+linePlotMultiEns(years = years, ens1 = lai_lnd_mean_ens, ens2 = lai_lnd_mean_ens_wave01, ens3 = lai_lnd_mean_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'Lai')
 
 lines(years, lai_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
 
-linePlotMultiEns(years = years, ens1 = rh_lnd_sum_ens, ens2 = rh_lnd_sum_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+linePlotMultiEns(years = years, ens1 = rh_lnd_sum_ens, ens2 = rh_lnd_sum_ens_wave01, ens3 = rh_lnd_sum_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01,  col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'RH')
 
 lines(years, rh_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
 
-linePlotMultiEns(years = years, ens1 = fLuc_lnd_sum_ens, ens2 = fLuc_lnd_sum_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+linePlotMultiEns(years = years, ens1 = fLuc_lnd_sum_ens, ens2 = fLuc_lnd_sum_ens_wave01, ens3 = fLuc_lnd_sum_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'fLuc')
 
 lines(years, fLuc_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = fHarvest_lnd_sum_ens, ens2 = fHarvest_lnd_sum_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ens3 = fHarvest_lnd_sum_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'fHarvest')
 
 lines(years, fHarvest_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = treeFrac_lnd_mean_ens, ens2 = treeFrac_lnd_mean_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
-                 ylab = 'GtC', main = 'treefrac')
+                 ens3 = treeFrac_lnd_mean_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'treefrac'
+                 )
 
 lines(years, treeFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = shrubFrac_lnd_mean_ens, ens2 = shrubFrac_lnd_mean_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
-                 ylab = 'GtC', main = 'shrubfrac')
+                 ens3 = shrubFrac_lnd_mean_ens[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'shrubfrac'
+)
 
 lines(years, shrubFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
 
 linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens, ens2 = baresoilFrac_lnd_mean_ens_wave01,
-                 col1 = lcol_wave0, col2 = lcol_wave01,
+                 ens3 = baresoilFrac_lnd_mean_ens_wave01[level2_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
                  ylab = 'GtC', main = 'baresoilfrac')
 
 lines(years, baresoilFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
 
+reset()
+
+legend('bottomright', legend = c('wave00','wave01','wave01 level2','standard'), lty = 'solid', lwd = 1.5, col = c(lcol_wave0, lcol_wave01, lcol_wave01_level2, stancol), inset = c(0.05, 0.15) )
+
 
 ```
+This is a plot of timeseries of Wave00, Wave01, and level2-constrained wave01 on top of one another. We see that the wave01 is closer to the standard than wave00, and the level-2 constrained wave01 ensemble is often closer again. However, there are still quite large discrepancies. For example, baresoilfrac is often way too high, shrubfrac is often too low (though both these span the standard). Treefrac is away from zero, but still often too low or too high. While fHarvest looks good, fLuc does not appear constrained by the process at all. RH (soil respiration) looks well constrained, whereas lai is often too low.  
+
+One thing we could do next is constrain input space again, using observations or "tolerance to error" on some or all of these outputs.  
+
+We could also extend sensitivity analysis to work out what controls e.g. treefrac.
+
 
 ## Emulator fits
 
