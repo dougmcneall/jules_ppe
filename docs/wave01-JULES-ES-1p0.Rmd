@@ -3,6 +3,9 @@ title: "Analysis of JULES1p0 ensemble wave1"
 output:
   html_document:
     df_print: paged
+    toc: true
+    toc_depth: 3
+    toc_float: true
 ---
 
 ## Introduction
