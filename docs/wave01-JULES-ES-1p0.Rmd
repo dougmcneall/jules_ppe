@@ -1,28 +1,34 @@
 ---
-title: "Analysis of JULES1p0 ensemble wave1"
-output:
-  html_document:
-    df_print: paged
-    toc: true
-    toc_depth: 3
-    toc_float: true
+title: "Analysis of JULES1p0 ensemble wave01"
+output: 
+    html_notebook:
+        toc: true
+        toc_float: true
+        toc_depth: 3
+        number_sections: true
 ---
 
-## Introduction
+# Introduction
 
 A comparison of JULES-ES-1p0 wave01 members against the original ensemble (wave00).
 
-Wave 01 input parameter sets were picked using History matching to fall within Andy Wiltshires basic constraints on NBP, NPP, cSoil and cVeg stocks at the end of the 20th century. We use 300 of the 500 members, keeping back 2/5ths for emulator validation later.
+Wave 01 input parameter sets were picked using History matching to fall within Andy Wiltshire's basic constraints on NBP, NPP, cSoil and cVeg stocks at the end of the 20th century. We use 300 of the 500 members, keeping back 2/5ths for emulator validation later.
 
 We answer some basic questions.
 
 What proportion of the new ensemble match AW's constraints?
 
+What do the timeseries of carbon cycle properties look like with and without AW's constraints?
+
 How good is a GP emulator? Does it get better overall with the new ensemble members added? In particular, does it get better for those members within the AW constraints?
+
+Does comparison of the ensemble with Atmospheric growth observations give more of a constraint?
+
+To do:
 
 Does the sensitivity analysis change?
 
-## Preliminaries
+# Preliminaries
 Load libraries, functions and data.
 
 ```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
@@ -34,8 +40,6 @@ knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warning
 source('JULES-ES-1p0-common.R')
 
 ```
-
-
 
 ```{r}
 
@@ -136,7 +140,7 @@ colnames(ens_wave01_mv$datmat)[9]
 
 ```
 
-## Ensemble behaviour in key (constraining) outputs. 
+# Ensemble behaviour in key (constraining) outputs. 
 
 Global mean for the 20 years at the end of the 20th Century. There is still a significant low bias on cVeg output.
 
@@ -213,7 +217,7 @@ reset()
 
 legend('top', horiz = TRUE, fill = c(makeTransparent(wave00col, 150), makeTransparent(wave01col, 150), makeTransparent(rangecol, 60)), legend = c('Wave00', 'Wave01', 'AW range'))
 ```
-### What proportion of models *now* fall within Andy's constraints?
+## What proportion of models *now* fall within Andy's constraints?
 
 A third! Better than before, but still not great. Pointing at a significant model discrepency in cVeg
 
@@ -265,8 +269,6 @@ pairs(X_wave01[level2_ix_wave01, ],
 ```
 
 ## Timeseries of mean carbon cycle properties over whole run.
-
-
 
 ```{r}
 
@@ -508,15 +510,17 @@ One thing we could do next is constrain input space again, using observations or
 We could also extend sensitivity analysis to work out what controls e.g. treefrac.
 
 
-## Emulator fits
+# Emulator fits
 
 We hope that running the new ensemble gives us a better emulator, and allows us to rule out more input space.
 We particularly hope that the emulator is better for those members that are inside AW's constraints.
 
 First, we can look at the emulator errors in two cases: The level1a data (a basic carbon cycle), and then with the Wave01 data, which should have similar characteristics. (We should have eliminated really bad simulations, but wave01 is not constrained the data perfectly to be within AW constraints.)
 
-# Emulator fit list of level 1a ensemble
+
 ```{r}
+## Emulator fit list of level 1a ensemble
+
 #fit_list_const_level1a <- createKmFitList(X = X_level1a, Y = Y_const_level1a_scaled)
 
 Y_const_level1a_scaled_list <- mat2list(Y_const_level1a_scaled)
@@ -529,10 +533,10 @@ fit_list_const_level1a <- mclapply(X = Y_const_level1a_scaled_list, FUN = km, fo
 
 ```
 
-# Remove an outlier from the new wave and build emulators
+
 
 ```{r}
-
+## Remove an outlier from the new wave and build emulators
 # Bind together the input matrices and scaled output data
 X_level1a_wave01 <- rbind(X_level1a, X_wave01_train)[-440, ]
 
@@ -851,7 +855,7 @@ print(pmae_table)
 
 ```
 
-## Comparing atmospheric growth in wave00, wave01 and observations
+# Comparing atmospheric growth in wave00, wave01 and observations
 
 ```{r, include = FALSE}
 historical_carbon_budget <- read_excel('Global_Carbon_Budget_2020v1.0.xlsx', sheet = "Historical Budget", skip = 15, n_max = 270)
@@ -1056,7 +1060,7 @@ print(cor( agiav_modern_wave01, cnbp_modern_wave01))
 ```
 
 
-# How close can we get the model to reality?
+## How close can we get the model to reality?
 
 Using Atmospheric Growth Rate as an example, how close can we get the model to observations? Can we do better than standard? What are the trade offs of doing so? How does getting close in AGR affect performance in other outputs?
 
@@ -1182,7 +1186,7 @@ pairs(X_better_ag,
 
 ```
 
-# Build emulators and find parts of parameter space that to better than standard at atmospheric growth.
+## Build emulators and find parts of parameter space that to better than standard at atmospheric growth.
 
 Having trouble fitting RMSE, to trying mean error.
 
@@ -1239,7 +1243,7 @@ pairs(X_level2_and_better_ag01,
 
 
 
-```{r}
+```{r, include = FALSE}
 library(DiceKriging)
 
 ag01_outlier_ix <- which(ag01_modern_me > 10)
