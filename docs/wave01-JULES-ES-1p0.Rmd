@@ -1,11 +1,11 @@
 ---
 title: "Analysis of JULES1p0 ensemble wave01"
-output: 
-    html_notebook:
-        toc: true
-        toc_float: true
-        toc_depth: 3
-        number_sections: true
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    toc_depth: 3
+    number_sections: yes
 ---
 
 # Introduction
@@ -1372,6 +1372,9 @@ pairs(X_unif[level2_ix_em, ],
 Emulated members passing level2 constraints AND having lower error in atmospheric growth than standard. 
 
 Red point indicates the standard input.
+
+The position of the standard input with regards to the histograms give us an idea of what we might do to improve the simulation - at least in terms of atmospheric growth. If we were to move the input towards areas of higher density, we might expect a better model performance.
+
 
 ```{r, fig.width = 12, fig.height = 12, warning = FALSE}
 
