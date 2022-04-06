@@ -38,7 +38,8 @@ source('~/myRpackages/julesR/vignettes/default_jules_parameter_perturbations.R')
 ## ----------------------------------------------------------------------
 ## Data locations and constants
 ## ----------------------------------------------------------------------
-ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
+#ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
+ensloc_wave00 <- '/data/users/hadaw/JULES_ES_PPE/u-au932/'
 
 # Some pallete options
 yg = brewer.pal(9, "YlGn")
@@ -62,6 +63,17 @@ y_names_sum <- c('nbp_lnd_sum', 'fLuc_lnd_sum', 'npp_nlim_lnd_sum', 'cSoil_lnd_s
                  'cVeg_lnd_sum', 'landCoverFrac_lnd_sum', 'fHarvest_lnd_sum',
                  'lai_lnd_sum', 'rh_lnd_sum', 'treeFrac_lnd_sum', 'c3PftFrac_lnd_sum', 
                  'c4PftFrac_lnd_sum', 'shrubFrac_lnd_sum', 'baresoilFrac_lnd_sum')
+
+y_names_all <-  c("nbp_lnd_sum", "year" ,"nbp_lnd_mean", "fLuc_lnd_sum", "fLuc_lnd_mean" , "npp_nlim_lnd_sum",  
+                 "npp_nlim_lnd_mean" , "cSoil_lnd_sum" ,"cSoil_lnd_mean" ,
+                 "cVeg_lnd_sum"  ,"cVeg_lnd_mean"  ,"landCoverFrac_lnd_sum" ,
+                 "landCoverFrac_lnd_mean","fHarvest_lnd_sum","fHarvest_lnd_mean", 
+                 "lai_lnd_sum" ,"lai_lnd_mean" ,"rh_lnd_sum" ,
+                 "rh_lnd_mean" ,"treeFrac_lnd_sum", "treeFrac_lnd_mean" ,
+                 "c3PftFrac_lnd_sum" ,"c3PftFrac_lnd_mean"  , "c4PftFrac_lnd_sum" ,
+                 "c4PftFrac_lnd_mean" ,"shrubFrac_lnd_sum"  ,   "shrubFrac_lnd_mean",
+                 "baresoilFrac_lnd_sum" ,"baresoilFrac_lnd_mean","residualFrac_lnd_sum" ,
+                 "residualFrac_lnd_mean")
 
 ## ----------------------------------------------------------------------
 ## Helper functions
@@ -112,7 +124,8 @@ makeTimeseriesEnsemble <- function(ensloc, variable, nens = 499, nts = 164, cn =
     
     ensmember <- enslist[i] 
     
-    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    #fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
     
     
     try(nc <- nc_open(paste0(fn)))
@@ -130,7 +143,8 @@ getStandardMember <- function(ensloc, variable, nts = 164, cn = 1850:2013){
   colnames(datmat) <- cn
   
   ensmember <- 'S3'
-  fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+  #fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+  fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
   
   try(nc <- nc_open(paste0(fn)))
   try(dat <- extractTimeseries(nc, variable))
@@ -140,6 +154,9 @@ getStandardMember <- function(ensloc, variable, nts = 164, cn = 1850:2013){
   datmat
   
 }
+
+
+
 
 
 mat2list <- function(X){
@@ -204,34 +221,34 @@ twoStep_glmnet <- function(X, y, nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, 
 ## ----------------------------------------------------------------------
 
 
-if (file.exists("ensemble_timeseries.rdata")) {
-  load("ensemble_timeseries.rdata")
+if (file.exists("ensemble_timeseries_2022-03-22.rdata")) {
+  load("ensemble_timeseries_2022-03-22.rdata")
 } else {
   
   # primary carbon cycle outputs
-  npp_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
-  nbp_ens <-  makeTimeseriesEnsemble(ensloc = ensloc,variable = "nbp_lnd_sum") / (1e12/ysec)
-  cSoil_ens <-  makeTimeseriesEnsemble(ensloc = ensloc,variable = "cSoil_lnd_sum") / 1e12
-  cVeg_ens <-  makeTimeseriesEnsemble(ensloc = ensloc,variable = "cVeg_lnd_sum") / 1e12
+  npp_ens <- makeTimeseriesEnsemble(ensloc = ensloc_wave00, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+  nbp_ens <-  makeTimeseriesEnsemble(ensloc = ensloc_wave00,variable = "nbp_lnd_sum") / (1e12/ysec)
+  cSoil_ens <-  makeTimeseriesEnsemble(ensloc = ensloc_wave00,variable = "cSoil_lnd_sum") / 1e12
+  cVeg_ens <-  makeTimeseriesEnsemble(ensloc = ensloc_wave00,variable = "cVeg_lnd_sum") / 1e12
   
   
-  lai_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc,variable = "lai_lnd_mean")
+  lai_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc_wave00,variable = "lai_lnd_mean")
   
   # fluxes
-  rh_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "rh_lnd_sum") / (1e12/ysec)
-  fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "fLuc_lnd_sum") / (1e12/ysec)
-  fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "fHarvest_lnd_sum") / (1e12/ysec)
+  rh_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc_wave00, variable = "rh_lnd_sum") / (1e12/ysec)
+  fLuc_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc_wave00, variable = "fLuc_lnd_sum") / (1e12/ysec)
+  fHarvest_lnd_sum_ens <- makeTimeseriesEnsemble(ensloc = ensloc_wave00, variable = "fHarvest_lnd_sum") / (1e12/ysec)
   
   
   # fractions
-  treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "treeFrac_lnd_mean")
-  shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "shrubFrac_lnd_mean")
-  baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc, variable = "baresoilFrac_lnd_mean")
+  treeFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc_wave00, variable = "treeFrac_lnd_mean")
+  shrubFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc_wave00, variable = "shrubFrac_lnd_mean")
+  baresoilFrac_lnd_mean_ens <- makeTimeseriesEnsemble(ensloc = ensloc_wave00, variable = "baresoilFrac_lnd_mean")
   #c3PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c3PftFrac_lnd_mean_ens")
   #c4PftFrac_lnd_mean_ens <- makeTimeseriesEnsemble(variable = "c4PftFrac_lnd_mean_ens")
   
   save(npp_ens, nbp_ens, cSoil_ens, cVeg_ens, lai_lnd_mean_ens, rh_lnd_sum_ens, fLuc_lnd_sum_ens, fHarvest_lnd_sum_ens,
-       treeFrac_lnd_mean_ens, shrubFrac_lnd_mean_ens, baresoilFrac_lnd_mean_ens, file = "ensemble_timeseries.rdata" )
+       treeFrac_lnd_mean_ens, shrubFrac_lnd_mean_ens, baresoilFrac_lnd_mean_ens, file = "ensemble_timeseries_2022-03-22.rdata" )
   
 }
 
@@ -242,23 +259,23 @@ total_land_carbon_ens <- cSoil_ens + cVeg_ens
 #
 # ------------------------------------------------------------------------------
 
-npp_stan <- getStandardMember(ensloc = ensloc, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
-nbp_stan <- getStandardMember(ensloc = ensloc, variable = "nbp_lnd_sum") / (1e12/ysec)
-cSoil_stan <- getStandardMember(ensloc = ensloc, variable = "cSoil_lnd_sum") / 1e12
-cVeg_stan <- getStandardMember(ensloc = ensloc, variable = "cVeg_lnd_sum") / 1e12
-lai_lnd_mean_stan <- getStandardMember(ensloc = ensloc, variable = "lai_lnd_mean")
+npp_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+nbp_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "nbp_lnd_sum") / (1e12/ysec)
+cSoil_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "cSoil_lnd_sum") / 1e12
+cVeg_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "cVeg_lnd_sum") / 1e12
+lai_lnd_mean_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "lai_lnd_mean")
 
 
 # fluxes
-rh_lnd_sum_stan <- getStandardMember(ensloc = ensloc, variable = "rh_lnd_sum") / (1e12/ysec)
-fLuc_lnd_sum_stan <- getStandardMember(ensloc = ensloc, variable = "fLuc_lnd_sum") / (1e12/ysec)
-fHarvest_lnd_sum_stan <- getStandardMember(ensloc = ensloc, variable = "fHarvest_lnd_sum") / (1e12/ysec)
+rh_lnd_sum_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "rh_lnd_sum") / (1e12/ysec)
+fLuc_lnd_sum_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "fLuc_lnd_sum") / (1e12/ysec)
+fHarvest_lnd_sum_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "fHarvest_lnd_sum") / (1e12/ysec)
 
 
 # fractions
-treeFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc, variable = "treeFrac_lnd_mean")
-shrubFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc, variable = "shrubFrac_lnd_mean")
-baresoilFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc, variable = "baresoilFrac_lnd_mean")
+treeFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "treeFrac_lnd_mean")
+shrubFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "shrubFrac_lnd_mean")
+baresoilFrac_lnd_mean_stan <- getStandardMember(ensloc = ensloc_wave00, variable = "baresoilFrac_lnd_mean")
 
 ## ----------------------------------------------------------------------
 ## Anomalize ensemble
@@ -278,33 +295,31 @@ total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
 ## --------------------------------------------------------------------------------------
 
 
-if (file.exists("ensemble.rdata")) {
-  load("ensemble.rdata")
+if (file.exists("ensemble_2022-03-23.rdata")) {
+  load("ensemble_2022-03-23.rdata")
 } else {
   
   nens = 499
-  datmat <- matrix(nrow = nens, ncol = length(y_names_sum))
-  colnames(datmat) <- y_names_sum
+  datmat <- matrix(nrow = nens, ncol = length(y_names_all))
+  colnames(datmat) <- y_names_all
   
   enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
-  floc <- paste0(ensloc,ensmember,subdir)
   
   for(i in 1:nens){
     
-    vec <- rep(NA, length(y_names_sum))
+    vec <- rep(NA, length(y_names_all))
     
     ensmember <- enslist[i] 
     
-    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
-    #print(fn)
-    
+    fn <- paste0(ensloc_wave00,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+
     try(nc <- nc_open(paste0(fn)))
-    try(vec <- sapply(y_names_sum, FUN = modernValue, nc = nc, ix = 144:164))
+    try(vec <- sapply(y_names_all, FUN = modernValue, nc = nc, ix = 144:164))
     datmat[i, ] <- vec
     nc_close(nc)
   }
   
-  save(nens, datmat,enslist,floc, file ="ensemble.rdata")
+  save(nens, datmat,enslist, file ="ensemble_2023-03-22.rdata")
 }
 
 
@@ -312,9 +327,9 @@ if (file.exists("ensemble.rdata")) {
 # Standard Member modern value
   
 ensmember <- 'S3'
-fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+fn <- paste0(ensloc_wave00,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
 try(nc <- nc_open(paste0(fn)))
-try(standard_modern_value <- sapply(y_names_sum, FUN = modernValue, nc = nc, ix = 144:164))
+try(standard_modern_value <- sapply(y_names_all, FUN = modernValue, nc = nc, ix = 144:164))
   
   
 
@@ -339,33 +354,33 @@ tsAnomaly <- function(nc, variable, startix = 1:20, endix = 144:164){
 
 # Generate ensemble  mean of the last 20 years of the timeseries (1994-2013)
 
-if (file.exists("anomaly_ensemble.rdata")) {
-  load("anomaly_ensemble.rdata")
+if (file.exists("anomaly_ensemble_2022-03-23.rdata")) {
+  load("anomaly_ensemble_2022-03-23.rdata")
 } else {
   
   nens = 499
-  datmatAnom <- matrix(nrow = nens, ncol = length(y_names_sum))
-  colnames(datmatAnom) <- y_names_sum
+  datmatAnom <- matrix(nrow = nens, ncol = length(y_names_all))
+  colnames(datmatAnom) <- y_names_all
   
   enslist <- paste("P", formatC(0:(nens-1), width=4, flag="0"), sep="")
-  floc <- paste0(ensloc,ensmember,subdir)
+  #floc <- paste0(ensloc,ensmember,subdir)
   
   for(i in 1:nens){
     
-    vec <- rep(NA, length(y_names_sum))
+    vec <- rep(NA, length(y_names_all))
     
     ensmember <- enslist[i] 
     
-    fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    fn <- paste0(ensloc_wave00,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
     #print(fn)
     
     try(nc <- nc_open(paste0(fn)))
-    try(vec <- sapply(y_names_sum, FUN = tsAnomaly, nc = nc))
+    try(vec <- sapply(y_names_all, FUN = tsAnomaly, nc = nc))
     datmatAnom[i, ] <- vec
     nc_close(nc)
   }
   
-  save(nens, datmatAnom, enslist,floc, file ="anomaly_ensemble.rdata")
+  save(nens, datmatAnom, enslist, file ="anomaly_ensemble_2022-03-23.rdata")
 }
 
 
@@ -375,9 +390,11 @@ if (file.exists("anomaly_ensemble.rdata")) {
 ## ---------------------------------------------------------------------------------------------
 ## Clean data sets to "level 0"
 ## Initial clean of data set, removing variables that don't change, and removing NAs (models that didn't run).
+
+
 ## ---------------------------------------------------------------------------------------------
 
-
+# this is wrong now, for some reason
 Y_nlevel0_ix <- which(is.na(datmat[,'year']))
 
 YAnom_nlevel0_ix <- which(is.na(datmatAnom[,'year']))
@@ -387,16 +404,16 @@ identical(Y_nlevel0_ix, YAnom_nlevel0_ix)
 
 # Y is the whole data set
 Y <- datmat
-# Y_level0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
-Y_level0 <- datmat[-Y_nlevel0_ix, -c(2,30,31)]
-Y_nlevel0 <- datmat[Y_nlevel0_ix, -c(2, 30, 31)]
+# Y_level0 is the 'cleaned' data set removing NAs
+Y_level0 <- datmat[-Y_nlevel0_ix, ]
+Y_nlevel0 <- datmat[Y_nlevel0_ix, ]
 
 
 # Y is the whole data set
 YAnom <- datmatAnom
-# Y.level0 is the 'cleaned' data set, truncated to variables that change, and removing NAs
-YAnom_level0 <- datmatAnom[-YAnom_nlevel0_ix, -c(2,30,31)]
-YAnom_nlevel0 <- datmatAnom[YAnom_nlevel0_ix, -c(2,30,31)]
+# Y.level0 is the 'cleaned' data set  removing NAs
+YAnom_level0 <- datmatAnom[-YAnom_nlevel0_ix, ]
+YAnom_nlevel0 <- datmatAnom[YAnom_nlevel0_ix, ]
 
 
 
@@ -488,26 +505,26 @@ YAnom_sum_level1a <- YAnom_level1a[ , y_names_sum]
 Y_sum_level1a_list <- mat2list(Y_sum_level1a)
 YAnom_sum_level1a_list <- mat2list(YAnom_sum_level1a)
 
-if (file.exists("emlist_km_Y_level1a.rdata")) {
-  load("emlist_km_Y_level1a.rdata")
+if (file.exists("emlist_km_Y_level1a_2022-03-22.rdata")) {
+  load("emlist_km_Y_level1a_2022-03-22.rdata")
 } else {
   
   # Here, the list is a list version of the matrix Y_
   emlist_km_Y_level1a <- mclapply(X = Y_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
   
-  save(emlist_km_Y_level1a, file = "emlist_km_Y_level1a.rdata")
+  save(emlist_km_Y_level1a, file = "emlist_km_Y_level1a_2022-03-22.rdata")
   
 }
 
 
-if (file.exists("emlist_km_YAnom_level1a.rdata")) {
-  load("emlist_km_YAnom_level1a.rdata")
+if (file.exists("emlist_km_YAnom_level1a_2022-03-22.rdata")) {
+  load("emlist_km_YAnom_level1a_2022-03-22.rdata")
 } else {
   
   
   emlist_km_YAnom_level1a <- mclapply(X = YAnom_sum_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
   
-  save(emlist_km_YAnom_level1a, file = "emlist_km_YAnom_level1a.rdata")
+  save(emlist_km_YAnom_level1a, file = "emlist_km_YAnom_level1a_2022-03-22.rdata")
   
 }
 

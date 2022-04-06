@@ -1,0 +1,58 @@
+---
+title: "File checking"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(ncdf4)
+library(ncdf4.helpers)
+
+
+```
+
+```{r}
+
+
+ensloc_wave00 <- '/data/users/hadaw/JULES_ES_PPE/u-au932/'
+
+ensloc_wave01_orig <- '/scratch/hadaw/jules_postprocess/u-ck006/'
+
+#ensloc_wave01 <- '/data/users/hadaw/JULES_ES_PPE/u-cl851/'
+ ensloc_wave01 <- '/data/users/hadaw/JULES_ES_PPE/u-ck006/'
+
+```
+
+```{r}
+
+# random ensemble member
+ensmember = 'P0700'
+nc_orig <- nc_open( fn <- paste0(ensloc_wave01_orig,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc'))
+nc_new <- nc_open( fn <- paste0(ensloc_wave01,'JULES-ES-1p0_',ensmember,'_Annual_global.nc'))
+
+
+varlist_orig <- nc.get.variable.list(nc_orig)
+varlist_new <- nc.get.variable.list(nc_new)
+
+identical(varlist_orig, varlist_new)
+```
+
+```{r}
+
+for(i in 1:length(varlist_orig)){
+  
+  print(varlist_orig[i])
+  var_orig <- ncvar_get(nc_orig, varlist_orig[i])
+  var_new  <-ncvar_get(nc_new, varlist_orig[i])
+  
+  print(rbind(var_orig[1:10], var_new[1:10]))
+  print(identical(var_orig, var_new))
+  
+}
+
+```
+
+
