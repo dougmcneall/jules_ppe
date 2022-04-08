@@ -112,8 +112,8 @@ makeJulesEnsembleModernValue <- function(ensloc, varlist, nstart, nend, ix = 144
 nstart <- 499
 nend <- (nstart + ntrain_wave01) - 1
 
-if (file.exists("ensemble_wave01_2022-04-05.rdata")) {
-  load("ensemble_wave01_2022-04-05.rdata")
+if (file.exists("ensemble_wave01_2022-04-08.rdata")) {
+  load("ensemble_wave01_2022-04-08.rdata")
 } else {
   
 ens_wave01_mv <- makeJulesEnsembleModernValue(ensloc = ensloc_wave01, 
@@ -122,7 +122,7 @@ ens_wave01_mv <- makeJulesEnsembleModernValue(ensloc = ensloc_wave01,
                                               nend = nend, 
                                               ix = 144:164) 
   
-  save(ens_wave01_mv, file ="ensemble_wave01_2022-04-05.rdata")
+  save(ens_wave01_mv, file ="ensemble_wave01_2022-04-08.rdata")
 }
   
 ```
@@ -306,43 +306,43 @@ pairs(X_wave01[level2_ix_wave01, ],
 # 
 #This has a problem with variable lengths of time in the runs (eg P0509)
 
-makeTimeseriesEnsemble <- function(ensloc, variable, nstart, nend, nts = 164, cn = 1850:2013){
-
-  ysec <- 31536000
-
-  nens <- (nend - nstart) + 1
-  # nens is number of ensemble members
-  # nts length of timeseries
-  # cn is colnames()
-  datmat <- matrix(NA, nrow = nens, ncol = nts)
-  colnames(datmat) <- cn
-
-  enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
-
-  for(i in 1:nens){
-
-    #vec <- rep(NA,nts)
-
-    ensmember <- enslist[i]
-    #print(ensmember)
-
-    fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
-
-
-    try(nc <- nc_open(paste0(fn)))
-    try(localtime <- ncvar_get(nc, 'time'))
-
-    # This part compensates for the fact that sometimes years are missing
-    try(localyear <- floor(2010 + (localtime / ysec)))
-    try(ix <- which(cn%in%localyear))
-
-    try(dat <- extractTimeseries(nc, variable))
-
-    try(datmat[i, ix] <- dat)
-    nc_close(nc)
-  }
-  datmat
-}
+# makeTimeseriesEnsemble <- function(ensloc, variable, nstart, nend, nts = 164, cn = 1850:2013){
+# 
+#   ysec <- 31536000
+# 
+#   nens <- (nend - nstart) + 1
+#   # nens is number of ensemble members
+#   # nts length of timeseries
+#   # cn is colnames()
+#   datmat <- matrix(NA, nrow = nens, ncol = nts)
+#   colnames(datmat) <- cn
+# 
+#   enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
+# 
+#   for(i in 1:nens){
+# 
+#     #vec <- rep(NA,nts)
+# 
+#     ensmember <- enslist[i]
+#     #print(ensmember)
+# 
+#     fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+# 
+# 
+#     try(nc <- nc_open(paste0(fn)))
+#     try(localtime <- ncvar_get(nc, 'time'))
+# 
+#     # This part compensates for the fact that sometimes years are missing
+#     try(localyear <- floor(2010 + (localtime / ysec)))
+#     try(ix <- which(cn%in%localyear))
+# 
+#     try(dat <- extractTimeseries(nc, variable))
+# 
+#     try(datmat[i, ix] <- dat)
+#     nc_close(nc)
+#   }
+#   datmat
+# }
 
 
 
@@ -381,8 +381,8 @@ makeTimeseriesEnsemble <- function(ensloc, variable, nstart, nend, nts = 164, cn
 
 ```{r}
 
-if (file.exists("ensemble_timeseries_wave01_2022-04-05.rdata")) {
-  load("ensemble_timeseries_wave01_2022-04-05.rdata")
+if (file.exists("ensemble_timeseries_wave01_2022-04-08.rdata")) {
+  load("ensemble_timeseries_wave01_2022-04-08.rdata")
 } else {
   
   # primary carbon cycle outputs
@@ -404,6 +404,11 @@ if (file.exists("ensemble_timeseries_wave01_2022-04-05.rdata")) {
    treeFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,  variable = "treeFrac_lnd_mean")
    shrubFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,  variable = "shrubFrac_lnd_mean")
    baresoilFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,  variable = "baresoilFrac_lnd_mean")
+   
+     c3PftFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01, nstart = nstart, nend = nend,variable = "c3PftFrac_lnd_mean")
+  c4PftFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01, nstart = nstart, nend = nend,variable = "c4PftFrac_lnd_mean")
+   
+   
   
    save(npp_ens_wave01,
         nbp_ens_wave01,
@@ -416,7 +421,9 @@ if (file.exists("ensemble_timeseries_wave01_2022-04-05.rdata")) {
         treeFrac_lnd_mean_ens_wave01,
         shrubFrac_lnd_mean_ens_wave01,
         baresoilFrac_lnd_mean_ens_wave01,
-       file = "ensemble_timeseries_wave01_2022-04-05.rdata" )
+        c3PftFrac_lnd_mean_ens_wave01,
+        c4PftFrac_lnd_mean_ens_wave01,
+       file = "ensemble_timeseries_wave01_2022-04-08.rdata" )
 }
 
 #total_land_carbon_ens_wave01 <- cSoil_ens_wave01 + cVeg_ens_wave01
@@ -602,6 +609,166 @@ One thing we could do next is constrain input space again, using observations or
 We could also extend sensitivity analysis to work out what controls e.g. treefrac.
 
 A summary of what gets constrained when you constrain the top-level variables would be a useful aanalysis.
+
+
+## Anomaly timeseries
+
+Similar to above, but output anomaly
+```{r}
+npp_ens_anom_wave01 <- anomalizeTSmatrix(npp_ens_wave01, 1:20)
+nbp_ens_anom_wave01 <- anomalizeTSmatrix(nbp_ens_wave01, 1:20)
+cSoil_ens_anom_wave01 <- anomalizeTSmatrix(cSoil_ens_wave01, 1:20)
+cVeg_ens_anom_wave01 <- anomalizeTSmatrix(cVeg_ens_wave01, 1:20)
+
+rh_lnd_sum_ens_anom_wave01 <- anomalizeTSmatrix(rh_lnd_sum_ens_wave01, 1:20)
+fLuc_lnd_sum_ens_anom_wave01 <- anomalizeTSmatrix(fLuc_lnd_sum_ens_wave01, 1:20)
+lai_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(lai_lnd_mean_ens_wave01, 1:20) 
+
+fHarvest_lnd_sum_ens_anom_wave01 <- anomalizeTSmatrix(fHarvest_lnd_sum_ens_wave01, 1:20)
+treeFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(treeFrac_lnd_mean_ens_wave01, 1:20)
+shrubFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(shrubFrac_lnd_mean_ens_wave01, 1:20)
+baresoilFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(baresoilFrac_lnd_mean_ens_wave01, 1:20)
+c3PftFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(c3PftFrac_lnd_mean_ens_wave01, 1:20)
+c4PftFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(c4PftFrac_lnd_mean_ens_wave01, 1:20)
+
+total_land_carbon_anom_wave01 <- anomalizeTSmatrix(total_land_carbon_ens_wave01, 1:20)
+
+
+
+
+
+```
+
+```{r}
+
+anomalizeTS <- function(x, ix = 1:20){x - mean(x[ix]) } 
+npp_stan_anom <- anomalizeTS(npp_stan)
+
+nbp_stan_anom <- anomalizeTS(nbp_stan)
+cSoil_stan_anom <-anomalizeTS(cSoil_stan)
+cVeg_stan_anom <- anomalizeTS(cVeg_stan)
+lai_lnd_mean_stan_anom <- anomalizeTS(lai_lnd_mean_stan)
+
+
+# fluxes
+rh_lnd_sum_stan_anom <- anomalizeTS(rh_lnd_sum_stan)
+fLuc_lnd_sum_stan_anom <- anomalizeTS(fLuc_lnd_sum_stan)
+fHarvest_lnd_sum_stan_anom <- anomalizeTS(fHarvest_lnd_sum_stan)
+
+
+# fractions
+treeFrac_lnd_mean_stan_anom <- anomalizeTS(treeFrac_lnd_mean_stan)
+shrubFrac_lnd_mean_stan_anom <- anomalizeTS(shrubFrac_lnd_mean_stan)
+baresoilFrac_lnd_mean_stan_anom <- anomalizeTS(baresoilFrac_lnd_mean_stan)
+c3PftFrac_lnd_mean_stan_anom <- anomalizeTS(c3PftFrac_lnd_mean_stan)
+c4PftFrac_lnd_mean_stan_anom <- anomalizeTS(c4PftFrac_lnd_mean_stan)
+```
+
+
+
+```{r, fig.width = 10, fig.height = 12}
+par(mfrow= c(3,4), las = 1)
+
+linePlotMultiEns(years = years, ens1 = npp_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = npp_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = npp_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NPP')
+
+lines(years,npp_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+linePlotMultiEns(years = years, ens1 =  nbp_ens_anom[without_outliers_ix_wave00,], 
+                 ens2 = nbp_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = nbp_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01,col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NBP', ylim = c(-10,10))
+
+lines(years, nbp_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = cSoil_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = cSoil_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = cSoil_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cSoil', ylim = range(c(cSoil_ens_anom[,1], cSoil_ens_anom[,164])))
+
+lines(years, cSoil_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = cVeg_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = cVeg_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = cVeg_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cVeg')
+
+lines(years, cVeg_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = lai_lnd_mean_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = lai_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = lai_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'Lai')
+
+lines(years, lai_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = rh_lnd_sum_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = rh_lnd_sum_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = rh_lnd_sum_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01,  col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'RH')
+
+lines(years, rh_lnd_sum_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = fLuc_lnd_sum_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = fLuc_lnd_sum_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = fLuc_lnd_sum_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fLuc')
+
+lines(years, fLuc_lnd_sum_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = fHarvest_lnd_sum_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = fHarvest_lnd_sum_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = fHarvest_lnd_sum_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fHarvest')
+
+lines(years, fHarvest_lnd_sum_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = treeFrac_lnd_mean_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = treeFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = treeFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'treefrac'
+                 )
+
+lines(years, treeFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = shrubFrac_lnd_mean_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = shrubFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = shrubFrac_lnd_mean_ens_anom[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'shrubfrac'
+)
+
+lines(years, shrubFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = baresoilFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = baresoilFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'baresoilfrac')
+
+lines(years, baresoilFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+reset()
+
+legend('bottomright', legend = c('wave00','wave01','wave01 level2','standard'), lty = 'solid', lwd = 1.5, col = c(lcol_wave0, lcol_wave01, lcol_wave01_level2, stancol), inset = c(0.05, 0.15) )
+
+
+
+
+
+
+```
+
 
 
 
