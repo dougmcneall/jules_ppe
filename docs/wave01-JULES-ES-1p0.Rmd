@@ -171,6 +171,31 @@ colnames(ens_wave01_mv$datmat)[9]
 
 ```
 
+
+
+# Ensemble behaviour in all outputs
+
+Need the modern value standard.
+
+
+```{r, fig.width = 8, fig.height = 10}
+
+
+par(mfrow = c(5,3), fg = 'grey', las = 1)
+for (i in y_names_select){
+  
+  
+  hist(Y_level1a[, i], main = i, col = 'grey', xlab = '')
+  
+}
+
+
+
+
+```
+
+
+
 # Ensemble behaviour in key (constraining) outputs. 
 
 Global mean for the 20 years at the end of the 20th Century. There is still a significant low bias on cVeg output.
@@ -503,8 +528,8 @@ linePlotMultiEns <- function(years, ens1, ens2, ens3, col1, col2, col3, ylab, ma
     matlines(years, t(ens3), col = col3, lty = 'solid')
 }
 
-
-par(mfrow= c(3,4), las = 1)
+#pdf(file = 'figs/carbon-cycle-timeseries-waves-constrained.pdf', width = 10, height = 12)
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
 
 linePlotMultiEns(years = years, ens1 = npp_ens[without_outliers_ix_wave00,],
                  ens2 = npp_ens_wave01[without_outliers_ix_wave01,],
@@ -574,7 +599,7 @@ linePlotMultiEns(years = years, ens1 = treeFrac_lnd_mean_ens[without_outliers_ix
                  ens2 = treeFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
                  ens3 = treeFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
                  col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
-                 ylab = 'GtC', main = 'treefrac'
+                 ylab = '%', main = 'treefrac'
                  )
 
 lines(years, treeFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
@@ -583,7 +608,7 @@ linePlotMultiEns(years = years, ens1 = shrubFrac_lnd_mean_ens[without_outliers_i
                  ens2 = shrubFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
                  ens3 = shrubFrac_lnd_mean_ens[level2a_ix_wave01, ],
                  col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
-                 ylab = 'GtC', main = 'shrubfrac'
+                 ylab = '%', main = 'shrubfrac'
 )
 
 lines(years, shrubFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
@@ -592,15 +617,34 @@ linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens[without_outlier
                  ens2 = baresoilFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
                  ens3 = baresoilFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
                  col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
-                 ylab = 'GtC', main = 'baresoilfrac')
+                 ylab = '%', main = 'baresoilfrac')
 
 lines(years, baresoilFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
+
+linePlotMultiEns(years = years, c3PftFrac_lnd_mean_ens[without_outliers_ix_wave00,],
+                 ens2 = c3PftFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = c3PftFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+lines(years, c3PftFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
+
+linePlotMultiEns(years = years, c4PftFrac_lnd_mean_ens[without_outliers_ix_wave00,],
+                 ens2 = c4PftFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = c4PftFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+lines(years, c4PftFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
 
 reset()
 
 legend('bottomright', legend = c('wave00','wave01','wave01 level2','standard'), lty = 'solid', lwd = 1.5, col = c(lcol_wave0, lcol_wave01, lcol_wave01_level2, stancol), inset = c(0.05, 0.15) )
 
-
+#dev.off()
 ```
 This is a plot of timeseries of Wave00, Wave01, and level2-constrained wave01 on top of one another. We see that the wave01 is closer to the standard than wave00, and the level-2 constrained wave01 ensemble is often closer again. However, there are still quite large discrepancies. For example, baresoilfrac is often way too high, shrubfrac is often too low (though both these span the standard). Treefrac is away from zero, but still often too low or too high. While fHarvest looks good, fLuc does not appear constrained by the process at all. RH (soil respiration) looks well constrained, whereas lai is often too low.  
 
@@ -631,7 +675,7 @@ baresoilFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(baresoilFrac_lnd_mean
 c3PftFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(c3PftFrac_lnd_mean_ens_wave01, 1:20)
 c4PftFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(c4PftFrac_lnd_mean_ens_wave01, 1:20)
 
-total_land_carbon_anom_wave01 <- anomalizeTSmatrix(total_land_carbon_ens_wave01, 1:20)
+#total_land_carbon_anom_wave01 <- anomalizeTSmatrix(total_land_carbon_ens_wave01, 1:20)
 
 
 
@@ -667,7 +711,10 @@ c4PftFrac_lnd_mean_stan_anom <- anomalizeTS(c4PftFrac_lnd_mean_stan)
 
 
 ```{r, fig.width = 10, fig.height = 12}
-par(mfrow= c(3,4), las = 1)
+
+
+#pdf(file = 'figs/carbon-cycle-timeseries-anomaly-waves-constrained.pdf', width = 10, height = 12)
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
 
 linePlotMultiEns(years = years, ens1 = npp_ens_anom[without_outliers_ix_wave00,],
                  ens2 = npp_ens_anom_wave01[without_outliers_ix_wave01,],
@@ -736,7 +783,7 @@ linePlotMultiEns(years = years, ens1 = treeFrac_lnd_mean_ens_anom[without_outlie
                  ens2 = treeFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
                  ens3 = treeFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
                  col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
-                 ylab = 'GtC', main = 'treefrac'
+                 ylab = '%', main = 'treefrac'
                  )
 
 lines(years, treeFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
@@ -745,7 +792,7 @@ linePlotMultiEns(years = years, ens1 = shrubFrac_lnd_mean_ens_anom[without_outli
                  ens2 = shrubFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
                  ens3 = shrubFrac_lnd_mean_ens_anom[level2a_ix_wave01, ],
                  col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
-                 ylab = 'GtC', main = 'shrubfrac'
+                 ylab = '%', main = 'shrubfrac'
 )
 
 lines(years, shrubFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
@@ -754,18 +801,34 @@ linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens_anom[without_ou
                  ens2 = baresoilFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
                  ens3 = baresoilFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
                  col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
-                 ylab = 'GtC', main = 'baresoilfrac')
+                 ylab = '%', main = 'baresoilfrac')
 
 lines(years, baresoilFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+
+linePlotMultiEns(years = years, c3PftFrac_lnd_mean_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = c3PftFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = c3PftFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+lines(years, c3PftFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+
+linePlotMultiEns(years = years, c4PftFrac_lnd_mean_ens_anom[without_outliers_ix_wave00,],
+                 ens2 = c4PftFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = c4PftFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+lines(years, c4PftFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
 
 reset()
 
 legend('bottomright', legend = c('wave00','wave01','wave01 level2','standard'), lty = 'solid', lwd = 1.5, col = c(lcol_wave0, lcol_wave01, lcol_wave01_level2, stancol), inset = c(0.05, 0.15) )
 
 
-
-
-
+#dev.off()
 
 ```
 
