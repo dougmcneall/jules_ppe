@@ -173,19 +173,22 @@ colnames(ens_wave01_mv$datmat)[9]
 
 
 
-# Ensemble behaviour in all outputs
+## Wave00 level1a Ensemble behaviour in all outputs
 
-Need the modern value standard.
+
+
+Need units
 
 
 ```{r, fig.width = 8, fig.height = 10}
 
 
-par(mfrow = c(5,3), fg = 'grey', las = 1)
+par(mfrow = c(5,3), fg = 'darkgrey', las = 1)
 for (i in y_names_select){
   
   
   hist(Y_level1a[, i], main = i, col = 'grey', xlab = '')
+  abline(v = standard_modern_value[i], col = 'black')
   
 }
 
@@ -196,7 +199,7 @@ for (i in y_names_select){
 
 
 
-# Ensemble behaviour in key (constraining) outputs. 
+## Wave00/Wave01  Ensemble behaviour in key (constraining) outputs. 
 
 Global mean for the 20 years at the end of the 20th Century. There is still a significant low bias on cVeg output.
 
