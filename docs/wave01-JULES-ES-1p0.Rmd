@@ -1748,7 +1748,7 @@ Build an ensemble of modern vegetation fractions.
 #} else {
 y_names_frac_mean <- c('treeFrac_lnd_mean', 'c3PftFrac_lnd_mean', 'c4PftFrac_lnd_mean', 'shrubFrac_lnd_mean', 'baresoilFrac_lnd_mean')
   
-ens_wave01_frac_mean_mv <- makeJulesEnsembleModernValue(ensloc = '/scratch/hadaw/jules_postprocess/u-ck006/', 
+ens_wave01_frac_mean_mv <- makeJulesEnsembleModernValue(ensloc = ensloc_wave01, 
                                               varlist = y_names_frac_mean,
                                               nstart = nstart,
                                               nend = nend, 
@@ -1774,17 +1774,29 @@ ens_wave01_frac_mean_mv <- makeJulesEnsembleModernValue(ensloc = '/scratch/hadaw
 
 ```
 
-```{r}
-par(mfrow = c(2,3))
-# bind ensemble 0 (level 1a) and wave01 fractions
-Y_frac_level1a_wave01 <- rbind(Y_level1a[, y_names_frac_mean], ens_wave01_frac_mean_mv$datmat )[-440, ]
+```{r, fig.width = 6, fig.height = 9}
+# need to 
 
+
+par(mfrow = c(5,1), mar = c(2,2,2,1))
+# bind ensemble 0 (level 1a) and wave01 fractions
+Y_frac_level1a_wave01 <- rbind(Y_level1a[, y_names_frac_mean], ens_wave01_frac_mean_mv$datmat[without_outliers_ix_wave01 ,  ])
+
+frac_hist_breaks <- seq(from = 0, to = 100, by  = 5)
 
 for(i in 1:ncol(Y_frac_level1a_wave01))
 {
   
-  hist(Y_frac_level1a_wave01[1:nrow(Y_level1a),i], main = colnames(Y_frac_level1a_wave01)[i], xlab = '')
-  hist(Y_frac_level1a_wave01[(nrow(Y_level1a)+1) : nrow(Y_frac_level1a_wave01), i],  add = TRUE, col = 'grey')
+  cnam <-  colnames(Y_frac_level1a_wave01)[i]
+  
+  hist(Y_frac_level1a_wave01[1:nrow(Y_level1a),i], main = colnames(Y_frac_level1a_wave01)[i], 
+       xlab = '', xlim = c(0,100), breaks = frac_hist_breaks, ylim = c(0,300), col = makeTransparent(wave00col,100))
+  
+  hist(Y_frac_level1a_wave01[(nrow(Y_level1a)+1) : nrow(Y_frac_level1a_wave01), i], 
+       add = TRUE, col = makeTransparent(wave01col,100), breaks = frac_hist_breaks )
+  
+  
+  abline(v = standard_modern_value[cnam])
   
 }
 ```
