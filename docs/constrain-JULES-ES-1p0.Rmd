@@ -83,9 +83,8 @@ plot(historical_carbon_budget$Year, historical_carbon_budget$`budget imbalance`,
 Load a single ensemble member to examine contents
 ```{r, load-output-ensemble}
 ensmember <- 'P0000/'
-subdir <- 'stats/'
 
-floc <- paste0(ensloc,ensmember,subdir)
+floc <- paste0(ensloc_wave00,ensmember)
 fn <- 'JULES-ES-1p0_P0000_Annual_global.nc'
 
 # test file
@@ -100,6 +99,8 @@ for(i in 1:length(varlist)){
   print(var)
   print(ncatt_get(nc,var,"long_name")[[2]])
 }
+
+
 ```
 
 

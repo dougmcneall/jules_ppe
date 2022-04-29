@@ -183,15 +183,16 @@ Need units
 ```{r, fig.width = 8, fig.height = 10}
 
 
+#pdf(file = 'figs/wave00-level1a-modern-value-hists.pdf', width = 8, height = 10)
 par(mfrow = c(5,3), fg = 'darkgrey', las = 1)
 for (i in y_names_select){
   
   
-  hist(Y_level1a[, i], main = i, col = 'grey', xlab = '')
+  hist(Y_level1a[, i], main = i, col = 'grey', xlab = select_units[i])
   abline(v = standard_modern_value[i], col = 'black')
   
 }
-
+#dev.off()
 
 
 
@@ -1207,9 +1208,8 @@ lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growt
 
 ```
 
-## Need to remove Timeseries outliers here
 
-```{r, fig.width = 12, fig.height = 6}
+```{r, fig.width = 10, fig.height = 8}
 
 obscol = 'purple'
 wave01_level2col <- 'gold'
@@ -1233,6 +1233,7 @@ ag01[i, ] <- historical_carbon_budget$`fossil emissions excluding carbonation`[r
 ag_stan <- historical_carbon_budget$`fossil emissions excluding carbonation`[resid_ix] - historical_carbon_budget$`ocean sink`[resid_ix] -  nbp_stan
 
 #pdf(width = 8, height = 6, file = 'ag.pdf')
+par(las = 1)
 matplot(years, t(ag[without_outliers_ix_wave00, ]), type = 'l', lty = 'solid',ylim = c(-2, 10), col = makeTransparent(wave00col,100), 
          ylab = 'GtC', main = 'atmospheric growth', xlab = '',
          bty = 'n', xlim = c(1960, 2013))
@@ -1737,7 +1738,7 @@ pairs(rbind(X_unif[level2_and_ag_ix_em, ], X_stan_norm),
 It's pretty clear that the "initial" (level2) constraints can be improved on. How about tree, shrub and bare soil fractions?
 
 Build an ensemble of modern vegetation fractions.
-```{r}
+```{r, include = FALSE}
 
 # nstart <- 499
 # nend <- 798

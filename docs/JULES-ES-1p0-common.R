@@ -78,11 +78,14 @@ y_names_all <-  c("nbp_lnd_sum", "year" ,"nbp_lnd_mean", "fLuc_lnd_sum", "fLuc_l
 y_names_select <-  c("npp_nlim_lnd_sum", "nbp_lnd_sum", "cSoil_lnd_sum", "cVeg_lnd_sum",
                      "lai_lnd_mean",
                      "rh_lnd_sum" , "fLuc_lnd_sum", "fHarvest_lnd_sum",  
-                     "landCoverFrac_lnd_mean","fHarvest_lnd_mean", 
+                     "landCoverFrac_lnd_mean", 
                      "treeFrac_lnd_mean" , "baresoilFrac_lnd_mean",
                      "shrubFrac_lnd_mean", "c3PftFrac_lnd_mean",
                      "c4PftFrac_lnd_mean"   
 )
+
+select_units <- c('GtC/year', 'GtC/year', 'GtC', 'GtC', 'index', 'GtC/year','GtC/year', 'GtC/year', '%', '%', '%', '%', '%', '%')
+names(select_units) <- y_names_select
 
 ## ----------------------------------------------------------------------
 ## Helper functions
