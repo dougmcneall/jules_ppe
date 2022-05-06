@@ -1589,9 +1589,6 @@ fit_ag_me <- km(~., design = X_wave01_train[-ag01_outlier_ix, ], response = ag01
 
 plot(fit_ag_me)
 
-
-
-
 ```
 
 ```{r}
@@ -1599,7 +1596,7 @@ library(emtools)
 library(imptools)
 library(viztools)
 
-nunif <- 100000
+nunif <- 10000
 X_unif <- samp_unif(nunif, mins = rep(0,32), maxes = rep(1, 32))
 colnames(X_unif) <- colnames(X)
 
@@ -1802,26 +1799,27 @@ for(i in 1:ncol(Y_frac_level1a_wave01))
 ```
 
 
-
+## Build emulators for the fraction data
 
 ```{r}
 # Create fit lists for the combined data
 Y_frac_level1a_wave01_list <- mat2list(Y_frac_level1a_wave01)
 
-fit_list_frac_level1a_wave01 <- mclapply(X = Y_frac_level1a_wave01_list, FUN = km, formula = ~., design = X_level1a_wave01[-440,],
+fit_list_frac_level1a_wave01 <- mclapply(X = Y_frac_level1a_wave01_list, FUN = km, formula = ~., design = X_level1a_wave01,
                                    mc.cores = 4, control = list(trace = FALSE))
 
 
 ```
 
+It might be useful to try emulating log (fractions)
 
 ```{r}
 
-
-
-for(i in 1:length(fit_list_frac_level1a_wave01))
+for(i in 1:length(fit_list_frac_level1a_wave01)){
   
   plot(fit_list_frac_level1a_wave01[[i]])
+  
+  }
 
 
 ```
@@ -1859,19 +1857,24 @@ for(i in 1:length(fit_list_frac_level1a_wave01)){
 
 
 ```{r, fig.width = 12, fig.height = 12, warning = FALSE, message = FALSE, error = FALSE }
+# treefrac 20- 40
+
+# shrubfrac < 5
+
+# baresoil < 40
+
+treefrac_ix_em <- which(Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] > 20 & Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] < 40)
+  
+#  Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
+#                      Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
+#                      Y_const_pred_unif_mean[,'cSoil_lnd_sum'] > 750 & Y_const_pred_unif_mean[,'cSoil_lnd_sum'] < 3000 &
+#                      Y_const_pred_unif_mean[,'cVeg_lnd_sum'] > 300 & Y_const_pred_unif_mean[,'cVeg_lnd_sum'] < 800 &
+#                        & &
+                      #abs(pred_unif_ag$mean) < abs(ag_modern_me_stan)
+#                  )
 
 
-
-level2_and_ag_and_frac_ix_em <- which(Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
-                      Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
-                      Y_const_pred_unif_mean[,'cSoil_lnd_sum'] > 750 & Y_const_pred_unif_mean[,'cSoil_lnd_sum'] < 3000 &
-                      Y_const_pred_unif_mean[,'cVeg_lnd_sum'] > 300 & Y_const_pred_unif_mean[,'cVeg_lnd_sum'] < 800 &
-                      abs(pred_unif_ag$mean) < abs(ag_modern_me_stan)
-                  )
-
-
-
-pairs(rbind(X_unif[level2_and_ag_ix_em, ], X_stan_norm),
+pairs(rbind(X_unif[treefrac_ix_em, ], X_stan_norm),
     #  labels = 1:d,
       gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
       panel = dfunc_up_truth,
@@ -1881,14 +1884,126 @@ pairs(rbind(X_unif[level2_and_ag_ix_em, ], X_stan_norm),
       dfunc_col = rb)
 
 
-(length(level2_and_ag_ix_em) / nunif) * 100
+```
 
-(length(level2_and_ag_and_frac_ix_em) / nunif) * 100
+
+```{r}
+
+(length(treefrac_ix_em) / nunif) * 100
+
+```
+
+```{r}
+
+treefrac_ix_em <- which(Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] > 20 & Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] < 40)
+  
+#  Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
+#                      Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
+#                      Y_const_pred_unif_mean[,'cSoil_lnd_sum'] > 750 & Y_const_pred_unif_mean[,'cSoil_lnd_sum'] < 3000 &
+#                      Y_const_pred_unif_mean[,'cVeg_lnd_sum'] > 300 & Y_const_pred_unif_mean[,'cVeg_lnd_sum'] < 800 &
+#                        & &
+                      #abs(pred_unif_ag$mean) < abs(ag_modern_me_stan)
+#                  )
+
+
+```
+
+## Sequentially add constraints
+
+```{r}
+# use get or assign?
+
+# use eval and parse
+eval(parse(text="5+5"))
+
+
+createConstraintString <- function(yvec, mins, maxes){
+  # This function constructs the string to be evaluated
+  out <- 'which('
+  
+  for(i in 1:length(yvec)){
+    
+    if(i<length(yvec)){
+      
+    subconst <- paste0('Y_unif','[,', '"',yvec[i],'"',']', '>', mins[i], '&', 'Y_unif','[,', '"',yvec[i], '"',']' , '<', maxes[i], '&')
+    }
+    
+    else{
+     subconst <-  paste0('Y_unif','[,', '"',yvec[i],'"',']', '>', mins[i], '&', 'Y_unif','[,', '"',yvec[i], '"',']' , '<', maxes[i])
+    }
+   out <-  paste0(out, subconst)
+  }
+  
+  out <- paste0(out, ')')
+}
+
+yvec <- colnames(Y_frac_pred_unif_mean)
+
+test <- createConstraintString(yvec, mins = c(-20,-20,-20,-20,-20), maxes = c(100,100,100,100,100))
+
+
+#eval(parse(text = paste0()))
+
+inputConstraintSize <- function(X_unif, Y_unif, yvec, mins, maxes){
+  
+  ix_kept <- eval(parse(text = createConstraintString(yvec=yvec, mins = mins, maxes = maxes)))
+  
+  prop_kept <- length(ix_kept) / nrow(X_unif)
+  
+  return(list(ix_kept = ix_kept, prop_kept = prop_kept))
+  
+}
+  
+  
+  # construct a statement
 
 
 ```
 
 
+```{r}
 
 
+Y_pred <- cbind(Y_const_pred_unif_mean, Y_frac_pred_unif_mean)
+
+Y_pred_mins <- c(0, 35, 750, 300, 20, 0, 0, 0, 0)
+Y_pred_maxes <- c(10000, 80, 3000, 800, 40, 100,100, 5, 40)
+
+
+ics_list <- vector(mode = 'list', length = ncol(Y_pred))
+
+for(i in 1:ncol(Y_pred)){
+  
+  yvec <- colnames(Y_pred)[1:i]
+  ics <- inputConstraintSize(X_unif = X_unif,
+                             Y_unif = subset(Y_pred, select=yvec ),
+                             yvec = yvec,
+                             mins = Y_pred_mins[1:i],
+                             maxes = Y_pred_maxes[1:i]
+  )
+  
+  ics_list[[i]] <- ics
+  
+}
+
+```
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+perc_kept <- sapply(ics_list, FUN = function(x) x$prop_kept) * 100
+
+
+par(mar = c(10, 4, 2, 1))
+plot(1:9, perc_kept, ylim = c(0,100), type = 'b', axes = FALSE, xlab = '')
+
+axis(2)
+
+axis(1, labels = colnames(Y_pred), at = 1:9, las = 2)
+
+
+
+
+
+```
 
