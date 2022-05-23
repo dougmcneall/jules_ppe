@@ -78,33 +78,6 @@ makeJulesEnsembleModernValue <- function(ensloc, varlist, nstart, nend, ix = 144
   return(list(datmat = datmat, enslist = enslist))
 }
 
-
-# makeJulesEnsembleModernValue <- function(ensloc, varlist, nstart, nend, ix = 144:164){
-#   
-#   nens <- (nend - nstart) + 1
-#   datmat <- matrix(nrow = nens, ncol = length(varlist))
-#   colnames(datmat) <- varlist
-#   
-#   enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
-#   
-#   for(i in 1:nens){
-#     
-#     vec <- rep(NA, length(varlist))
-#     
-#     ensmember <- enslist[i] 
-#     
-#     fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
-#     
-#     try(nc <- nc_open(paste0(fn)))
-#     try(vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = ix))
-#     datmat[i, ] <- vec
-#     nc_close(nc)
-#   }
-#   return(list(datmat = datmat, enslist = enslist))
-# }
-
-
-
 ```
 
 
@@ -134,14 +107,15 @@ lhs_wave01 <- read.table( '../conf_files_augment_JULES-ES-1p0/lhs_example.txt', 
 X_wave01 = normalize(lhs_wave01, wrt = rbind(lhs_i, lhs_ii, lhs_wave01))
 colnames(X_wave01) = colnames(lhs_wave01)
 
-# Match the 300 outputs we're using in the training data
+# Match the 400 outputs we're using in the training data
 X_wave01_train <- X_wave01[1:ntrain_wave01, ]
 
 ```
 
 ```{r}
-Y_const_wave01 <- ens_wave01_mv$datmat[, ynames_const]
+# Modern values that we use for constraints
 
+Y_const_wave01 <- ens_wave01_mv$datmat[, ynames_const]
 Y_const_wave01_scaled <- sweep(Y_const_wave01, 2, STATS = scalevec, FUN = '/' )
 
 
@@ -180,7 +154,7 @@ colnames(ens_wave01_mv$datmat)[9]
 Need units
 
 
-```{r, fig.width = 8, fig.height = 10}
+```{r, fig.width = 8, fig.height = 10, }
 
 
 #pdf(file = 'figs/wave00-level1a-modern-value-hists.pdf', width = 8, height = 10)
@@ -205,15 +179,16 @@ for (i in y_names_select){
 Global mean for the 20 years at the end of the 20th Century. There is still a significant low bias on cVeg output.
 
 ```{r, fig.width = 8, fig.height = 8}
-
 wave00col <- 'skyblue2'
 wave01col <- 'tomato2'
 
 wave00col <- 'dodgerblue2'
 wave01col <- 'firebrick'
 rangecol <- 'grey'
+```
 
 
+```{r, fig.width = 8, fig.height = 8, }
 # Histogram of level 1 constraints
 hcol = 'darkgrey'
 lcol = 'black'
@@ -315,7 +290,7 @@ length(level2_ix_wave01)
 
 Pairs plot of the inputs that pass the constraints with respect to the limits of the original ensemble.
 
-```{r, fig.width = 10, fig.height = 10}
+```{r, fig.width = 10, fig.height = 10 }
 
 pairs(X_wave01[level2_ix_wave01, ],
       xlim = c(0,1),
@@ -507,7 +482,7 @@ without_outliers_ix_wave00 <- setdiff(wave00_all_ix,ts_outliers_ix_wave00)
 
 
 
-```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
+```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12, }
 
 lcol_wave0 <- makeTransparent('dodgerblue2',  120)
 lcol_wave01 <- makeTransparent('firebrick',  120)
@@ -714,7 +689,7 @@ c4PftFrac_lnd_mean_stan_anom <- anomalizeTS(c4PftFrac_lnd_mean_stan)
 
 
 
-```{r, fig.width = 10, fig.height = 12}
+```{r, fig.width = 10, fig.height = 12, }
 
 
 #pdf(file = 'figs/carbon-cycle-timeseries-anomaly-waves-constrained.pdf', width = 10, height = 12)
@@ -847,7 +822,7 @@ We particularly hope that the emulator is better for those members that are insi
 First, we can look at the emulator errors in two cases: The level1a data (a basic carbon cycle), and then with the Wave01 data, which should have similar characteristics. (We should have eliminated really bad simulations, but wave01 is not constrained the data perfectly to be within AW constraints.)
 
 
-```{r}
+```{r, }
 ## Emulator fit list of level 1a ensemble
 
 #fit_list_const_level1a <- createKmFitList(X = X_level1a, Y = Y_const_level1a_scaled)
@@ -864,7 +839,7 @@ fit_list_const_level1a <- mclapply(X = Y_const_level1a_scaled_list, FUN = km, fo
 
 
 
-```{r}
+```{r, }
 ## Remove any  timeseries outliers from the new wave and build emulators
 # Bind together the input matrices and scaled output data
 
@@ -881,7 +856,7 @@ Y_const_level1a_wave01_scaled <- rbind(Y_const_level1a_scaled, Y_const_wave01_sc
 
 
 Found the outlier - looks like it's 440
-```{r}
+```{r, }
 
 findOutliers <- function(x, sds = 6){
   
@@ -893,7 +868,7 @@ apply(Y_const_level1a_wave01_scaled ,2, findOutliers, sds = 10)
 ```
 
 
-```{r}
+```{r, }
 # Create fit lists for the combined data
 Y_const_level1a_wave01_scaled_list <- mat2list(Y_const_level1a_wave01_scaled)
 
@@ -905,7 +880,7 @@ fit_list_const_level1a_wave01 <- mclapply(X = Y_const_level1a_wave01_scaled_list
 
 ## Leave-one-out analyses of emulator prediction accuracy
 
-```{r}
+```{r, }
 
 loolist_km_Y_level1a <- mclapply(X = fit_list_const_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
 
@@ -914,7 +889,7 @@ loolist_km_Y_level1a_wave01 <- mclapply(X = fit_list_const_level1a_wave01, FUN =
 ```
 
 
-```{r}
+```{r, }
 
 loostats_km_Y_level1a <- lapply(fit_list_const_level1a, FUN = kmLooStats)
 loostats_km_Y_level1a_wave01 <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStats)
@@ -924,7 +899,7 @@ loostats_km_Y_level1a_wave01 <- lapply(fit_list_const_level1a_wave01, FUN = kmLo
 
 The top row shows the leave-one-out prediction accuracy of the original wave00 ensemble, and the lower row the entire wave00 AND wave01 ensemble combined.
 
-```{r, fig.width = 12, fig.height = 6}
+```{r, fig.width = 12, fig.height = 6, }
 
 #pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -996,7 +971,7 @@ We see that the error stats for some of the outputs from wave01 are worse, but t
 
 "pmae" is "proportional mean absolue error", which is the mean absolute error expressed as a percentage of the original (minimally constrained) ensemble range in that output. 
 
-```{r, fig.width = 12, fig.height = 6}
+```{r, fig.width = 12, fig.height = 6, }
 
 #pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -1042,7 +1017,7 @@ This gives us an idea of how good the emulator is where it really matters, and a
 
 Good news is, the emulators are more accurate for wave01.
 
-```{r}
+```{r, }
 
 
 kmLooStatsSubset <- function (km, ix, type = "UK") 
@@ -1062,7 +1037,7 @@ kmLooStatsSubset <- function (km, ix, type = "UK")
 ```
 
 
-```{r}
+```{r, }
 
 loolist_km_Y_level1a_level2 <- rapply(loolist_km_Y_level1a, f = function(x) x[level2_ix], how = "list")
 
@@ -1071,7 +1046,7 @@ loolist_km_Y_level1a_wave01_level2 <- rapply(loolist_km_Y_level1a_wave01, f = fu
 
 ```
 
-```{r, fig.width = 12, fig.height = 12}
+```{r, fig.width = 12, fig.height = 12, }
 
 #pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,2), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -1116,7 +1091,7 @@ Many of the wave01 predictions are closer to the horizontal line, and therefore 
 None of the predictions are outside the uncertainty bounds, which suggests they are overconservative (should be smaller).
 
 
-```{r, fig.width = 10, fig.height = 10}
+```{r, fig.width = 10, fig.height = 10, }
 
 #pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(4,1), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -1164,7 +1139,7 @@ for(i in 1:length(loolist_km_Y_level1a_level2)){
 ```
 
 
-```{r}
+```{r, }
 
 loostats_km_Y_level1a_sub <- lapply(fit_list_const_level1a, FUN = kmLooStatsSubset, ix = level2_ix)
 loostats_km_Y_level1a_wave01_sub <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStatsSubset, ix = level2_ix)
@@ -1173,7 +1148,7 @@ loostats_km_Y_level1a_wave01_sub <- lapply(fit_list_const_level1a_wave01, FUN = 
 
 Looking at the proportional mean absolute error (pmae), expressed in percent, we can see that it doesn't improve much for the whole ensemble, but *does* improve significantly for the subset of ensemble members that fall within AW's constraints from the first ensemble (marked "_sub").
 
-```{r, echo = TRUE}
+```{r, echo = TRUE, }
 
 pmae_wave00 <- lapply(loostats_km_Y_level1a, FUN = function(x) x$pmae )
 pmae_wave01 <- lapply(loostats_km_Y_level1a_wave01, FUN = function(x) x$pmae )
@@ -1189,7 +1164,7 @@ print(pmae_table)
 
 # Comparing atmospheric growth in wave00, wave01 and observations
 
-```{r, include = FALSE}
+```{r, include = FALSE, eval=params$limit}
 historical_carbon_budget <- read_excel('Global_Carbon_Budget_2020v1.0.xlsx', sheet = "Historical Budget", skip = 15, n_max = 270)
 
 resid <- historical_carbon_budget$`ocean sink` - historical_carbon_budget$`fossil emissions excluding carbonation`
@@ -1209,7 +1184,7 @@ lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growt
 ```
 
 
-```{r, fig.width = 10, fig.height = 8}
+```{r, fig.width = 10, fig.height = 8, }
 
 obscol = 'purple'
 wave01_level2col <- 'gold'
@@ -1255,7 +1230,7 @@ legend('topleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard
 
 ## Andy asks - what constraint does that give us in cumulative NBP?
 
-```{r, fig.width = 7, fig.height = 7}
+```{r, fig.width = 7, fig.height = 7, }
 
 cumulative_nbp_ens <- t(apply(nbp_ens, 1, cumsum))
 
@@ -1285,7 +1260,7 @@ legend('topleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard
 
 ## Eddy suggests measuring cumulative NBP against atmospheric growth rate
 
-```{r}
+```{r, }
 
 # Cumulative NBP at the end of the run
 cnbp_modern_ens <- apply(cumulative_nbp_ens[, 135:164], 1, mean)
@@ -1300,7 +1275,7 @@ cnbp_modern_stan <- mean(cumulative_nbp_stan[135:164])
 
 Calculate the atmospheric growth rate of 1984- 2013 using a simple linear fit
 
-```{r}
+```{r, }
 # agr = atmospheric growth rate
 # agiav = atmospheric growth interannual variability
 
@@ -1335,7 +1310,7 @@ agiav_stan <- sd(agr_stan_fit$residuals)
   
 ```
 
-```{r, fig.width = 7, fig.height = 7}
+```{r, fig.width = 7, fig.height = 7, }
 
 plot(agr_modern_ens, cnbp_modern_ens,  col = makeTransparent(wave00col,150),
      ylim = c(-120,220), pch = 19,
@@ -1367,7 +1342,7 @@ Interannual variability and cumulative NBP
 (correlations are close to zero, especially in the later wave)
 
 
-```{r, fig.width = 7, fig.height = 7}
+```{r, fig.width = 7, fig.height = 7, }
 
 plot(agiav_modern_ens, cnbp_modern_ens,  col = makeTransparent(wave00col,150),
      ylim = c(-120,220), pch = 19,
@@ -1383,7 +1358,7 @@ legend('bottomright', legend = c('wave00', 'wave01', 'wave01 constrained', 'stan
 ```
 
 
-```{r}
+```{r, }
 
 
 print(cor(agiav_modern_ens, cnbp_modern_ens))
@@ -1396,7 +1371,7 @@ print(cor( agiav_modern_wave01, cnbp_modern_wave01))
 
 Using Atmospheric Growth Rate as an example, how close can we get the model to observations? Can we do better than standard? What are the trade offs of doing so? How does getting close in AGR affect performance in other outputs?
 
-```{r}
+```{r, }
 # Define the observed atmospheric growth rate.
 
 ag_obs <- historical_carbon_budget$`atmospheric growth`[which(historical_carbon_budget$Year %in% years)]
@@ -1418,7 +1393,7 @@ ag_err_stan_modern <- ag_err_stan[ag_modern_ix]
 
 ```
 
-```{r}
+```{r, }
 matplot(long_modern_years, t(ag_err_modern[without_outliers_ix_wave00,]), type = 'l', lty = 'solid', col = makeTransparent(wave00col, 100), main = 'Amospheric Growth Error')
 
 errcol <- rep(wave01col, nrow(ag01[without_outliers_ix_wave01,]))
@@ -1435,7 +1410,7 @@ abline(h=0)
 ```
 
 
-```{r, fig.width = 7, fig.height = 7}
+```{r, fig.width = 7, fig.height = 7, }
 
 # Atmospheric growth mean error
 ag_modern_me <- apply(ag_err_modern,1,mean)
@@ -1483,7 +1458,7 @@ rug(ag_modern_rmse_stan, col = stancol, lwd = 2 )
 
 We've established that most of the original ensemble have an ME/MAE/RMSE larger than the standard run. More (but few) of the wave01 perform better than standard. 
 
-```{r}
+```{r, }
 
 
 better_ix_ag_rmse <- which(ag_modern_rmse < ag_modern_rmse_stan)
@@ -1500,7 +1475,7 @@ A map of the 2D projections of parameter space where the ensemble member perform
 The blue part is the first wave, and not subject to constraint so may be removed in the second wave (wave01).
 
 
-```{r, fig.width = 12, fig.height = 12}
+```{r, fig.width = 12, fig.height = 12, }
 
 better_ix <- 1:nrow(X_better_ag)
 
@@ -1524,7 +1499,7 @@ Having trouble fitting RMSE, to trying mean error.
 
 Why is there an odd collection at just under 1?
 
-```{r, fig.width = 12, fig.height = 12}
+```{r, fig.width = 12, fig.height = 12, }
 # there are 100 wave01 ensemble members that pass the level 2 constrainst
 length(level2_ix_wave01)
 
@@ -1540,7 +1515,7 @@ level2_and_better_ag01_ix <- intersect(level2_ix_wave01, better_ix_ag01_me)
 
 This next pairs plot looks at all the ensemble members that have a better mean atmospheric growth error than standard.
 
-```{r, fig.width = 12, fig.height = 12}
+```{r, fig.width = 12, fig.height = 12, }
 X_better_ag <- rbind(X[better_ix_ag_me, ], X_wave01_train[better_ix_ag01_me, ])
 
 better_ix <- 1:nrow(X_better_ag)
@@ -1560,7 +1535,7 @@ This next plot looks at all the ensemble members that have a better mean atmosph
 
 The number is small (41/300), but the ensemble members seem spread across parameter space.
 
-```{r, fig.width = 12, fig.height = 12}
+```{r, fig.width = 12, fig.height = 12, }
 
 X_level2_and_better_ag01 <- X[level2_and_better_ag01_ix, ]
 pairs(X_level2_and_better_ag01,
@@ -1575,7 +1550,7 @@ pairs(X_level2_and_better_ag01,
 
 
 
-```{r, include = FALSE}
+```{r, include = FALSE, }
 library(DiceKriging)
 
 ag01_outlier_ix <- which(ag01_modern_me > 10)
@@ -1585,7 +1560,7 @@ fit_ag_me <- km(~., design = X_wave01_train[-ag01_outlier_ix, ], response = ag01
 
 ```
 
-```{r}
+```{r, }
 
 plot(fit_ag_me)
 
@@ -1599,7 +1574,10 @@ library(viztools)
 nunif <- 10000
 X_unif <- samp_unif(nunif, mins = rep(0,32), maxes = rep(1, 32))
 colnames(X_unif) <- colnames(X)
+```
 
+
+```{r, }
 pred_unif_ag <- predict.km(fit_ag_me, newdata = X_unif, type = 'UK' ) 
 
 # Keeps about 20%
@@ -1619,7 +1597,7 @@ This pairs plot shows the 2d and marginal density of emulated input points where
 
 This technique might provide a useful set of points for optimising the model (at least to atmospheric growth).
 
-```{r, fig.width = 12, fig.height = 12, warning = FALSE}
+```{r, fig.width = 12, fig.height = 12, warning = FALSE, }
 #pairs(X_unif[X_kept_ix, ][1:50,],
 #      col = makeTransparent('black',50),
 #      gap = 0,
@@ -1705,7 +1683,7 @@ Red point indicates the standard input.
 The position of the standard input with regards to the histograms give us an idea of what we might do to improve the simulation - at least in terms of atmospheric growth. If we were to move the input towards areas of higher density, we might expect a better model performance.
 
 
-```{r, fig.width = 12, fig.height = 12, warning = FALSE}
+```{r, fig.width = 12, fig.height = 12, warning = FALSE, }
 
 X_stan_norm <- normalize(matrix(rep(1, 32), nrow = 1), wrt = lhs)
 
@@ -1851,7 +1829,8 @@ for(i in 1:length(fit_list_frac_level1a_wave01)){
   Y_frac_pred_unif_sd[,i ] <- pred_unif$sd
 }
 
-
+rm(pred_unif)
+gc()
 
 ```
 
@@ -1897,14 +1876,6 @@ pairs(rbind(X_unif[treefrac_ix_em, ], X_stan_norm),
 
 treefrac_ix_em <- which(Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] > 20 & Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] < 40)
   
-#  Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
-#                      Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
-#                      Y_const_pred_unif_mean[,'cSoil_lnd_sum'] > 750 & Y_const_pred_unif_mean[,'cSoil_lnd_sum'] < 3000 &
-#                      Y_const_pred_unif_mean[,'cVeg_lnd_sum'] > 300 & Y_const_pred_unif_mean[,'cVeg_lnd_sum'] < 800 &
-#                        & &
-                      #abs(pred_unif_ag$mean) < abs(ag_modern_me_stan)
-#                  )
-
 
 ```
 
@@ -1918,7 +1889,7 @@ eval(parse(text="5+5"))
 
 
 createConstraintString <- function(yvec, mins, maxes){
-  # This function constructs the string to be evaluated
+  # This function constructs a logical expression as a string to be evaluated
   out <- 'which('
   
   for(i in 1:length(yvec)){
@@ -1944,39 +1915,79 @@ test <- createConstraintString(yvec, mins = c(-20,-20,-20,-20,-20), maxes = c(10
 
 #eval(parse(text = paste0()))
 
-inputConstraintSize <- function(X_unif, Y_unif, yvec, mins, maxes){
+inputConstraintSize <- function(Y_unif, yvec, mins, maxes){
+  # Calculate the indices of Y_unif that are within the bounds set by mins and maxes
+  
   
   ix_kept <- eval(parse(text = createConstraintString(yvec=yvec, mins = mins, maxes = maxes)))
   
-  prop_kept <- length(ix_kept) / nrow(X_unif)
+  prop_kept <- length(ix_kept) / nrow(Y_unif)
   
   return(list(ix_kept = ix_kept, prop_kept = prop_kept))
   
 }
   
-  
-  # construct a statement
 
-
-```
-
-
-```{r}
-
-
+# Put all of the constraint inputs together
 Y_pred <- cbind(Y_const_pred_unif_mean, Y_frac_pred_unif_mean)
 
 Y_pred_mins <- c(0, 35, 750, 300, 20, 0, 0, 0, 0)
 Y_pred_maxes <- c(10000, 80, 3000, 800, 40, 100,100, 5, 40)
 
+```
+
+
+
+### individual constraint
+
+```{r, fig.width = 8, fig.height = 7}
+
+ics_individual_list <- vector(mode = 'list', length = ncol(Y_pred))
+
+for(i in 1:ncol(Y_pred)){
+  
+  yvec <- colnames(Y_pred)[i]
+  ics <- inputConstraintSize(Y_unif = subset(Y_pred, select=yvec ),
+                             yvec = yvec,
+                             mins = Y_pred_mins[i],
+                             maxes = Y_pred_maxes[i]
+  )
+  
+  ics_individual_list[[i]] <- ics
+  
+}
+
+
+perc_kept_individual <- sapply(ics_individual_list, FUN = function(x) x$prop_kept) * 100
+
+
+#pdf(file = 'figs/individual_constraint.pdf')
+par(mar = c(14, 4, 2, 1), las = 1)
+plot(1:9, perc_kept_individual, ylim = c(0,100), type = 'b', axes = FALSE, xlab = '',
+     ylab = 'Proportion of input space retained (%)')
+
+axis(2)
+
+axis(1, labels = paste0(colnames(Y_pred), ' (',Y_pred_mins,'-', Y_pred_maxes,')'), at = 1:9, las = 2)
+#dev.off()
+
+
+```
+
+
+
+## Sequential constraint
+
+Each constraint is added to the previous constraint
+
+```{r, fig.width = 8, fig.height = 7}
 
 ics_list <- vector(mode = 'list', length = ncol(Y_pred))
 
 for(i in 1:ncol(Y_pred)){
   
   yvec <- colnames(Y_pred)[1:i]
-  ics <- inputConstraintSize(X_unif = X_unif,
-                             Y_unif = subset(Y_pred, select=yvec ),
+  ics <- inputConstraintSize(Y_unif = subset(Y_pred, select=yvec ),
                              yvec = yvec,
                              mins = Y_pred_mins[1:i],
                              maxes = Y_pred_maxes[1:i]
@@ -1986,24 +1997,49 @@ for(i in 1:ncol(Y_pred)){
   
 }
 
-```
-
-
-```{r, fig.width = 7, fig.height = 8}
-
 perc_kept <- sapply(ics_list, FUN = function(x) x$prop_kept) * 100
 
-
-par(mar = c(10, 4, 2, 1))
-plot(1:9, perc_kept, ylim = c(0,100), type = 'b', axes = FALSE, xlab = '')
+#pdf(file = 'figs/sequential_constraint.pdf')
+par(mar = c(14, 4, 2, 1), las = 1)
+plot(1:9, perc_kept, ylim = c(0,100), type = 'b', axes = FALSE, xlab = '',
+     ylab = 'Proportion of input space retained (%)')
 
 axis(2)
+axis(1, labels = paste0(colnames(Y_pred), ' (',Y_pred_mins,'-', Y_pred_maxes,')'), at = 1:9, las = 2)
+#dev.off()
 
-axis(1, labels = colnames(Y_pred), at = 1:9, las = 2)
 
+```
+
+### How far from data is the model?
+
+```{r, fig.width = 6, fig.height = 7}
+
+frac_cci <- c(global_frac_cci[1] + global_frac_cci[2], global_frac_cci[3], global_frac_cci[4], global_frac_cci[5], global_frac_cci[8] )
+frac_mv <- c(standard_modern_value['treeFrac_lnd_mean'], standard_modern_value['c3PftFrac_lnd_mean'], standard_modern_value['c4PftFrac_lnd_mean'], standard_modern_value['shrubFrac_lnd_mean'], standard_modern_value['baresoilFrac_lnd_mean']  )
+
+
+fraclab = c('Trees', 'C3 grasses', 'C4 grasses', 'Shrubs', 'Bare soil')
+par(las = 1, mar = c(8, 4,3,2))
+plot(1:5, frac_cci*100, ylim = c(0,50), pch = 19, cex = 1.5, axes = FALSE, xlab = '')
+axis(1, at = 1:5, labels = fraclab, las = 2)
+axis(2)
+points(1:5, frac_mv, col = 'red', pch = 19, cex = 1.5)
+legend('topleft', legend = c('LC CCI', 'JULES-ES-1p0'), col = c('black', 'red'), pch = c(19,19))
+
+
+
+```
+
+
+
+### How similar are each of the constraints?
+```{r}
 
 
 
 
 ```
+
+
 

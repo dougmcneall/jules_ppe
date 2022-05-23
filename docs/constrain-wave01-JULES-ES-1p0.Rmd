@@ -1,0 +1,151 @@
+---
+title: "Constrain wave01"
+output: 
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    toc_depth: 3
+    number_sections: yes
+---
+
+# Preliminaries
+Load libraries, functions and data.
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
+# Load helper functions
+
+knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
+
+# load helper functions, data and do preliminary processing of the ensemble.
+source('JULES-ES-1p0-common.R')
+
+```
+
+
+```{r}
+
+ensloc_wave01 <- '/data/users/hadaw/JULES_ES_PPE/u-ck006/'
+
+# Number of ensemble members (out of 500) to use for training in wave01
+ntrain_wave01 <- 400
+
+```
+
+
+```{r}
+
+makeJulesEnsembleModernValue <- function(ensloc, varlist, nstart, nend, ix = 144:164){
+
+  nens <- (nend - nstart) + 1
+  datmat <- matrix(nrow = nens, ncol = length(varlist))
+  colnames(datmat) <- varlist
+
+  enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
+
+  for(i in 1:nens){
+
+    vec <- rep(NA, length(varlist))
+
+    ensmember <- enslist[i]
+
+    fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+
+    try(nc <- nc_open(paste0(fn)))
+    try(vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = ix))
+    datmat[i, ] <- vec
+    nc_close(nc)
+  }
+  return(list(datmat = datmat, enslist = enslist))
+}
+
+
+```
+
+```{r}
+nstart <- 499
+nend <- (nstart + ntrain_wave01) - 1
+
+if (file.exists("ensemble_wave01_2022-04-08.rdata")) {
+  load("ensemble_wave01_2022-04-08.rdata")
+} else {
+  
+ens_wave01_mv <- makeJulesEnsembleModernValue(ensloc = ensloc_wave01, 
+                                              varlist = y_names_sum,
+                                              nstart = nstart,
+                                              nend = nend, 
+                                              ix = 144:164) 
+  
+  save(ens_wave01_mv, file ="ensemble_wave01_2022-04-08.rdata")
+}
+  
+```
+
+
+```{r}
+
+lhs_wave01 <- read.table( '../conf_files_augment_JULES-ES-1p0/lhs_example.txt', header = TRUE)
+
+X_wave01 = normalize(lhs_wave01, wrt = rbind(lhs_i, lhs_ii, lhs_wave01))
+colnames(X_wave01) = colnames(lhs_wave01)
+
+# Match the 400 outputs we're using in the training data
+X_wave01_train <- X_wave01[1:ntrain_wave01, ]
+
+```
+
+```{r}
+Y_const_wave01 <- ens_wave01_mv$datmat[, ynames_const]
+
+Y_const_wave01_scaled <- sweep(Y_const_wave01, 2, STATS = scalevec, FUN = '/' )
+
+
+```
+
+
+```{r}
+
+low_npp_ix_wave01 <- which(ens_wave01_mv$datmat[,'npp_nlim_lnd_sum'] < 1e5)
+
+min(ens_wave01_mv$datmat[,'npp_nlim_lnd_sum'])
+
+Y_wave01_nlevel0_ix <- which(is.na(ens_wave01_mv$datmat[,'nbp_lnd_sum']))
+
+all(is.finite(ens_wave01_mv$datmat))
+
+which(!is.finite(ens_wave01_mv$datmat), arr.ind = TRUE)
+
+ens_wave01_mv$datmat[which(!is.finite(ens_wave01_mv$datmat), arr.ind = TRUE)]
+
+colnames(ens_wave01_mv$datmat)[9]
+
+
+```
+
+## What proportion of models *now* fall within Andy's constraints?
+
+Just over a third! Better than before, but still not great. Pointing at a significant model discrepency in cVeg
+
+```{r}
+AW_constraints <- matrix(nrow = 2, ncol = length(ynames_const))
+
+AW_constraints[1,] <- c(0, 35, 750, 300)
+AW_constraints[2,] <- c(100, 80, 3000, 800)
+
+colnames(AW_constraints) <- ynames_const
+rownames(AW_constraints) <- c('min', 'max')
+
+
+# conform to Andy's basic constraints
+#level2_ix_wave01 <- which(apply(Y_const_wave01_scaled, 1, FUN = withinRange, maxes  = AW_constraints[2,], mins = AW_constraints[1,] ))
+
+#nlevel2_ix_wave01 <- which(apply(Y_const_wave01_scaled, 1, FUN = withinRange, maxes  = AW_constraints[2,], mins = AW_constraints[1,] ) == FALSE)
+
+level2_ix_wave01 <- which(Y_const_wave01_scaled[,'nbp_lnd_sum'] > 0 &
+                    Y_const_wave01_scaled[,'npp_nlim_lnd_sum'] > 35 & Y_const_wave01_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_wave01_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_wave01_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_wave01_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_wave01_scaled[,'cVeg_lnd_sum'] < 800
+                  )
+
+
+```
+

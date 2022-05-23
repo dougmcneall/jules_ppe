@@ -1,0 +1,170 @@
+---
+title: "Treefrac data"
+output: html_notebook
+---
+
+```{r}
+library(ncdf4)
+library(ncdf4.helpers)
+
+
+
+```
+
+```{r}
+
+nc_cci <- nc_open('treefrac/qrparm.veg.frac_lc_cci_2005_9PFTs.nc')
+
+```
+
+```{r}
+
+vars <- nc.get.variable.list(nc_cci)
+print(vars)
+
+```
+```{r}
+# This reads
+
+
+lc_dat_cci <- ncvar_get(nc = nc_cci, varid = 'field1391' )
+
+
+lat_cci <- ncvar_get(nc_cci,"latitude")
+lon_cci <- ncvar_get(nc_cci,"longitude")
+
+
+pseudo_cci <- ncvar_get(nc_cci,"pseudo")
+  
+```
+
+The cci lats run -90 to 90 (145), whereas the land fraction runs -89.375 to 89.375 (144)
+
+```{r, fig.width = 10, fig.height = 8}
+
+lc_vec <- c('broadleaf trees', 'needleleaf trees', 'C3 (temperate) grass', 'C4 (tropical) grass', 'shrubs', 'urban', 'inland water', 'bare soil', 'ice')
+
+par(mfrow = c(3,3))
+
+for(i in 1:9){
+  
+image(lon_cci, lat_cci, lc_dat_cci[, , i], main = lc_vec[i], zlim = c(0,1))
+  
+}
+
+treefrac_cci <- lc_dat_cci[, , 1] + lc_dat_cci[, , 2]
+
+```
+
+This is the landfrac file from Andy - it has a smaller grid than the cci landcover file
+
+```{r}
+
+nc_landfrac <- nc_open('treefrac/bb075_m01s03i395.nc')
+
+landfrac_dat <- ncvar_get(nc = nc_landfrac , varid = 'landFrac' )
+
+image(landfrac_dat)
+
+lat_landfrac <- ncvar_get(nc_landfrac,"latitude")
+lon_landfrac <- ncvar_get(nc_landfrac,"longitude")
+
+```
+
+I created an area file using the following cdo command:
+
+cdo gridarea qrparm.veg.frac_lc_cci_2005_9PFTs.nc gridarea.nc
+
+Need to remap the landfrac file 
+cdo remapbil,targetgrid ifile ofile
+
+```{r}
+
+nc_ga <- nc_open('treefrac/gridarea.nc')
+vars <- nc.get.variable.list(nc_ga)
+print(vars)
+
+ga_dat  <- ncvar_get(nc = nc_ga , varid = 'cell_area' )
+
+
+lat_ga <- ncvar_get(nc_ga,"latitude")
+lon_ga <- ncvar_get(nc_ga,"longitude")
+
+
+#let's create a land mask from this map.
+
+mask <- ga_dat
+
+land_ix <- which(!is.na(lc_dat_cci[, , i]))
+other_ix <- which(is.na(lc_dat_cci[, , i]))
+mask[land_ix] <- 1
+mask[other_ix] <- 0
+
+image(mask)
+
+
+```
+```{r, fig.width = 10, fig.height = 8}
+
+# It's going to be pretty close to just sum up with area * fraction
+
+frac_area <- array(NA, dim = dim(lc_dat_cci))
+  
+  for(i in 1:dim(lc_dat_cci)[3]){
+    
+    frac_area[, , i] <- lc_dat_cci[,,i] * ga_dat
+    
+  }
+
+frac_area_scaled <- frac_area / sum(ga_dat)
+
+par(mfrow = c(3,3))
+
+for(i in 1:9){
+  
+image(lon_cci, lat_cci, lc_dat_cci[, , i], main = lc_vec[i], zlim = c(0,1))
+  
+}
+
+```
+
+We calculate the global fraction data as:  
+
+sum(grid area * cci fraction) / global land surface area  
+
+and global land surface area is sum(grid area * land mask)  
+
+
+
+```{r}
+
+
+# Global land surface area is the sum of the gridbox areas, multiplied by the land mask. 
+glsa <- sum(ga_dat * mask)
+
+
+# global sum of BL trees, for example
+
+
+sum(frac_area[,,1], na.rm = TRUE) / glsa
+sum(frac_area[,,2], na.rm = TRUE) / glsa
+
+global_frac_cci <- rep(NA,9)
+
+for(i in 1:9){
+  
+  global_frac_cci[i] <- sum(frac_area[,,i], na.rm = TRUE) / glsa
+  
+}
+
+treefrac_total <- sum(global_frac_cci[1:2])
+
+names(global_frac_cci) <- lc_vec
+
+print(global_frac_cci * 100)
+
+save(global_frac_cci, file = 'treefrac/global_frac_cci.RData')
+
+
+```
+

@@ -3,4 +3,6 @@
 /conf_files_augment_JULES-ES-1p0
 *.rdata
 .Rhistory
+constraint.RData
+
 

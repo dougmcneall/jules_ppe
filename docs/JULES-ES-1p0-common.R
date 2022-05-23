@@ -202,9 +202,6 @@ getStandardMember <- function(ensloc, variable, nts = 164, cn = 1850:2013){
 }
 
 
-
-
-
 mat2list <- function(X){
   
   # Turns the p columns of a matrix into a p length list,
