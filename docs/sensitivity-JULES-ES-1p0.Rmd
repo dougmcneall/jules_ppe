@@ -276,8 +276,8 @@ It's important to remember that the design of the experiment is multiplication f
 
 #pdf(file = 'figs/lhs_range.pdf', width = 6, height = 8)
 par(las = 1, mar = c(5,8,2,1))
-lhs_min <- apply(lhs, 2, min)
-lhs_max <- apply(lhs,2, max)
+lhs_min <- apply(lhs_wave0_wave01_all, 2, min)
+lhs_max <- apply(lhs_wave0_wave01_all,2, max)
 
 plot(lhs_max, 1:d, type = 'n', xlim = c(0,10), axes = FALSE, xlab = 'multiplying factor', ylab = '')
 
@@ -302,6 +302,8 @@ X_standard <- matrix(rep(1,d), ncol = d, nrow = 1)
 X_standard_norm <- normalize(X_standard, wrt = lhs)
 
 X_level1a_unnorm <- unnormalize(X_level1a, un.mins = lhs_min, un.maxes = lhs_max)
+
+X_level1a_wave01_unnorm <- unnormalize(X_level1a_wave01, un.mins = lhs_min, un.maxes = lhs_max)
 
 ```
 
@@ -452,7 +454,7 @@ Y_oaat_const_level1a_scaled_norm <- normalize(Y_oaat_const_level1a_scaled)
 
         oaatLinePlotMulti <- function(X_oaat, Y_oaat, n_oaat, nr, nc, cols, ...){
   
-          par(mfrow = c(nr,nc), oma = c(0.1,0.1,3,0.1), mar = c(2,2,3,1))
+          par(mfrow = c(nr,nc), oma = c(0.1,0.1,3,0.1), mar = c(2,2,3,1), las = 1)
   
           for(i in 1:ncol(X_oaat)){
             ix <- seq(from = ((i*n_oaat) - (n_oaat-1)), to =  (i*n_oaat), by = 1)
@@ -486,6 +488,154 @@ legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = cbPal[c(1,2,6,8)], lty = '
 ```
 
 
+## Update for wave01
+
+
+```{r}
+# Build list of emulators for both waves, standard constraint parameters.
+
+Y_const_level1a_wave01_scaled_list <- mat2list(Y_const_level1a_wave01_scaled)
+fit_list_const_level1a_wave01 <- mclapply(X = Y_const_level1a_wave01_scaled_list, FUN = km, formula = ~., design = X_level1a_wave01,
+                                   mc.cores = 4, control = list(trace = FALSE))
+
+```
+
+```{r}
+
+Y_oaat_const_level1a_wave01_scaled <- matrix(ncol = ncol(Y_const_level1a_wave01_scaled), nrow = nrow(X_oaat_level1a))
+
+for(i in 1:ncol(Y_oaat_const_level1a_wave01_scaled)){
+
+  y_oaat <- predict.km(fit_list_const_level1a_wave01[[i]], newdata = X_oaat_level1a, type = 'UK')
+  Y_oaat_const_level1a_wave01_scaled[,i] <- y_oaat$mean
+}
+
+```
+
+```{r, fig.width=10, fig.height = 10}
+Y_oaat_const_level1a_wave01_scaled_norm <- normalize(Y_oaat_const_level1a_wave01_scaled)
+
+#pdf(file = 'figs/Y_oaat_const_level1a_wave01_scaled_norm.pdf', width = 10, height = 10)
+oaatLinePlotMulti(X_oaat = X_oaat_level1a_unnorm, Y_oaat = Y_oaat_const_level1a_wave01_scaled_norm ,  n_oaat = 21, nr = 6, nc = 6,
+                  lwd = 3, col = cbPal[c(1,2,6,8)])
+  
+reset()
+legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = cbPal[c(1,2,6,8)], lty = 'solid', lwd = 3, horiz = TRUE)
+#dev.off()
+
+```
+
+
+```{r}
+Y_sum_level1a_wave01_list <- mat2list(Y_sum_level1a_wave01)
+
+if (file.exists("emlist_km_Y_level1a_wave01_2022-05-24.rdata")) {
+  load("emlist_km_Y_level1a_wave01_2022-05-24.rdata")
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_Y_level1a_wave01 <- mclapply(X = Y_sum_level1a_wave01_list, FUN = km, formula = ~., design = X_level1a_wave01, mc.cores = 4) 
+  
+  save( emlist_km_Y_level1a_wave01, file = "emlist_km_Y_level1a_2022-05-24.rdata")
+  
+}
+
+
+
+```
+
+```{r}
+#if (file.exists("oaat_level1a_Y.rdata")) {
+#  load("oaat_level1a_Y.rdata")
+#} else {
+  
+oat_var_sensmat_level1a_wave01_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1a[, yname]
+  oat <- oaatSensvarKmList(X = X_level1a_wave01, em_list = emlist_km_Y_level1a_wave01, med = FALSE, hold = X_standard_norm)
+  oat_var_sensmat_level1a_wave01_Y[i, ] <- oat
+}
+
+#save(y_names_sum, oat_var_sensmat_level1a_Y, file = "oaat_level1a_Y.rdata")
+#}
+
+rownames(oat_var_sensmat_level1a_wave01_Y) <- y_names_sum
+colnames(oat_var_sensmat_level1a_wave01_Y) <- colnames(X_level1a)
+
+#normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
+
+```
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+#pdf(file = 'figs/oat_var_sensmat_level1a_wave01_Y.pdf', width = 7, height = 8)
+oaatSensvarSummaryPlot(oat_var_sensmat_level1a_wave01_Y)
+
+#dev.off()
+
+```
+
+## Anomaly wave01
+
+```{r}
+YAnom_sum_level1a_wave01_list <- mat2list(YAnom_sum_level1a_wave01)
+
+if (file.exists("emlist_km_Y_level1a_wave01_2022-05-25.rdata")) {
+  load("emlist_km_Y_level1a_wave01_2022-05-25.rdata")
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_YAnom_level1a_wave01 <- mclapply(X = YAnom_sum_level1a_wave01_list, FUN = km, formula = ~., design = X_level1a_wave01, mc.cores = 4) 
+  
+  save( emlist_km_YAnom_level1a_wave01, file = "emlist_km_YAnom_level1a_2022-05-25.rdata")
+  
+}
+
+
+
+```
+
+```{r}
+  
+oat_var_sensmat_level1a_wave01_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1a[, yname]
+  oat <- oaatSensvarKmList(X = X_level1a_wave01, em_list = emlist_km_YAnom_level1a_wave01, med = FALSE, hold = X_standard_norm)
+  oat_var_sensmat_level1a_wave01_YAnom[i, ] <- oat
+}
+
+#save(y_names_sum, oat_var_sensmat_level1a_Y, file = "oaat_level1a_Y.rdata")
+#}
+
+rownames(oat_var_sensmat_level1a_wave01_YAnom) <- y_names_sum
+colnames(oat_var_sensmat_level1a_wave01_YAnom) <- colnames(X_level1a)
+
+#normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
+
+
+```
+
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+#pdf(file = 'figs/oat_var_sensmat_level1a_wave01_YAnom.pdf', width = 7, height = 8)
+oaatSensvarSummaryPlot(oat_var_sensmat_level1a_wave01_YAnom)
+
+#dev.off()
+
+```
+
+
+
+
 
 # FAST sensitivity analysis
 We use a FAST99 algorithm by Saltelli et al (2000), from the R package "sensitivity"
@@ -494,15 +644,16 @@ We use a FAST99 algorithm by Saltelli et al (2000), from the R package "sensitiv
 # Need to think about how mins and maxes are dealt with - we have a truncated input design
 
 # Generate a design for the FAST99 analysis
-X_fast <- fast99(model = NULL, factors = colnames(X_level1a), n = 3000,
+X_fast <- fast99(model = NULL, factors = colnames(X_level1a_wave01), n = 3000,
                  q = "qunif", q.arg = list(min = 0, max = 1))
 ```
 
 
 Create a list of sensitivity analyses, one for each column of the "sum" (modern) output matrix. 
+(This now uses wave01 data)
 ```{r}
 
-MF_Y_sum_level1a <- multiFAST(X = X_level1a, Y = Y_sum_level1a, fit_list = emlist_km_Y_level1a, n = 1000)
+MF_Y_sum_level1a <- multiFAST(X = X_level1a_wave01, Y = Y_sum_level1a_wave01, fit_list = emlist_km_Y_level1a_wave01, n = 1000)
 
 ```
 
@@ -525,7 +676,7 @@ rownames(FAST_total_Y_sum_level1a) <- colnames(Y_sum_level1a)
 
 Plot the summary matrix
 ```{r, fig.width = 8, fig.height = 10, message = FALSE, warning=FALSE}
-#pdf(file = 'figs/FAST_sensmat_Y_level1a.pdf', width = 7, height = 8)
+#pdf(file = 'figs/FAST_sensmat_Y_level1a_wave01.pdf', width = 7, height = 8)
 sensMatSummaryPlot(FAST_total_Y_sum_level1a)
 #dev.off()
 
@@ -559,7 +710,7 @@ rownames(FAST_total_YAnom_sum_level1a) <- colnames(YAnom_sum_level1a)
 Plot the sensitivity summary matrix
 ```{r, fig.width = 8, fig.height = 10}
 
-#pdf(file = 'figs/FAST_sensmat_YAnom_level1a.pdf', width = 7, height = 8)
+#pdf(file = 'figs/FAST_sensmat_YAnom_level1a_wave01.pdf', width = 7, height = 8)
 sensMatSummaryPlot(FAST_total_YAnom_sum_level1a)
 #dev.off()
 
@@ -634,10 +785,10 @@ Y_target = Y_upper - (abs(Y_upper - (Y_lower)) / 2 )# abs() to fix the problem w
 # standard deviation is derived from the limits and the central target
 # (this distance is assumed to be 4 standard deviations.
 Y_sd = (Y_upper - Y_target) / 4
-names(Y_sd) = colnames(Y_const_level1a_scaled)
+names(Y_sd) = colnames(Y_const_level1a_wave01_scaled)
 
 
-p = ncol(Y_const_level1a_scaled)
+p = ncol(Y_const_level1a_wave01_scaled)
 
 obs_sd_list = as.list(rep(0.01,p))
 disc_list =  as.list(rep(0,p)) 
@@ -655,8 +806,8 @@ Y_target = matrix(Y_target, nrow = 1)
 ```{r}
 # First build an emulator list for the Y
 
-list_Y_const_level1a_scaled <- mat2list(Y_const_level1a_scaled)
-emlist_Y_const_level1a_scaled <- mclapply(X = list_Y_const_level1a_scaled, FUN = km, formula = ~., design = X_level1a, mc.cores = 4,
+emlist_Y_const_level1a_wave01_scaled <- mclapply(X = Y_const_level1a_wave01_scaled_list, FUN = km, formula = ~., 
+                                                 design = X_level1a_wave01, mc.cores = 4,
                                           control = list(trace = FALSE)) 
 
 ```
@@ -668,12 +819,12 @@ emlist_Y_const_level1a_scaled <- mclapply(X = list_Y_const_level1a_scaled, FUN =
 nsamp_unif <- 10000  
 X_unif <- samp_unif(nsamp_unif, mins = (rep(0, d)), maxes = rep(1,d))
 
-Y_unif <- matrix(nrow = nsamp_unif, ncol = ncol(Y_const_level1a_scaled))
-colnames(Y_unif) <- colnames(Y_const_level1a_scaled)
+Y_unif <- matrix(nrow = nsamp_unif, ncol = ncol(Y_const_level1a_wave01_scaled))
+colnames(Y_unif) <- colnames(Y_const_level1a_wave01_scaled)
 
 # Build an emulator for each output individually
-for(i in 1:ncol(Y_const_level1a_scaled)){
-  em <- emlist_Y_const_level1a_scaled[[i]]
+for(i in 1:ncol(Y_const_level1a_wave01_scaled)){
+  em <- emlist_Y_const_level1a_wave01_scaled[[i]]
   pred <- predict(em, newdata = X_unif, type = 'UK')
   Y_unif[,i] <- pred$mean
 }
@@ -688,8 +839,9 @@ mcf_npp = mcf(X_unif, which(Y_unif[,'npp_nlim_lnd_sum'] > 35 & Y_unif[,'npp_nlim
 mcf_cSoil = mcf(X_unif, which(Y_unif[,'cSoil_lnd_sum'] > 750 & Y_unif[,'cSoil_lnd_sum'] < 3000))
 mcf_cVeg <- mcf(X_unif, which(Y_unif[,'cVeg_lnd_sum'] > 300 & Y_unif[,'cVeg_lnd_sum'] < 800))
 
+mcf_all_const <- mcf(X_unif, which(Y_unif[,'cVeg_lnd_sum'] > 300 & Y_unif[,'cVeg_lnd_sum'] < 800 & Y_unif[,'cSoil_lnd_sum'] > 750 & Y_unif[,'cSoil_lnd_sum'] < 3000 & Y_unif[,'npp_nlim_lnd_sum'] > 35 & Y_unif[,'npp_nlim_lnd_sum'] < 80 & Y_unif[,'nbp_lnd_sum'] > 0))
 
-mcf_summary <- matrix(rbind(mcf_nbp, mcf_npp, mcf_cSoil, mcf_cVeg), nrow = ncol(Y_const_level1a_scaled))
+mcf_summary <- matrix(rbind(mcf_nbp, mcf_npp, mcf_cSoil, mcf_cVeg), nrow = ncol(Y_const_level1a_wave01_scaled))
 colnames(mcf_summary) <- colnames(X_level1a)
 rownames(mcf_summary) <- c('nbp', 'npp', 'cSoil', 'cVeg')
 
@@ -702,6 +854,18 @@ sensMatSummaryPlot(mcf_summary)
 #dev.off()
 
 ```
+
+```{r}
+# using all together is quite similar to using the mean
+plot(1:32, mcf_all_const, ylim = c(0,0.7))
+points(1:32, mcf_npp, col = 'red')
+points(1:32, mcf_cVeg, col = 'green')
+points(1:32, mcf_cSoil, col = 'brown')
+points(1:32, mcf_nbp, col = 'gold')
+
+
+```
+
 
 
 ```{r}
@@ -719,8 +883,8 @@ The idea here is to summarise the relative importance of the input parameters. T
 
 
 
-sensrank_Y_level1a_oat <- SensRank(oat_var_sensmat_level1a_Y)
-sensrank_YAnom_level1a_oat <- SensRank(oat_var_sensmat_level1a_YAnom)
+sensrank_Y_level1a_oat <- SensRank(oat_var_sensmat_level1a_wave01_Y)
+sensrank_YAnom_level1a_oat <- SensRank(oat_var_sensmat_level1a_wave01_YAnom)
 
 sensrank_FAST <- SensRank(FAST_total_Y_sum_level1a)
 sensrank_FAST_YAnom <- SensRank(FAST_total_YAnom_sum_level1a)

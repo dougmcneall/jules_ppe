@@ -41,6 +41,10 @@ source('~/myRpackages/julesR/vignettes/default_jules_parameter_perturbations.R')
 #ensloc <- '/project/carbon_ppe/JULES-ES-1p0_PPE/'
 ensloc_wave00 <- '/data/users/hadaw/JULES_ES_PPE/u-au932/'
 
+ensloc_wave01 <- '/data/users/hadaw/JULES_ES_PPE/u-ck006/'
+
+
+
 # Some pallete options
 yg = brewer.pal(9, "YlGn")
 ryb = brewer.pal(11, "RdYlBu")
@@ -227,6 +231,68 @@ modernValue <- function(nc, variable, ix){
   out <- mean(dat[ix])
   out
 }
+
+makeJulesEnsembleModernValue <- function(ensloc, varlist, nstart, nend, ix = 144:164){
+  
+  nens <- (nend - nstart) + 1
+  datmat <- matrix(nrow = nens, ncol = length(varlist))
+  colnames(datmat) <- varlist
+  
+  enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
+  
+  for(i in 1:nens){
+    
+    vec <- rep(NA, length(varlist))
+    
+    ensmember <- enslist[i]
+    
+    fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    
+    try(nc <- nc_open(paste0(fn)))
+    try(vec <- sapply(varlist, FUN = modernValue, nc = nc, ix = ix))
+    datmat[i, ] <- vec
+    nc_close(nc)
+  }
+  return(list(datmat = datmat, enslist = enslist))
+}
+
+
+anomalyValue <- function(nc, variable, ix){
+  # A basic function to read a variable and 
+  # take the mean of the timeseries at locations ix
+  dat <- ncvar_get(nc, variable)
+  out <- mean(dat[ix]) - mean(dat[1:20])
+  out
+}
+
+makeJulesEnsembleAnomaly <- function(ensloc, varlist, nstart, nend, ix = 144:164){
+  
+  nens <- (nend - nstart) + 1
+  datmat <- matrix(nrow = nens, ncol = length(varlist))
+  colnames(datmat) <- varlist
+  
+  enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
+  
+  for(i in 1:nens){
+    
+    vec <- rep(NA, length(varlist))
+    
+    ensmember <- enslist[i]
+    
+    fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    
+    try(nc <- nc_open(paste0(fn)))
+    try(vec <- sapply(varlist, FUN = anomalyValue, nc = nc, ix = ix))
+    datmat[i, ] <- vec
+    nc_close(nc)
+  }
+  return(list(datmat = datmat, enslist = enslist))
+  
+  
+}
+
+
+
 
 twoStep_glmnet <- function(X, y, nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, seed=NULL, trace=FALSE, maxit=100,
                            REPORT=10, factr=1e7, pgtol=0.0, parinit=NULL, popsize=100){
@@ -592,7 +658,191 @@ if (file.exists("emlist_km_YAnom_level1a_2022-04-08.rdata")) {
 
 
 
+## ------------------------------------------------------------------------------------
+## Wave01 (second wave) specific stuff
+## ------------------------------------------------------------------------------------ 
 
+# Number of ensemble members (out of 500) to use for training in wave01
+ntrain_wave01 <- 400
+
+
+
+# Modern value JULES ensemble Wave01
+nstart <- 499
+nend <- (nstart + ntrain_wave01) - 1
+
+if (file.exists("ensemble_wave01_2022-04-08.rdata")) {
+  load("ensemble_wave01_2022-04-08.rdata")
+} else {
+  
+  ens_wave01_mv <- makeJulesEnsembleModernValue(ensloc = ensloc_wave01, 
+                                                varlist = y_names_sum,
+                                                nstart = nstart,
+                                                nend = nend, 
+                                                ix = 144:164) 
+  
+  save(ens_wave01_mv, file ="ensemble_wave01_2022-04-08.rdata")
+}
+
+
+
+if (file.exists("ensemble_wave01_2022-05-25.rdata")) {
+  load("ensemble_wave01_2022-05-25.rdata")
+} else {
+  
+  ens_wave01_anom <- makeJulesEnsembleAnomaly(ensloc = ensloc_wave01, 
+                                                varlist = y_names_sum,
+                                                nstart = nstart,
+                                                nend = nend, 
+                                                ix = 144:164) 
+  
+  save(ens_wave01_anom, file ="ensemble_wave01_2022-05-25.rdata")
+}
+
+
+# Load input matrices and bind with wave00 inputs
+lhs_wave01 <- read.table( '../conf_files_augment_JULES-ES-1p0/lhs_example.txt', header = TRUE)
+
+X_wave01 = normalize(lhs_wave01, wrt = rbind(lhs_i, lhs_ii, lhs_wave01))
+colnames(X_wave01) = colnames(lhs_wave01)
+
+# Match the 400 outputs we're using in the training data
+X_wave01_train <- X_wave01[1:ntrain_wave01, ]
+
+
+# Modern values that we use for constraints
+
+Y_const_wave01 <- ens_wave01_mv$datmat[, ynames_const]
+Y_const_wave01_scaled <- sweep(Y_const_wave01, 2, STATS = scalevec, FUN = '/' )
+
+
+## -----------------------------------------------------------------------------
+## Timeseries wave01
+##
+## 
+
+## -----------------------------------------------------------------------------
+if (file.exists("ensemble_timeseries_wave01_2022-04-08.rdata")) {
+  load("ensemble_timeseries_wave01_2022-04-08.rdata")
+} else {
+  
+  # primary carbon cycle outputs
+  npp_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+  nbp_ens_wave01 <-  makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,variable = "nbp_lnd_sum") / (1e12/ysec)
+  cSoil_ens_wave01 <-  makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,variable = "cSoil_lnd_sum") / 1e12
+  cVeg_ens_wave01 <-  makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,variable = "cVeg_lnd_sum") / 1e12
+  # 
+  # 
+  lai_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,variable = "lai_lnd_mean")
+  # 
+  # # fluxes
+  rh_lnd_sum_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend, variable = "rh_lnd_sum") / (1e12/ysec)
+  fLuc_lnd_sum_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend, variable = "fLuc_lnd_sum") / (1e12/ysec)
+  fHarvest_lnd_sum_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend, variable = "fHarvest_lnd_sum") / (1e12/ysec)
+  # 
+  # 
+  # # fractions
+  treeFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,  variable = "treeFrac_lnd_mean")
+  shrubFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,  variable = "shrubFrac_lnd_mean")
+  baresoilFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01,nstart = nstart, nend = nend,  variable = "baresoilFrac_lnd_mean")
+  
+  c3PftFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01, nstart = nstart, nend = nend,variable = "c3PftFrac_lnd_mean")
+  c4PftFrac_lnd_mean_ens_wave01 <- makeTimeseriesEnsemble(ensloc = ensloc_wave01, nstart = nstart, nend = nend,variable = "c4PftFrac_lnd_mean")
+  
+  
+  
+  save(npp_ens_wave01,
+       nbp_ens_wave01,
+       cSoil_ens_wave01,
+       cVeg_ens_wave01,
+       lai_lnd_mean_ens_wave01,
+       rh_lnd_sum_ens_wave01,
+       fLuc_lnd_sum_ens_wave01,
+       fHarvest_lnd_sum_ens_wave01,
+       treeFrac_lnd_mean_ens_wave01,
+       shrubFrac_lnd_mean_ens_wave01,
+       baresoilFrac_lnd_mean_ens_wave01,
+       c3PftFrac_lnd_mean_ens_wave01,
+       c4PftFrac_lnd_mean_ens_wave01,
+       file = "ensemble_timeseries_wave01_2022-04-08.rdata" )
+}
+
+lhs_wave0_wave01_all <- rbind(lhs, lhs_wave01)
+
+## -----------------------------------------------------------------------------------------------------
+## Fix outliers in wave01
+## find timeseries outliers
+## 
+## -----------------------------------------------------------------------------------------------------
+
+# Timeseries that have problems. NBP, RH and cSoil seems to have large outliers
+
+# These indices reference the separate ensembles
+# cSoil over 6000
+# rh over 200
+# nbp less than -15
+cSoil_outlier_ix_wave00 <- unique(which(cSoil_ens > 6000, arr.ind = TRUE)[,'row'])
+cSoil_outlier_ix_wave01 <- unique(which(cSoil_ens_wave01 > 6000, arr.ind = TRUE)[,'row'])
+
+nbp_outlier_ix_wave00 <- unique(which(nbp_ens < -15, arr.ind = TRUE)[,'row'])
+nbp_outlier_ix_wave01 <- unique(which(nbp_ens_wave01 < -15, arr.ind = TRUE)[,'row'])
+
+rh_lnd_sum_outlier_ix_wave00 <- unique(which(rh_lnd_sum_ens > 200, arr.ind = TRUE)[,'row'])
+rh_lnd_sum_outlier_ix_wave01 <- unique(which(rh_lnd_sum_ens_wave01 > 200, arr.ind = TRUE)[,'row'])
+
+
+# are there additional excluded indices to those already excluded by the constraint
+
+wave01_all_ix <- 1:ntrain_wave01
+
+
+AW_constraints <- matrix(nrow = 2, ncol = length(ynames_const))
+
+AW_constraints[1,] <- c(0, 35, 750, 300)
+AW_constraints[2,] <- c(100, 80, 3000, 800)
+
+colnames(AW_constraints) <- ynames_const
+rownames(AW_constraints) <- c('min', 'max')
+
+
+# conform to Andy's basic constraints
+#level2_ix_wave01 <- which(apply(Y_const_wave01_scaled, 1, FUN = withinRange, maxes  = AW_constraints[2,], mins = AW_constraints[1,] ))
+
+#nlevel2_ix_wave01 <- which(apply(Y_const_wave01_scaled, 1, FUN = withinRange, maxes  = AW_constraints[2,], mins = AW_constraints[1,] ) == FALSE)
+
+level2_ix_wave01 <- which(Y_const_wave01_scaled[,'nbp_lnd_sum'] > 0 &
+                            Y_const_wave01_scaled[,'npp_nlim_lnd_sum'] > 35 & Y_const_wave01_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                            Y_const_wave01_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_wave01_scaled[,'cSoil_lnd_sum'] < 3000 &
+                            Y_const_wave01_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_wave01_scaled[,'cVeg_lnd_sum'] < 800
+)
+
+
+# Indices excluded in wave01 level2
+level2_nix_wave01 <- setdiff(wave01_all_ix, level2_ix_wave01)
+
+# would be interesting to see if these look normal in other ways
+ts_outliers_ix_wave01 <- unique(c(cSoil_outlier_ix_wave01,nbp_outlier_ix_wave01, rh_lnd_sum_outlier_ix_wave01))
+# are there any that are not excluded by level 2? (I assume so)
+intersect(ts_outliers_ix_wave01, level2_nix_wave01)
+
+without_outliers_ix_wave01 <- setdiff(wave01_all_ix,ts_outliers_ix_wave01)
+
+# Remove these from the wave01 ensemble to remove outliers and excluded ensemble members
+level2_and_ts_outliers_nix_wave01 <- union(level2_nix_wave01, ts_outliers_ix_wave01)
+
+level2a_ix_wave01 <- setdiff(wave01_all_ix, level2_and_ts_outliers_nix_wave01)
+
+wave00_all_ix <- 1:499
+ts_outliers_ix_wave00 <- unique(c(cSoil_outlier_ix_wave00,nbp_outlier_ix_wave00, rh_lnd_sum_outlier_ix_wave00))
+without_outliers_ix_wave00 <- setdiff(wave00_all_ix,ts_outliers_ix_wave00)
+
+# Build "clean" complete dataset that conforms to level 1a (all training runs)
+X_level1a_wave01 <- rbind(X_level1a, X_wave01_train[without_outliers_ix_wave01, ])
+Y_const_level1a_wave01_scaled <- rbind(Y_const_level1a_scaled, Y_const_wave01_scaled[without_outliers_ix_wave01, ])
+
+Y_sum_level1a_wave01 <- rbind(Y_sum_level1a, ens_wave01_mv$datmat[without_outliers_ix_wave01, ])
+
+YAnom_sum_level1a_wave01 <- rbind(YAnom_sum_level1a, ens_wave01_anom$datmat[without_outliers_ix_wave01, ])
 
 
 
