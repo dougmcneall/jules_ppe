@@ -634,9 +634,6 @@ oaatSensvarSummaryPlot(oat_var_sensmat_level1a_wave01_YAnom)
 ```
 
 
-
-
-
 # FAST sensitivity analysis
 We use a FAST99 algorithm by Saltelli et al (2000), from the R package "sensitivity"
 
@@ -841,15 +838,15 @@ mcf_cVeg <- mcf(X_unif, which(Y_unif[,'cVeg_lnd_sum'] > 300 & Y_unif[,'cVeg_lnd_
 
 mcf_all_const <- mcf(X_unif, which(Y_unif[,'cVeg_lnd_sum'] > 300 & Y_unif[,'cVeg_lnd_sum'] < 800 & Y_unif[,'cSoil_lnd_sum'] > 750 & Y_unif[,'cSoil_lnd_sum'] < 3000 & Y_unif[,'npp_nlim_lnd_sum'] > 35 & Y_unif[,'npp_nlim_lnd_sum'] < 80 & Y_unif[,'nbp_lnd_sum'] > 0))
 
-mcf_summary <- matrix(rbind(mcf_nbp, mcf_npp, mcf_cSoil, mcf_cVeg), nrow = ncol(Y_const_level1a_wave01_scaled))
+mcf_summary <- matrix(rbind(mcf_nbp, mcf_npp, mcf_cSoil, mcf_cVeg, mcf_all_const), nrow = ncol(Y_const_level1a_wave01_scaled)+1)
 colnames(mcf_summary) <- colnames(X_level1a)
-rownames(mcf_summary) <- c('nbp', 'npp', 'cSoil', 'cVeg')
+rownames(mcf_summary) <- c('nbp', 'npp', 'cSoil', 'cVeg', 'all')
 
 ```
 
 
 ```{r, fig.width = 6, fig.height = 8}
-#pdf(file = 'figs/MCF_sensmat_Yconst_level1a.pdf', width = 6, height = 8 )
+#pdf(file = 'figs/MCF_sensmat_Yconst_level1a_wave01.pdf', width = 6, height = 8 )
 sensMatSummaryPlot(mcf_summary)
 #dev.off()
 
@@ -857,11 +854,15 @@ sensMatSummaryPlot(mcf_summary)
 
 ```{r}
 # using all together is quite similar to using the mean
-plot(1:32, mcf_all_const, ylim = c(0,0.7))
-points(1:32, mcf_npp, col = 'red')
-points(1:32, mcf_cVeg, col = 'green')
-points(1:32, mcf_cSoil, col = 'brown')
-points(1:32, mcf_nbp, col = 'gold')
+plot(1:32, mcf_all_const, ylim = c(0,0.7), pch = 19)
+points(1:32, mcf_npp, col = 'red', pch = 19)
+points(1:32, mcf_cVeg, col = 'green', pch = 19)
+points(1:32, mcf_cSoil, col = 'brown', pch = 19)
+points(1:32, mcf_nbp, col = 'gold', pch = 19)
+
+legend('topleft', legend = c('all', 'npp', 'cVeg', 'cSoil', 'nbp'), 
+       col = c('black','red','green', 'brown', 'gold' ),
+       pch = 19) 
 
 
 ```
@@ -870,8 +871,7 @@ points(1:32, mcf_nbp, col = 'gold')
 
 ```{r}
 
-
-sensrank_Y_level1a_mcf <- SensRank(mcf_summary)
+sensrank_Y_level1a_mcf <- SensRank(mcf_summary[1:4, ])
 
 ```
 
