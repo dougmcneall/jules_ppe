@@ -41,19 +41,6 @@ source('JULES-ES-1p0-common.R')
 
 ```
 
-```{r}
-
-
-
-```
-
-
-```{r}
-
-
-
-```
-
 
 
 ## How many run failures were there?  
@@ -120,12 +107,12 @@ rangecol <- 'grey'
 ```
 
 
-```{r, fig.width = 8, fig.height = 8, }
+```{r, fig.width = 8, fig.height = 8 }
 # Histogram of level 1 constraints
 hcol = 'darkgrey'
 lcol = 'black'
 
-#pdf(file = 'figs/level_2_constraints_hists.pdf', width = 6, height = 5)
+#pdf(file = 'figs/level_2_constraints_hists.pdf', width = 8, height = 8)
 par(mfrow = c(2,2), fg = 'darkgrey', las = 1, oma = c(0.1, 0.1, 4, 0.1))
 
 trunc <- function(x, vec){
@@ -178,11 +165,13 @@ polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
         col = makeTransparent(rangecol, 60),
        border =  makeTransparent(rangecol))
 
-#dev.off()
+
 
 reset()
 
 legend('top', horiz = TRUE, fill = c(makeTransparent(wave00col, 150), makeTransparent(wave01col, 150), makeTransparent(rangecol, 60)), legend = c('Wave00', 'Wave01', 'AW range'))
+
+#dev.off()
 ```
 ## What proportion of models *now* fall within Andy's constraints?
 
@@ -198,7 +187,7 @@ length(level2_ix_wave01)
 
 Pairs plot of the inputs that pass the constraints with respect to the limits of the original ensemble.
 
-```{r, fig.width = 10, fig.height = 10 }
+```{r, fig.width = 10, fig.height = 10, eval = FALSE }
 
 pairs(X_wave01[level2_ix_wave01, ],
       xlim = c(0,1),
@@ -292,7 +281,7 @@ pairs(X_wave01[level2_ix_wave01, ],
 
 
 
-```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12, }
+```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12, eval = FALSE }
 
 lcol_wave0 <- makeTransparent('dodgerblue2',  120)
 lcol_wave01 <- makeTransparent('firebrick',  120)
@@ -499,7 +488,7 @@ c4PftFrac_lnd_mean_stan_anom <- anomalizeTS(c4PftFrac_lnd_mean_stan)
 
 
 
-```{r, fig.width = 10, fig.height = 12, }
+```{r, fig.width = 10, fig.height = 12, eval = FALSE }
 
 
 #pdf(file = 'figs/carbon-cycle-timeseries-anomaly-waves-constrained.pdf', width = 10, height = 12)
@@ -662,7 +651,7 @@ apply(Y_const_level1a_wave01_scaled ,2, findOutliers, sds = 10)
 
 
 ```{r, }
-# Create fit lists for the combined data
+# Create fit lists for the combined data wave00 level 1a and wave01
 Y_const_level1a_wave01_scaled_list <- mat2list(Y_const_level1a_wave01_scaled)
 
 fit_list_const_level1a_wave01 <- mclapply(X = Y_const_level1a_wave01_scaled_list , FUN = km, formula = ~., design = X_level1a_wave01,
@@ -673,7 +662,7 @@ fit_list_const_level1a_wave01 <- mclapply(X = Y_const_level1a_wave01_scaled_list
 
 ## Leave-one-out analyses of emulator prediction accuracy
 
-```{r, }
+```{r, eval = FALSE}
 
 loolist_km_Y_level1a <- mclapply(X = fit_list_const_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
 
@@ -682,7 +671,7 @@ loolist_km_Y_level1a_wave01 <- mclapply(X = fit_list_const_level1a_wave01, FUN =
 ```
 
 
-```{r, }
+```{r, eval = FALSE}
 
 loostats_km_Y_level1a <- lapply(fit_list_const_level1a, FUN = kmLooStats)
 loostats_km_Y_level1a_wave01 <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStats)
@@ -692,7 +681,7 @@ loostats_km_Y_level1a_wave01 <- lapply(fit_list_const_level1a_wave01, FUN = kmLo
 
 The top row shows the leave-one-out prediction accuracy of the original wave00 ensemble, and the lower row the entire wave00 AND wave01 ensemble combined.
 
-```{r, fig.width = 12, fig.height = 6, }
+```{r, fig.width = 12, fig.height = 6, eval = FALSE }
 
 #pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -764,7 +753,7 @@ We see that the error stats for some of the outputs from wave01 are worse, but t
 
 "pmae" is "proportional mean absolue error", which is the mean absolute error expressed as a percentage of the original (minimally constrained) ensemble range in that output. 
 
-```{r, fig.width = 12, fig.height = 6, }
+```{r, fig.width = 12, fig.height = 6, eval = FALSE }
 
 #pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -830,7 +819,7 @@ kmLooStatsSubset <- function (km, ix, type = "UK")
 ```
 
 
-```{r, }
+```{r, eval = FALSE }
 
 loolist_km_Y_level1a_level2 <- rapply(loolist_km_Y_level1a, f = function(x) x[level2_ix], how = "list")
 
@@ -839,7 +828,7 @@ loolist_km_Y_level1a_wave01_level2 <- rapply(loolist_km_Y_level1a_wave01, f = fu
 
 ```
 
-```{r, fig.width = 12, fig.height = 12, }
+```{r, fig.width = 12, fig.height = 12, eval = FALSE}
 
 #pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,2), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -884,7 +873,7 @@ Many of the wave01 predictions are closer to the horizontal line, and therefore 
 None of the predictions are outside the uncertainty bounds, which suggests they are overconservative (should be smaller).
 
 
-```{r, fig.width = 10, fig.height = 10, }
+```{r, fig.width = 10, fig.height = 10, eval = FALSE}
 
 #pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(4,1), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
@@ -932,7 +921,7 @@ for(i in 1:length(loolist_km_Y_level1a_level2)){
 ```
 
 
-```{r, }
+```{r, eval = FALSE}
 
 loostats_km_Y_level1a_sub <- lapply(fit_list_const_level1a, FUN = kmLooStatsSubset, ix = level2_ix)
 loostats_km_Y_level1a_wave01_sub <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStatsSubset, ix = level2_ix)
@@ -941,7 +930,7 @@ loostats_km_Y_level1a_wave01_sub <- lapply(fit_list_const_level1a_wave01, FUN = 
 
 Looking at the proportional mean absolute error (pmae), expressed in percent, we can see that it doesn't improve much for the whole ensemble, but *does* improve significantly for the subset of ensemble members that fall within AW's constraints from the first ensemble (marked "_sub").
 
-```{r, echo = TRUE, }
+```{r, echo = TRUE, eval = FALSE}
 
 pmae_wave00 <- lapply(loostats_km_Y_level1a, FUN = function(x) x$pmae )
 pmae_wave01 <- lapply(loostats_km_Y_level1a_wave01, FUN = function(x) x$pmae )
@@ -955,9 +944,193 @@ print(pmae_table)
 
 ```
 
+
+# Constraining to level 2 with the emulator
+```{r}
+
+nunif <- 50000
+X_unif <- samp_unif(nunif, mins = rep(0,32), maxes = rep(1, 32))
+colnames(X_unif) <- colnames(X)
+```
+
+
+```{r}
+
+multiPred <- function(Y, Xpred, fit_list ){
+  
+  pred_mean <- matrix(NA, ncol = ncol(Y), nrow = nrow(Xpred))
+  pred_sd <- matrix(NA, ncol = ncol(Y), nrow = nrow(Xpred))
+  
+  colnames(pred_mean) <- colnames(Y)
+  colnames(pred_sd) <- colnames(Y)
+  
+  for(i in 1:length(fit_list)){
+    
+    pred <- predict.km(object=fit_list[[i]], newdata = Xpred, type = 'UK')
+    pred_mean[, i] <- pred$mean
+    pred_sd[, i] <- pred$sd
+    
+  }
+  
+    return(list(pred_mean = pred_mean, pred_sd = pred_sd))
+    
+}
+
+
+Y_const_level1a_wave01_scaled_pred <- multiPred(Y = Y_const_level1a_wave01_scaled, Xpred = X_unif, fit_list = fit_list_const_level1a_wave01)
+
+```
+
+
+
+```{r}
+
+
+level2_ix_em_unif_wave00_wave01 <- which(Y_const_level1a_wave01_scaled_pred$pred_mean[,'nbp_lnd_sum'] > 0 &
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'npp_nlim_lnd_sum'] > 35 & 
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'npp_nlim_lnd_sum'] < 80 &
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'cSoil_lnd_sum'] > 750 &
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'cSoil_lnd_sum'] < 3000 &
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'cVeg_lnd_sum'] > 300 & 
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'cVeg_lnd_sum'] < 800
+)
+
+
+(length(level2_ix_em_unif_wave00_wave01) / nunif) * 100
+
+```
+
+```{r}
+
+par(oma = c(0,0,0,3), bg = 'white')
+
+panel.hist = function(x, ...) {
+  usr = par("usr"); on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5))
+  hist(x, freq = FALSE, col="grey", add=TRUE, main = '') 
+  lines(density(x))
+}
+
+panel.hist <- function(x, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+```
+
+
+```{r}
+X_stan_norm <- normalize(matrix(rep(1, 32), nrow = 1), wrt = lhs)
+
+colnames(X_unif) <- 1:32
+
+```
+
+
+```{r,fig.width = 12, fig.height = 12, warning = FALSE, eval = FALSE}
+
+
+
+#pdf(file = 'figs/pairs_level2_ix_em_unif_wave00_wave01.pdf', width = 12, height = 12)
+
+pairs(rbind(X_unif[level2_ix_em_unif_wave00_wave01, ], X_stan_norm),
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up_truth,
+      diag.panel = panel.hist,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc_col = rb
+      )
+
+#reset()
+#legend('right', legend = 1:32, )
+
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = rb,
+           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+           legend.shrink = 0.6,
+           horizontal = TRUE
+)
+
+legend('left', legend = paste(1:32, colnames(lhs)), cex = 1, bty = 'n')
+
+#dev.off()
+```
+
+Next, check emulators of all the other outputs and apply the constraints to them. See how the constraints change.
+
+
+## Input space with emulated members passing Level 2 constraints.
+
+```{r, fig.width = 12, fig.height = 12, warning = FALSE, eval = FALSE}
+
+level2_ix_em <- which(Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
+                    Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_pred_unif_mean[,'cSoil_lnd_sum'] > 750 & Y_const_pred_unif_mean[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_pred_unif_mean[,'cVeg_lnd_sum'] > 300 & Y_const_pred_unif_mean[,'cVeg_lnd_sum'] < 800
+                  )
+
+pairs(X_unif[level2_ix_em, ],
+    #  labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up,
+      diag.panel = panel.hist,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc_col = rb)
+
+(length(level2_ix_em) / nunif) * 100
+```
+
+## Input space with emulated members passing Level 2 constraints AND low atmospheric growth error
+Emulated members passing level2 constraints AND having lower error in atmospheric growth than standard. 
+
+Red point indicates the standard input.
+
+The position of the standard input with regards to the histograms give us an idea of what we might do to improve the simulation - at least in terms of atmospheric growth. If we were to move the input towards areas of higher density, we might expect a better model performance.
+
+
+```{r, fig.width = 12, fig.height = 12, warning = FALSE, eval = FALSE }
+
+
+level2_and_ag_ix_em <- which(Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
+                    Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_pred_unif_mean[,'cSoil_lnd_sum'] > 750 & Y_const_pred_unif_mean[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_pred_unif_mean[,'cVeg_lnd_sum'] > 300 & Y_const_pred_unif_mean[,'cVeg_lnd_sum'] < 800 &
+                    abs(pred_unif_ag$mean) < abs(ag_modern_me_stan)
+                  )
+
+
+
+pairs(rbind(X_unif[level2_and_ag_ix_em, ], X_stan_norm),
+    #  labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up_truth,
+      diag.panel = panel.hist,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc_col = rb)
+
+
+(length(level2_and_ag_ix_em) / nunif) * 100
+```
+
+
+
+
+
+
+
+
 # Comparing atmospheric growth in wave00, wave01 and observations
 
-```{r, include = FALSE, eval=params$limit}
+```{r, include = FALSE, eval=FALSE}
 historical_carbon_budget <- read_excel('Global_Carbon_Budget_2020v1.0.xlsx', sheet = "Historical Budget", skip = 15, n_max = 270)
 
 resid <- historical_carbon_budget$`ocean sink` - historical_carbon_budget$`fossil emissions excluding carbonation`
@@ -977,7 +1150,7 @@ lines(historical_carbon_budget$Year, historical_carbon_budget$`atmospheric growt
 ```
 
 
-```{r, fig.width = 10, fig.height = 8, }
+```{r, fig.width = 10, fig.height = 8, eval = FALSE}
 
 obscol = 'purple'
 wave01_level2col <- 'gold'
@@ -1023,7 +1196,7 @@ legend('topleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard
 
 ## Andy asks - what constraint does that give us in cumulative NBP?
 
-```{r, fig.width = 7, fig.height = 7, }
+```{r, fig.width = 7, fig.height = 7, eval = FALSE }
 
 cumulative_nbp_ens <- t(apply(nbp_ens, 1, cumsum))
 
@@ -1053,7 +1226,7 @@ legend('topleft', legend = c('wave00', 'wave01', 'wave01 constrained', 'standard
 
 ## Eddy suggests measuring cumulative NBP against atmospheric growth rate
 
-```{r, }
+```{r, eval = FALSE}
 
 # Cumulative NBP at the end of the run
 cnbp_modern_ens <- apply(cumulative_nbp_ens[, 135:164], 1, mean)
@@ -1068,7 +1241,7 @@ cnbp_modern_stan <- mean(cumulative_nbp_stan[135:164])
 
 Calculate the atmospheric growth rate of 1984- 2013 using a simple linear fit
 
-```{r, }
+```{r, eval = FALSE}
 # agr = atmospheric growth rate
 # agiav = atmospheric growth interannual variability
 
@@ -1103,7 +1276,7 @@ agiav_stan <- sd(agr_stan_fit$residuals)
   
 ```
 
-```{r, fig.width = 7, fig.height = 7, }
+```{r, fig.width = 7, fig.height = 7, eval = FALSE }
 
 plot(agr_modern_ens, cnbp_modern_ens,  col = makeTransparent(wave00col,150),
      ylim = c(-120,220), pch = 19,
@@ -1135,7 +1308,7 @@ Interannual variability and cumulative NBP
 (correlations are close to zero, especially in the later wave)
 
 
-```{r, fig.width = 7, fig.height = 7, }
+```{r, fig.width = 7, fig.height = 7, eval = FALSE }
 
 plot(agiav_modern_ens, cnbp_modern_ens,  col = makeTransparent(wave00col,150),
      ylim = c(-120,220), pch = 19,
@@ -1151,7 +1324,7 @@ legend('bottomright', legend = c('wave00', 'wave01', 'wave01 constrained', 'stan
 ```
 
 
-```{r, }
+```{r, eval = FALSE}
 
 
 print(cor(agiav_modern_ens, cnbp_modern_ens))
@@ -1164,7 +1337,7 @@ print(cor( agiav_modern_wave01, cnbp_modern_wave01))
 
 Using Atmospheric Growth Rate as an example, how close can we get the model to observations? Can we do better than standard? What are the trade offs of doing so? How does getting close in AGR affect performance in other outputs?
 
-```{r, }
+```{r, eval = FALSE}
 # Define the observed atmospheric growth rate.
 
 ag_obs <- historical_carbon_budget$`atmospheric growth`[which(historical_carbon_budget$Year %in% years)]
@@ -1186,7 +1359,7 @@ ag_err_stan_modern <- ag_err_stan[ag_modern_ix]
 
 ```
 
-```{r, }
+```{r, eval = FALSE}
 matplot(long_modern_years, t(ag_err_modern[without_outliers_ix_wave00,]), type = 'l', lty = 'solid', col = makeTransparent(wave00col, 100), main = 'Amospheric Growth Error')
 
 errcol <- rep(wave01col, nrow(ag01[without_outliers_ix_wave01,]))
@@ -1203,7 +1376,7 @@ abline(h=0)
 ```
 
 
-```{r, fig.width = 7, fig.height = 7, }
+```{r, fig.width = 7, fig.height = 7, eval = FALSE}
 
 # Atmospheric growth mean error
 ag_modern_me <- apply(ag_err_modern,1,mean)
@@ -1251,7 +1424,7 @@ rug(ag_modern_rmse_stan, col = stancol, lwd = 2 )
 
 We've established that most of the original ensemble have an ME/MAE/RMSE larger than the standard run. More (but few) of the wave01 perform better than standard. 
 
-```{r, }
+```{r, eval = FALSE}
 
 
 better_ix_ag_rmse <- which(ag_modern_rmse < ag_modern_rmse_stan)
@@ -1268,7 +1441,7 @@ A map of the 2D projections of parameter space where the ensemble member perform
 The blue part is the first wave, and not subject to constraint so may be removed in the second wave (wave01).
 
 
-```{r, fig.width = 12, fig.height = 12, }
+```{r, fig.width = 12, fig.height = 12, eval = FALSE}
 
 better_ix <- 1:nrow(X_better_ag)
 
@@ -1292,7 +1465,7 @@ Having trouble fitting RMSE, to trying mean error.
 
 Why is there an odd collection at just under 1?
 
-```{r, fig.width = 12, fig.height = 12, }
+```{r, fig.width = 12, fig.height = 12, eval = FALSE}
 # there are 100 wave01 ensemble members that pass the level 2 constrainst
 length(level2_ix_wave01)
 
@@ -1308,7 +1481,7 @@ level2_and_better_ag01_ix <- intersect(level2_ix_wave01, better_ix_ag01_me)
 
 This next pairs plot looks at all the ensemble members that have a better mean atmospheric growth error than standard.
 
-```{r, fig.width = 12, fig.height = 12, }
+```{r, fig.width = 12, fig.height = 12, eval = FALSE }
 X_better_ag <- rbind(X[better_ix_ag_me, ], X_wave01_train[better_ix_ag01_me, ])
 
 better_ix <- 1:nrow(X_better_ag)
@@ -1328,7 +1501,7 @@ This next plot looks at all the ensemble members that have a better mean atmosph
 
 The number is small (41/300), but the ensemble members seem spread across parameter space.
 
-```{r, fig.width = 12, fig.height = 12, }
+```{r, fig.width = 12, fig.height = 12, eval = FALSE}
 
 X_level2_and_better_ag01 <- X[level2_and_better_ag01_ix, ]
 pairs(X_level2_and_better_ag01,
@@ -1343,7 +1516,7 @@ pairs(X_level2_and_better_ag01,
 
 
 
-```{r, include = FALSE, }
+```{r, include = FALSE, eval = FALSE}
 library(DiceKriging)
 
 ag01_outlier_ix <- which(ag01_modern_me > 10)
@@ -1353,7 +1526,7 @@ fit_ag_me <- km(~., design = X_wave01_train[-ag01_outlier_ix, ], response = ag01
 
 ```
 
-```{r, }
+```{r, eval = FALSE}
 
 plot(fit_ag_me)
 
@@ -1370,7 +1543,7 @@ colnames(X_unif) <- colnames(X)
 ```
 
 
-```{r, }
+```{r, eval = FALSE}
 pred_unif_ag <- predict.km(fit_ag_me, newdata = X_unif, type = 'UK' ) 
 
 # Keeps about 20%
@@ -1390,7 +1563,7 @@ This pairs plot shows the 2d and marginal density of emulated input points where
 
 This technique might provide a useful set of points for optimising the model (at least to atmospheric growth).
 
-```{r, fig.width = 12, fig.height = 12, warning = FALSE, }
+```{r, fig.width = 12, fig.height = 12, warning = FALSE, eval = FALSE}
 #pairs(X_unif[X_kept_ix, ][1:50,],
 #      col = makeTransparent('black',50),
 #      gap = 0,
@@ -1476,7 +1649,7 @@ Red point indicates the standard input.
 The position of the standard input with regards to the histograms give us an idea of what we might do to improve the simulation - at least in terms of atmospheric growth. If we were to move the input towards areas of higher density, we might expect a better model performance.
 
 
-```{r, fig.width = 12, fig.height = 12, warning = FALSE, }
+```{r, fig.width = 12, fig.height = 12, warning = FALSE, eval = FALSE}
 
 X_stan_norm <- normalize(matrix(rep(1, 32), nrow = 1), wrt = lhs)
 
@@ -1627,15 +1800,65 @@ gc()
 
 ```
 
+### How far from data is the model?
+
+```{r, fig.width = 6, fig.height = 7}
+
+frac_cci <- c(global_frac_cci[1] + global_frac_cci[2], global_frac_cci[3], global_frac_cci[4], global_frac_cci[5], global_frac_cci[8] )
+frac_mv <- c(standard_modern_value['treeFrac_lnd_mean'], standard_modern_value['c3PftFrac_lnd_mean'], standard_modern_value['c4PftFrac_lnd_mean'], standard_modern_value['shrubFrac_lnd_mean'], standard_modern_value['baresoilFrac_lnd_mean']  )
+
+
+fraclab = c('Trees', 'C3 grasses', 'C4 grasses', 'Shrubs', 'Bare soil')
+
+
+# Half and double the LC CCI data to get bounds for constraining JULES ES-1.0
+frac_cci_max <- frac_cci + (0.5*frac_cci)
+frac_cci_min <- frac_cci - (0.5*frac_cci)
+
+
+```
+
+
+
+```{r, fig.width = 7, fig.height = 6}
+
+pdf(width = 7, height = 6, file = 'figs/land_surface_jules_vs_CCI.pdf')
+par(mar = c(10,4,2,1))
+df <- barplot(rbind(frac_cci*100, frac_mv), beside = TRUE, las = 2, ylim = c(0,100), 
+              ylab = c("Global mean land surface fraction (%)"),
+              names.arg = fraclab,
+        col = wes_palette('Zissou1')[c(2,3)])
+
+arrows(df[1,], frac_cci_min*100,df[1,],  frac_cci_max*100, angle = 90, code = 3, length = 0.05)
+n_in <- nrow(Y_frac_level1a_wave01)
+
+points(rep(df[2,1], n_in) + rnorm(n_in, mean = 0, sd = 0.1), Y_frac_level1a_wave01[,'treeFrac_lnd_mean'],
+       col = makeTransparent('black', 20), pch = 20)
+
+points(rep(df[2,2], nrow(Y_frac_level1a_wave01)) + rnorm(n_in, mean = 0, sd = 0.1), Y_frac_level1a_wave01[,'c3PftFrac_lnd_mean'],
+       col = makeTransparent('black', 20), pch = 20)
+
+points(jitter(rep(df[2,3], nrow(Y_frac_level1a_wave01))) + rnorm(n_in, mean = 0, sd = 0.1), Y_frac_level1a_wave01[,'c4PftFrac_lnd_mean'],
+       col = makeTransparent('black', 20), pch = 20)
+
+points(jitter(rep(df[2,4], nrow(Y_frac_level1a_wave01)))+ rnorm(n_in, mean = 0, sd = 0.1), Y_frac_level1a_wave01[,'shrubFrac_lnd_mean'],
+       col = makeTransparent('black', 20), pch = 20)
+
+points(jitter(rep(df[2,5], nrow(Y_frac_level1a_wave01))) + rnorm(n_in, mean = 0, sd = 0.1), Y_frac_level1a_wave01[,'baresoilFrac_lnd_mean'],
+       col = makeTransparent('black', 20), pch = 20)
+
+legend('top', fill = c(wes_palette('Zissou1')[c(2,3)], NA), border = NA, legend = c('LC CCI+- 50%', 'standard JULES-ES-1.0', 'ensemble JULES-ES-1.0'), col = c(NA, NA, 'black'), pch = c(NA, NA,20))
+dev.off()
+#dev.off()
+
+
+```
+
 
 ```{r, fig.width = 12, fig.height = 12, warning = FALSE, message = FALSE, error = FALSE }
-# treefrac 20- 40
 
-# shrubfrac < 5
-
-# baresoil < 40
-
-treefrac_ix_em <- which(Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] > 20 & Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] < 40)
+treefrac_ix_em <- which(Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] > frac_cci_min[1]*100 &
+                          Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] < frac_cci_max[1]*100)
   
 #  Y_const_pred_unif_mean[,'nbp_lnd_sum'] > 0 &
 #                      Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] > 35 & Y_const_pred_unif_mean[,'npp_nlim_lnd_sum'] < 80 &
@@ -1645,8 +1868,12 @@ treefrac_ix_em <- which(Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] > 20 & Y_fr
                       #abs(pred_unif_ag$mean) < abs(ag_modern_me_stan)
 #                  )
 
+X_treefrac <- rbind(X_unif[treefrac_ix_em, ], X_stan_norm)
+colnames(X_treefrac) <- 1:32
 
-pairs(rbind(X_unif[treefrac_ix_em, ], X_stan_norm),
+
+#pdf(file = 'X_treefrac_pairs_density.pdf', width = 10, height = 10)
+pairs(X_treefrac,
     #  labels = 1:d,
       gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
       panel = dfunc_up_truth,
@@ -1655,6 +1882,17 @@ pairs(rbind(X_unif[treefrac_ix_em, ], X_stan_norm),
       col.axis = 'white',
       dfunc_col = rb)
 
+
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = rb,
+           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+           legend.shrink = 0.6,
+           horizontal = TRUE
+)
+
+legend('left', legend = paste(1:32, colnames(lhs)), cex = 1, bty = 'n')
+#dev.off()
 
 ```
 
@@ -1665,12 +1903,6 @@ pairs(rbind(X_unif[treefrac_ix_em, ], X_stan_norm),
 
 ```
 
-```{r}
-
-treefrac_ix_em <- which(Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] > 20 & Y_frac_pred_unif_mean[, 'treeFrac_lnd_mean'] < 40)
-  
-
-```
 
 ## Sequentially add constraints
 
@@ -1724,8 +1956,8 @@ inputConstraintSize <- function(Y_unif, yvec, mins, maxes){
 # Put all of the constraint inputs together
 Y_pred <- cbind(Y_const_pred_unif_mean, Y_frac_pred_unif_mean)
 
-Y_pred_mins <- c(0, 35, 750, 300, 20, 0, 0, 0, 0)
-Y_pred_maxes <- c(10000, 80, 3000, 800, 40, 100,100, 5, 40)
+Y_pred_mins <- c(0, 35, 750, 300, (frac_cci_min*100))
+Y_pred_maxes <- c(10000, 80, 3000, 800, (frac_cci_max*100))
 
 ```
 
@@ -1733,7 +1965,7 @@ Y_pred_maxes <- c(10000, 80, 3000, 800, 40, 100,100, 5, 40)
 
 ### individual constraint
 
-```{r, fig.width = 8, fig.height = 7}
+```{r, fig.width = 8, fig.height = 8}
 
 ics_individual_list <- vector(mode = 'list', length = ncol(Y_pred))
 
@@ -1754,15 +1986,29 @@ for(i in 1:ncol(Y_pred)){
 perc_kept_individual <- sapply(ics_individual_list, FUN = function(x) x$prop_kept) * 100
 
 
-#pdf(file = 'figs/individual_constraint.pdf')
+```
+
+
+```{r, fig.width = 7, fig.height = 7}
+
+to_100 <- 100 - perc_kept_individual
+percmat <- rbind(perc_kept_individual, to_100)
+
+colnames(percmat) <- colnames(Y_pred)
+
+#pdf(width = 7, height = 7, file = 'figs/individual_constraint.pdf')
 par(mar = c(14, 4, 2, 1), las = 1)
-plot(1:9, perc_kept_individual, ylim = c(0,100), type = 'b', axes = FALSE, xlab = '',
-     ylab = 'Proportion of input space retained (%)')
+barplot(percmat, ylim = c(0,100), xlab = '',
+     ylab = 'Proportion of input space retained (%)', col = c(zissou5[2], 'grey90'),
+     las = 2)
 
-axis(2)
+#axis(2)
 
-axis(1, labels = paste0(colnames(Y_pred), ' (',Y_pred_mins,'-', Y_pred_maxes,')'), at = 1:9, las = 2)
+#axis(1, labels = paste0(colnames(Y_pred), ' (',Y_pred_mins,'-', Y_pred_maxes,')'), at = 1:9, las = 2)
 #dev.off()
+
+
+
 
 
 ```
@@ -1773,7 +2019,7 @@ axis(1, labels = paste0(colnames(Y_pred), ' (',Y_pred_mins,'-', Y_pred_maxes,')'
 
 Each constraint is added to the previous constraint
 
-```{r, fig.width = 8, fig.height = 7}
+```{r, fig.width = 8, fig.height = 8}
 
 ics_list <- vector(mode = 'list', length = ncol(Y_pred))
 
@@ -1792,43 +2038,50 @@ for(i in 1:ncol(Y_pred)){
 
 perc_kept <- sapply(ics_list, FUN = function(x) x$prop_kept) * 100
 
-#pdf(file = 'figs/sequential_constraint.pdf')
-par(mar = c(14, 4, 2, 1), las = 1)
-plot(1:9, perc_kept, ylim = c(0,100), type = 'b', axes = FALSE, xlab = '',
-     ylab = 'Proportion of input space retained (%)')
+perc_inv <- 100 - perc_kept
 
-axis(2)
-axis(1, labels = paste0(colnames(Y_pred), ' (',Y_pred_mins,'-', Y_pred_maxes,')'), at = 1:9, las = 2)
+perc_seq_mat <- rbind(perc_kept, perc_inv)
+colnames(perc_seq_mat) <- colnames(Y_pred)
+
+# #pdf(file = 'figs/sequential_constraint.pdf')
+# par(mar = c(15, 4, 2, 1), las = 1)
+# plot(1:9, perc_kept, ylim = c(0,100), type = 'b', axes = FALSE, xlab = '',
+#      ylab = 'Proportion of input space retained (%)')
+# 
+# axis(2)
+# axis(1, labels = paste0(colnames(Y_pred), ' (',round(Y_pred_mins,1),'-', round(Y_pred_maxes,1),')'), at = 1:9, las = 2)
+# #dev.off()
+
+#pdf(file = 'figs/sequential_constraint.pdf', width = 8, height = 8)
+par(mar = c(14, 4, 2, 1), las = 1)
+barplot(perc_seq_mat, ylim = c(0,100), xlab = '',
+     ylab = 'Proportion of input space retained (%)', col = c(zissou5[2], 'grey90'),
+     las = 2)
+
 #dev.off()
 
 
 ```
 
-### How far from data is the model?
-
-```{r, fig.width = 6, fig.height = 7}
-
-frac_cci <- c(global_frac_cci[1] + global_frac_cci[2], global_frac_cci[3], global_frac_cci[4], global_frac_cci[5], global_frac_cci[8] )
-frac_mv <- c(standard_modern_value['treeFrac_lnd_mean'], standard_modern_value['c3PftFrac_lnd_mean'], standard_modern_value['c4PftFrac_lnd_mean'], standard_modern_value['shrubFrac_lnd_mean'], standard_modern_value['baresoilFrac_lnd_mean']  )
-
-
-fraclab = c('Trees', 'C3 grasses', 'C4 grasses', 'Shrubs', 'Bare soil')
-par(las = 1, mar = c(8, 4,3,2))
-plot(1:5, frac_cci*100, ylim = c(0,50), pch = 19, cex = 1.5, axes = FALSE, xlab = '')
-axis(1, at = 1:5, labels = fraclab, las = 2)
-axis(2)
-points(1:5, frac_mv, col = 'red', pch = 19, cex = 1.5)
-legend('topleft', legend = c('LC CCI', 'JULES-ES-1p0'), col = c('black', 'red'), pch = c(19,19))
-
-
-
-```
 
 
 
 ### How similar are each of the constraints?
-```{r}
+```{r, fig.width = 10, fig.height = 10}
 
+X_all_constraints <- rbind(X_unif[ics_list[[8]]$ix_kept , ], X_stan_norm)
+colnames(X_treefrac) <- 1:32
+
+
+#pdf(file = 'X_treefrac_pairs_density.pdf', width = 10, height = 10)
+pairs(X_all_constraints,
+    #  labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      #panel = dfunc_up_truth,
+      #diag.panel = panel.hist,
+      cex.labels = 1,
+      col.axis = 'white')
+      #dfunc_col = rb)
 
 
 

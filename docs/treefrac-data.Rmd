@@ -6,7 +6,11 @@ output: html_notebook
 ```{r}
 library(ncdf4)
 library(ncdf4.helpers)
+library(RColorBrewer)
 
+
+yg <- brewer.pal(9, 'YlGn')
+gyg <- c('grey80', yg[2:9])
 
 
 ```
@@ -44,16 +48,6 @@ The cci lats run -90 to 90 (145), whereas the land fraction runs -89.375 to 89.3
 
 lc_vec <- c('broadleaf trees', 'needleleaf trees', 'C3 (temperate) grass', 'C4 (tropical) grass', 'shrubs', 'urban', 'inland water', 'bare soil', 'ice')
 
-par(mfrow = c(3,3))
-
-for(i in 1:9){
-  
-image(lon_cci, lat_cci, lc_dat_cci[, , i], main = lc_vec[i], zlim = c(0,1))
-  
-}
-
-treefrac_cci <- lc_dat_cci[, , 1] + lc_dat_cci[, , 2]
-
 ```
 
 This is the landfrac file from Andy - it has a smaller grid than the cci landcover file
@@ -64,7 +58,7 @@ nc_landfrac <- nc_open('treefrac/bb075_m01s03i395.nc')
 
 landfrac_dat <- ncvar_get(nc = nc_landfrac , varid = 'landFrac' )
 
-image(landfrac_dat)
+image(landfrac_dat, col = gyg)
 
 lat_landfrac <- ncvar_get(nc_landfrac,"latitude")
 lon_landfrac <- ncvar_get(nc_landfrac,"longitude")
@@ -82,7 +76,7 @@ cdo remapbil,targetgrid ifile ofile
 
 nc_ga <- nc_open('treefrac/gridarea.nc')
 vars <- nc.get.variable.list(nc_ga)
-print(vars)
+#print(vars)
 
 ga_dat  <- ncvar_get(nc = nc_ga , varid = 'cell_area' )
 
@@ -100,11 +94,11 @@ other_ix <- which(is.na(lc_dat_cci[, , i]))
 mask[land_ix] <- 1
 mask[other_ix] <- 0
 
-image(mask)
+image(mask, col = gyg)
 
 
 ```
-```{r, fig.width = 10, fig.height = 8}
+```{r, fig.width = 10, fig.height = 9}
 
 # It's going to be pretty close to just sum up with area * fraction
 
@@ -118,13 +112,24 @@ frac_area <- array(NA, dim = dim(lc_dat_cci))
 
 frac_area_scaled <- frac_area / sum(ga_dat)
 
-par(mfrow = c(3,3))
+#pdf(file = 'figs/LC_CCI_maps.pdf', width = 10, height = 9)
+par(mfrow = c(3,3), oma = c(8,0.1,0.1,0.1), las = 1)
 
 for(i in 1:9){
   
-image(lon_cci, lat_cci, lc_dat_cci[, , i], main = lc_vec[i], zlim = c(0,1))
+image(lon_cci, lat_cci, lc_dat_cci[, , i], 
+      main = lc_vec[i],
+      xlab = 'longitude', ylab = 'latitude',
+      zlim = c(0,1), col = gyg)
   
 }
+
+
+reset()
+
+image.plot(lc_dat_cci[, , i],legend.only = TRUE, horizontal = TRUE, col = gyg, legend.shrink = 0.4, legend.width = 1,legend.args=list( text="Fraction", cex=1, side=3, line=0.5))
+#dev.off()
+
 
 ```
 
