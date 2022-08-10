@@ -1,12 +1,24 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Analysis of JULES1p0 ensemble SSP585"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    toc_depth: 2
+    number_sections: yes
 ---
 
 This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
 
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
 
+```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
+# Load helper functions
+
+knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
+
+
+```
 
 ```{r}
 
@@ -328,6 +340,493 @@ matplot(sspyears,t(c4PftFrac_lnd_mean_ens_anom_ssp585_S3),
 
 
 ```
+
+
+## Which ensemble members match constraints?
+
+Start with Level 2 (Andy's constraints in NPP, NBP, cSoil and cVeg)
+
+```{r}
+
+ix_mv <- which(sspyears %in% 1996:2015)
+
+yvec_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3')
+
+# Matrix of constraint output modern values (1996 - 2015)
+Y_const_ssp585_mv <- matrix(data = NA, nrow = nrow(npp_ens_ssp585_S3), ncol = length(yvec_constraints_vec ))
+colnames(Y_const_ssp585_mv) <- yvec_constraints
+
+for(i in 1:length(yvec_constraints)){
+  
+  Y_trunc <- get(yvec_constraints[i])[, ix_mv]
+  Y_trunc_mean <- apply(Y_trunc, 1, mean, na.rm = TRUE)
+  Y_const_ssp585_mv[,i] <- Y_trunc_mean
+}
+
+```
+
+
+```{r}
+
+createConstraintString <- function(yvec, mins, maxes){
+  # This function constructs a logical expression as a string to be evaluated
+  out <- 'which('
+  
+  for(i in 1:length(yvec)){
+    
+    if(i<length(yvec)){
+      
+    subconst <- paste0('Y_unif','[,', '"',yvec[i],'"',']', '>', mins[i], '&', 'Y_unif','[,', '"',yvec[i], '"',']' , '<', maxes[i], '&')
+    }
+    
+    else{
+     subconst <-  paste0('Y_unif','[,', '"',yvec[i],'"',']', '>', mins[i], '&', 'Y_unif','[,', '"',yvec[i], '"',']' , '<', maxes[i])
+    }
+   out <-  paste0(out, subconst)
+  }
+  
+  out <- paste0(out, ')')
+}
+
+
+AW_mins <- c(35, 0, 750, 300)
+AW_maxes <- c(80, 10000, 3000, 800)
+
+Y_unif <- Y_const_ssp585_mv
+ix_kept <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = AW_mins, maxes = AW_maxes)))
+
+
+
+#eval(parse(text = paste0()))
+
+inputConstraintSize <- function(Y_unif, yvec, mins, maxes){
+  # Calculate the indices of Y_unif that are within the bounds set by mins and maxes
+  
+  
+  ix_kept <- eval(parse(text = createConstraintString(yvec=yvec, mins = mins, maxes = maxes)))
+  
+  prop_kept <- length(ix_kept) / nrow(Y_unif)
+  
+  return(list(ix_kept = ix_kept, prop_kept = prop_kept))
+  
+}
+  
+```
+
+### Timeseries of absolute vales
+
+```{r, fig.width = 10, fig.height = 12}
+
+lcol_wave01 <- makeTransparent('firebrick',  80)
+lcol_wave01_level2 <- makeTransparent('gold',  80)
+stancol = 'black'
+
+linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = NULL){
+  # Plot wave00 and wave01 timeseries on top of one another
+  
+  nt <- length(years) 
+  if(is.null(ylim)){
+    
+  #ylim = range(c(ens1[,1], ens1[,nt], ens2[,1], ens2[ ,nt]))
+  ylim = range(c(ens1,ens2))
+  }
+  
+  else ylim <- ylim
+  
+  matplot(years, t(ens1), type = 'l', lty = 'solid',ylim = ylim, col = col1,
+        ylab = ylab, main = main, xlab = '',
+        bty = 'n', lwd = 1.5)
+  matlines(years, t(ens2), col = col2, lty = 'solid', lwd = 1.5)
+}
+
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
+
+linePlotMultiEns(years = sspyears, ens1 = npp_ens_ssp585_S3,
+                 ens2 = npp_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NPP')
+
+linePlotMultiEns(years = sspyears, ens1 = nbp_ens_ssp585_S3,
+                 ens2 = nbp_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NBP')
+
+linePlotMultiEns(years = sspyears, ens1 = cSoil_ens_ssp585_S3,
+                 ens2 = cSoil_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cSoil')
+
+linePlotMultiEns(years = sspyears, ens1 = cVeg_ens_ssp585_S3,
+                 ens2 = cVeg_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cVeg')
+
+
+linePlotMultiEns(years = sspyears, ens1 = rh_lnd_sum_ens_ssp585_S3,
+                 ens2 = rh_lnd_sum_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'RH')
+
+linePlotMultiEns(years = sspyears, ens1 = fLuc_lnd_sum_ens_ssp585_S3,
+                 ens2 = fLuc_lnd_sum_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fLuc')
+
+
+linePlotMultiEns(years = sspyears, ens1 = lai_lnd_mean_ens_ssp585_S3,
+                 ens2 = lai_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'LAI')
+
+linePlotMultiEns(years = sspyears, ens1 = fHarvest_lnd_sum_ens_ssp585_S3,
+                 ens2 = fHarvest_lnd_sum_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fHarvest')
+
+
+linePlotMultiEns(years = sspyears, ens1 = treeFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = treeFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'treeFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = shrubFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = shrubFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'shrubFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = baresoilFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = baresoilFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'baresoilFrac')
+
+
+linePlotMultiEns(years = sspyears, ens1 = c3PftFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = c3PftFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = c4PftFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = c4PftFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'c4PftFrac')
+reset()
+
+legend('bottomright', legend = c('wave01', 'wave01 level2'), lty = 'solid', lwd = 2, col = c(lcol_wave01, lcol_wave01_level2), inset = c(0.05, 0.15) )
+
+```
+
+### Anomaly timeseries
+```{r, fig.width = 10, fig.height = 12}
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
+
+linePlotMultiEns(years = sspyears, ens1 = npp_ens_anom_ssp585_S3,
+                 ens2 = npp_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NPP')
+
+linePlotMultiEns(years = sspyears, ens1 = nbp_ens_anom_ssp585_S3,
+                 ens2 = nbp_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NBP')
+
+linePlotMultiEns(years = sspyears, ens1 = cSoil_ens_anom_ssp585_S3,
+                 ens2 = cSoil_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cSoil')
+
+linePlotMultiEns(years = sspyears, ens1 = cVeg_ens_anom_ssp585_S3,
+                 ens2 = cVeg_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cVeg')
+
+
+linePlotMultiEns(years = sspyears, ens1 = rh_lnd_sum_ens_anom_ssp585_S3,
+                 ens2 = rh_lnd_sum_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'RH')
+
+linePlotMultiEns(years = sspyears, ens1 = fLuc_lnd_sum_ens_anom_ssp585_S3,
+                 ens2 = fLuc_lnd_sum_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fLuc')
+
+
+linePlotMultiEns(years = sspyears, ens1 = lai_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = lai_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'LAI')
+
+linePlotMultiEns(years = sspyears, ens1 = fHarvest_lnd_sum_ens_anom_ssp585_S3,
+                 ens2 = fHarvest_lnd_sum_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fHarvest')
+
+
+linePlotMultiEns(years = sspyears, ens1 = treeFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = treeFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'treeFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = shrubFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = shrubFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'shrubFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = baresoilFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = baresoilFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'baresoilFrac')
+
+
+linePlotMultiEns(years = sspyears, ens1 = c3PftFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = c3PftFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = c4PftFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = c4PftFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'c4PftFrac')
+reset()
+
+legend('bottomright', legend = c('wave01', 'wave01 level2'), lty = 'solid', lwd = 2, col = c(lcol_wave01, lcol_wave01_level2), inset = c(0.05, 0.15) )
+
+
+```
+
+
+## Include Tree fraction data
+
+```{r}
+
+load('treefrac/global_frac_cci.RData')
+
+frac_cci <- c(global_frac_cci[1] + global_frac_cci[2], global_frac_cci[3], global_frac_cci[4], global_frac_cci[5], global_frac_cci[8] )
+#frac_mv <- c(standard_modern_value['treeFrac_lnd_mean'], standard_modern_value['c3PftFrac_lnd_mean'], #standard_modern_value['c4PftFrac_lnd_mean'], standard_modern_value['shrubFrac_lnd_mean'], standard_modern_value['baresoilFrac_lnd_mean']  )
+
+
+fraclab = c('Trees', 'C3 grasses', 'C4 grasses', 'Shrubs', 'Bare soil')
+
+
+# Half and double the LC CCI data to get bounds for constraining JULES ES-1.0
+frac_cci_max <- frac_cci + (0.5*frac_cci)
+frac_cci_min <- frac_cci - (0.5*frac_cci)
+
+```
+
+
+```{r}
+
+ix_mv <- which(sspyears %in% 1996:2015)
+
+yvec_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3','baresoilFrac_lnd_mean_ens_ssp585_S3')
+
+# Matrix of constraint output modern values (1996 - 2015)
+Y_const_ssp585_mv <- matrix(data = NA, nrow = nrow(npp_ens_ssp585_S3), ncol = length(yvec_constraints))
+colnames(Y_const_ssp585_mv) <- yvec_constraints
+
+for(i in 1:length(yvec_constraints)){
+  
+  Y_trunc <- get(yvec_constraints[i])[, ix_mv]
+  Y_trunc_mean <- apply(Y_trunc, 1, mean, na.rm = TRUE)
+  Y_const_ssp585_mv[,i] <- Y_trunc_mean
+}
+
+```
+
+```{r}
+const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
+const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
+
+Y_unif <- Y_const_ssp585_mv
+ix_kept <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
+
+```
+
+
+```{r, fig.width = 10, fig.height = 12}
+
+lcol_wave01 <- makeTransparent('firebrick',  120)
+lcol_wave01_level2 <- makeTransparent('gold',  120)
+stancol = 'black'
+
+linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = NULL){
+  # Plot wave00 and wave01 timeseries on top of one another
+  
+  nt <- length(years) 
+  if(is.null(ylim)){
+    
+  #ylim = range(c(ens1[,1], ens1[,nt], ens2[,1], ens2[ ,nt]))
+  ylim = range(c(ens1,ens2))
+  }
+  
+  else ylim <- ylim
+  
+  matplot(years, t(ens1), type = 'l', lty = 'solid',ylim = ylim, col = col1,
+        ylab = ylab, main = main, xlab = '',
+        bty = 'n', lwd = 1.5)
+  matlines(years, t(ens2), col = col2, lty = 'solid', lwd = 1.5)
+}
+
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
+
+linePlotMultiEns(years = sspyears, ens1 = npp_ens_ssp585_S3,
+                 ens2 = npp_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NPP')
+
+linePlotMultiEns(years = sspyears, ens1 = nbp_ens_ssp585_S3,
+                 ens2 = nbp_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NBP')
+
+linePlotMultiEns(years = sspyears, ens1 = cSoil_ens_ssp585_S3,
+                 ens2 = cSoil_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cSoil')
+
+linePlotMultiEns(years = sspyears, ens1 = cVeg_ens_ssp585_S3,
+                 ens2 = cVeg_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cVeg')
+
+
+linePlotMultiEns(years = sspyears, ens1 = rh_lnd_sum_ens_ssp585_S3,
+                 ens2 = rh_lnd_sum_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'RH')
+
+linePlotMultiEns(years = sspyears, ens1 = fLuc_lnd_sum_ens_ssp585_S3,
+                 ens2 = fLuc_lnd_sum_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fLuc')
+
+
+linePlotMultiEns(years = sspyears, ens1 = lai_lnd_mean_ens_ssp585_S3,
+                 ens2 = lai_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'LAI')
+
+linePlotMultiEns(years = sspyears, ens1 = fHarvest_lnd_sum_ens_ssp585_S3,
+                 ens2 = fHarvest_lnd_sum_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fHarvest')
+
+
+linePlotMultiEns(years = sspyears, ens1 = treeFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = treeFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'treeFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = shrubFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = shrubFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'shrubFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = baresoilFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = baresoilFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'baresoilFrac')
+
+
+linePlotMultiEns(years = sspyears, ens1 = c3PftFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = c3PftFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = c4PftFrac_lnd_mean_ens_ssp585_S3,
+                 ens2 = c4PftFrac_lnd_mean_ens_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'c4PftFrac')
+reset()
+
+legend('bottomright', legend = c('wave01', 'wave01 level2'), lty = 'solid', lwd = 2, col = c(lcol_wave01, lcol_wave01_level2), inset = c(0.05, 0.15) )
+
+```
+### Anomaly timeseries
+```{r, fig.width = 10, fig.height = 12}
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
+
+linePlotMultiEns(years = sspyears, ens1 = npp_ens_anom_ssp585_S3,
+                 ens2 = npp_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NPP')
+
+linePlotMultiEns(years = sspyears, ens1 = nbp_ens_anom_ssp585_S3,
+                 ens2 = nbp_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NBP')
+
+linePlotMultiEns(years = sspyears, ens1 = cSoil_ens_anom_ssp585_S3,
+                 ens2 = cSoil_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cSoil')
+
+linePlotMultiEns(years = sspyears, ens1 = cVeg_ens_anom_ssp585_S3,
+                 ens2 = cVeg_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cVeg')
+
+
+linePlotMultiEns(years = sspyears, ens1 = rh_lnd_sum_ens_anom_ssp585_S3,
+                 ens2 = rh_lnd_sum_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'RH')
+
+linePlotMultiEns(years = sspyears, ens1 = fLuc_lnd_sum_ens_anom_ssp585_S3,
+                 ens2 = fLuc_lnd_sum_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fLuc')
+
+
+linePlotMultiEns(years = sspyears, ens1 = lai_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = lai_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'LAI')
+
+linePlotMultiEns(years = sspyears, ens1 = fHarvest_lnd_sum_ens_anom_ssp585_S3,
+                 ens2 = fHarvest_lnd_sum_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fHarvest')
+
+
+linePlotMultiEns(years = sspyears, ens1 = treeFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = treeFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'treeFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = shrubFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = shrubFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'shrubFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = baresoilFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = baresoilFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'baresoilFrac')
+
+
+linePlotMultiEns(years = sspyears, ens1 = c3PftFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = c3PftFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+linePlotMultiEns(years = sspyears, ens1 = c4PftFrac_lnd_mean_ens_anom_ssp585_S3,
+                 ens2 = c4PftFrac_lnd_mean_ens_anom_ssp585_S3[ix_kept, ],
+                 col1 = lcol_wave01, col2 = lcol_wave01_level2,
+                 ylab = '%', main = 'c4PftFrac')
+reset()
+
+legend('bottomright', legend = c('wave01', 'wave01 level2'), lty = 'solid', lwd = 2, col = c(lcol_wave01, lcol_wave01_level2), inset = c(0.05, 0.15) )
+
+
+```
+
+
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
 
