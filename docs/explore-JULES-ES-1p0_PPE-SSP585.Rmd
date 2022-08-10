@@ -1,0 +1,336 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+```{r}
+
+source("JULES-ES-1p0-common-packages.R")
+source("JULES-ES-1p0-common-functions.R")
+```
+
+
+```{r}
+
+
+makeTimeseriesEnsembleSSP <- function(ensloc, variable, nstart, nend, cn = 1850:2100){
+  
+  ysec <- 31536000
+  
+  nens <- (nend - nstart) + 1
+  # nens is number of ensemble members
+  # nts length of timeseries
+  # cn is colnames()
+  datmat <- matrix(NA, nrow = nens, ncol = length(cn))
+  colnames(datmat) <- cn
+  
+  enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
+  
+  for(i in 1:nens){
+    
+    ensmember <- enslist[i]
+    
+    fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    
+    try(nc <- nc_open(paste0(fn)))
+    #try(localtime <- ncvar_get(nc, 'time'))
+    
+    # This part compensates for the fact that sometimes years are missing
+    #try(localyear <- floor(2100 + (localtime / ysec)))
+    #try(ix <- which(cn%in%localyear))
+    
+    try(dat <- extractTimeseries(nc, variable))
+    
+    try(datmat[i, ] <- dat)
+    nc_close(nc)
+  }
+  datmat
+}
+
+getStandardMemberSSP <- function(ensloc, variable, nts = 251, cn = 1850:2100){
+  
+  datmat <- matrix(NA, nrow = 1, ncol = nts)
+  colnames(datmat) <- cn
+  
+  ensmember <- 'S3'
+  #fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+  fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+  
+  try(nc <- nc_open(paste0(fn)))
+  try(dat <- extractTimeseries(nc, variable))
+  
+  datmat[1, ] <- dat
+  nc_close(nc)
+  datmat
+  
+}
+
+
+
+```
+
+
+
+```{r}
+
+
+ensloc_ssp585_S3 <- '/data/users/hadaw/JULES_ES_PPE/u-cf932/'
+ensloc_ssp585_RAD <- '/data/users/hadaw/JULES_ES_PPE/u-ck647/'
+
+ysec = 60*60*24*365
+sspyears <- 1850:2100
+
+
+
+```
+
+
+
+```{r}
+
+if (file.exists("ensemble_timeseries_ssp_2022-08-09.rdata")) {
+  load("ensemble_timeseries_ssp_2022-08-09.rdata")
+} else {
+  
+  # primary carbon cycle outputs
+  npp_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "npp_nlim_lnd_sum", cn = sspyears) / (1e12/ysec)
+  
+  nbp_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "nbp_lnd_sum", cn = sspyears) / (1e12/ysec)
+  
+  cSoil_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "cSoil_lnd_sum", cn = sspyears) / 1e12
+  
+  cVeg_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "cVeg_lnd_sum", cn = sspyears) / 1e12
+  
+  lai_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "lai_lnd_mean", cn = sspyears)
+  
+  # fluxes
+  rh_lnd_sum_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "rh_lnd_sum", cn = sspyears) / (1e12/ysec)
+  
+  fLuc_lnd_sum_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "fLuc_lnd_sum", cn = sspyears) / (1e12/ysec)
+ 
+  fHarvest_lnd_sum_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "fHarvest_lnd_sum", cn = sspyears) / (1e12/ysec)
+  
+  # fractions
+  treeFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "treeFrac_lnd_mean", cn = sspyears)
+
+  shrubFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "shrubFrac_lnd_mean", cn = sspyears)  
+  
+  baresoilFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "baresoilFrac_lnd_mean", cn = sspyears)  
+  
+  c3PftFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "c3PftFrac_lnd_mean", cn = sspyears) 
+  
+  c4PftFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "c4PftFrac_lnd_mean", cn = sspyears)   
+  
+  save(npp_ens_ssp585_S3, nbp_ens_ssp585_S3, cSoil_ens_ssp585_S3, cVeg_ens_ssp585_S3, lai_lnd_mean_ens_ssp585_S3, rh_lnd_sum_ens_ssp585_S3, fLuc_lnd_sum_ens_ssp585_S3, fHarvest_lnd_sum_ens_ssp585_S3,
+       treeFrac_lnd_mean_ens_ssp585_S3, shrubFrac_lnd_mean_ens_ssp585_S3, baresoilFrac_lnd_mean_ens_ssp585_S3,c3PftFrac_lnd_mean_ens_ssp585_S3, c4PftFrac_lnd_mean_ens_ssp585_S3,
+       file = "ensemble_timeseries_ssp_2022-08-09.rdata" )
+  
+}
+
+
+
+
+```
+
+
+```{r, include=FALSE}
+
+# npp_stan_ssp585_S3<- getStandardMember(ensloc = ensloc_wave00, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+# nbp_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "nbp_lnd_sum") / (1e12/ysec)
+# cSoil_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "cSoil_lnd_sum") / 1e12
+# cVeg_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "cVeg_lnd_sum") / 1e12
+# lai_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "lai_lnd_mean")
+# 
+# 
+# # fluxes
+# rh_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "rh_lnd_sum") / (1e12/ysec)
+# fLuc_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "fLuc_lnd_sum") / (1e12/ysec)
+# fHarvest_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "fHarvest_lnd_sum") / (1e12/ysec)
+# 
+# 
+# # fractions
+# treeFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "treeFrac_lnd_mean")
+# shrubFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "shrubFrac_lnd_mean")
+# baresoilFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "baresoilFrac_lnd_mean")
+# c3PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "c3PftFrac_lnd_mean")
+# c4PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "c4PftFrac_lnd_mean")
+
+
+
+```
+
+
+```{r}
+## ----------------------------------------------------------------------
+## Anomalize ensemble
+## ----------------------------------------------------------------------
+
+npp_ens_anom_ssp585_S3 <- anomalizeTSmatrix(npp_ens_ssp585_S3, 1:20)
+nbp_ens_anom_ssp585_S3 <- anomalizeTSmatrix(nbp_ens_ssp585_S3, 1:20)
+cSoil_ens_anom_ssp585_S3 <- anomalizeTSmatrix(cSoil_ens_ssp585_S3, 1:20)
+cVeg_ens_anom_ssp585_S3 <- anomalizeTSmatrix(cVeg_ens_ssp585_S3, 1:20)
+
+rh_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(rh_lnd_sum_ens_ssp585_S3, 1:20)
+fLuc_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(fLuc_lnd_sum_ens_ssp585_S3, 1:20)
+lai_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(lai_lnd_mean_ens_ssp585_S3, 1:20) 
+
+fHarvest_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(fHarvest_lnd_sum_ens_ssp585_S3, 1:20)
+treeFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(treeFrac_lnd_mean_ens_ssp585_S3, 1:20)
+shrubFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(shrubFrac_lnd_mean_ens_ssp585_S3, 1:20)
+baresoilFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(baresoilFrac_lnd_mean_ens_ssp585_S3, 1:20)
+c3PftFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(c3PftFrac_lnd_mean_ens_ssp585_S3, 1:20)
+c4PftFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(c4PftFrac_lnd_mean_ens_ssp585_S3, 1:20)
+
+#total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
+
+
+```
+
+```{r, fig.width = 12, fig.height = 12}
+
+transpval <- 30
+linecol = 'black'
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
+
+matplot(sspyears, t(npp_ens_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'NPP', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(nbp_ens_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'NBP', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(cSoil_ens_ssp585_S3), 
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'cSoil', xlab = '', ylab = 'GtC')
+ 
+matplot(sspyears,t(cVeg_ens_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval), 
+        main = 'cVeg', xlab = '', ylab = 'GtC' )
+
+matplot(sspyears,t(rh_lnd_sum_ens_ssp585_S3 ),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'RH', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(fLuc_lnd_sum_ens_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'fLuc', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(lai_lnd_mean_ens_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'LAI', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(fHarvest_lnd_sum_ens_ssp585_S3), 
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'fHarvest', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(treeFrac_lnd_mean_ens_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'treeFrac', xlab = '', ylab = '%')
+
+matplot(sspyears,t(shrubFrac_lnd_mean_ens_ssp585_S3), 
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'shrubFrac', xlab = '', ylab = '%')
+
+matplot(sspyears,t(baresoilFrac_lnd_mean_ens_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'baresoilFrac', xlab = '', ylab = '%')
+
+matplot(sspyears,t(c3PftFrac_lnd_mean_ens_ssp585_S3), type = 'l', 
+        lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'c3PftFrac', xlab = '', ylab = '%')
+
+matplot(sspyears,t(c4PftFrac_lnd_mean_ens_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'c4PftFrac', xlab = '',ylab = '%')
+
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+
+transpval <- 30
+linecol = 'black'
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
+
+matplot(sspyears, t(npp_ens_anom_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'NPP', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(nbp_ens_anom_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'NBP', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(cSoil_ens_anom_ssp585_S3), 
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'cSoil', xlab = '', ylab = 'GtC')
+ 
+matplot(sspyears,t(cVeg_ens_anom_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval), 
+        main = 'cVeg', xlab = '', ylab = 'GtC' )
+
+matplot(sspyears,t(rh_lnd_sum_ens_anom_ssp585_S3 ),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'RH', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(fLuc_lnd_sum_ens_anom_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'fLuc', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(lai_lnd_mean_ens_anom_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'LAI', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(fHarvest_lnd_sum_ens_anom_ssp585_S3), 
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'fHarvest', xlab = '', ylab = 'GtC')
+
+matplot(sspyears,t(treeFrac_lnd_mean_ens_anom_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'treeFrac', xlab = '', ylab = '%')
+
+matplot(sspyears,t(shrubFrac_lnd_mean_ens_anom_ssp585_S3), 
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'shrubFrac', xlab = '', ylab = '%')
+
+matplot(sspyears,t(baresoilFrac_lnd_mean_ens_anom_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'baresoilFrac', xlab = '', ylab = '%')
+
+matplot(sspyears,t(c3PftFrac_lnd_mean_ens_anom_ssp585_S3), type = 'l', 
+        lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'c3PftFrac', xlab = '', ylab = '%')
+
+matplot(sspyears,t(c4PftFrac_lnd_mean_ens_anom_ssp585_S3),
+        type = 'l', lty = 'solid', col = makeTransparent(linecol, transpval),
+        main = 'c4PftFrac', xlab = '',ylab = '%')
+
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
