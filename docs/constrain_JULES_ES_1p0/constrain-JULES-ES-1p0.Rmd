@@ -1,0 +1,33 @@
+---
+title: "Constraining the carbon cycle in JULES-ES-1.0"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    toc_depth: 2
+    number_sections: yes
+---
+
+
+Code to run analysis of McNeall et al. (2023?) "Constraining the carbon cycle in JULES-ES-1.0
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
+# Load helper functions
+
+knitr::opts_chunk$set(fig.path = "paperfigs/", echo = FALSE, message = FALSE, warnings = FALSE)
+
+
+```
+
+```{r}
+
+source("JULES-ES-1p0-common-packages.R")
+source("JULES-ES-1p0-common-functions.R")
+
+source("JULES-ES-1p0-common-load-data.R")
+
+
+```
+
+
+
