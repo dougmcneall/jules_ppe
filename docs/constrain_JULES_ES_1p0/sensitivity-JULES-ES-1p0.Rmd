@@ -1,0 +1,924 @@
+---
+title: "Sensitivity Analysis Earth System configuration of JULES"
+author: "Doug McNeall"
+date: "21/09/2022"
+output: 
+    html_notebook:
+        toc: true
+        toc_float: true
+        toc_depth: 3
+        number_sections: true
+---
+
+
+## Preliminaries
+Load libraries, functions and data.
+
+```{r, echo = TRUE, message = FALSE, warning=FALSE, results = 'hide'}
+# Load helper functions
+  
+knitr::opts_chunk$set(fig.path = "figs/", echo = TRUE, message = FALSE, warnings = FALSE)
+
+# load helper functions, data and do preliminary processing of the ensemble.
+source("JULES-ES-1p0-common-packages.R")
+source('JULES-ES-1p0-common-functions.R')
+source('JULES-ES-1p0-common-data.R')
+
+# locally specific packages
+library(sensitivity)
+```
+
+
+```{r}
+# Locally specific functions
+
+# rotate a matric 90 degrees clockwise for plotting
+rotate <- function(x) t(apply(x, 2, rev))
+
+sensvar = function(oaat_pred, n, d){
+  # Calculate variance as a global sensitivity meansure
+  out = rep(NA,d)
+  for(i in 1:d){
+    ix = seq(from = ((i*n) - (n-1)), to =  (i*n), by = 1)
+    out[i] = var(oaat_pred$mean[ix])
+  }
+  out
+}
+
+
+twoStep_sens <- function(X, y, n=21, predtype = 'UK', nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, seed=NULL, trace=FALSE, maxit=100,
+                        REPORT=10, factr=1e7, pgtol=0.0, parinit=NULL, popsize=100){
+  # Sensitivity analysis with twoStep emulator. 
+  # Calculates the variance of the output varied one at a time across each input.
+  d = ncol(X)
+  X_norm <- normalize(X)
+  X_oaat <- oaat_design(X_norm, n, med = TRUE)
+  colnames(X_oaat) = colnames(X)
+  
+  twoStep_em = twoStep_glmnet(X=X, y=y, nugget=nugget, nuggetEstim=nuggetEstim, noiseVar=noiseVar,
+                              seed=seed, trace=trace, maxit=maxit,
+                              REPORT=REPORT, factr=factr, pgtol=pgtol,
+                              parinit=parinit, popsize=popsize)
+  
+  oaat_pred = predict(twoStep_em$emulator, newdata = X_oaat, type = predtype)
+  
+  sens = sensvar(oaat_pred = oaat_pred, n=n, d=d)
+  out = sens
+  out
+}
+
+
+
+oaatSensvarKm <- function(X, y, n = 21, med = TRUE, hold = NULL,  formula = ~., predtype = 'UK', ...){
+  # one-at-a-time sensitivity summary with a standard dicekriging emulator
+  
+  d = ncol(X)
+  X_norm <- normalize(X)
+  X_oaat <- oaat_design(X_norm, n, med = med, hold = hold)
+  colnames(X_oaat) = colnames(X)
+  
+
+  em <- km(formula = formula, design = X, response = y, ...)
+  
+  oaat_pred = predict(em, newdata = X_oaat, type = predtype)
+  
+  sens = sensvar(oaat_pred = oaat_pred, n=n, d=d)
+  out = sens
+  out
+  
+}
+
+oaatSensvarKmList <- function(X, em_list, n = 21, med = TRUE, hold = NULL,  formula = ~., predtype = 'UK', ...){
+  # one-at-a-time sensitivity summary with a standard dicekriging emulator
+  
+  d = ncol(X)
+  X_oaat <- oaat_design(X, n, med = med, hold = hold)
+  colnames(X_oaat) = colnames(X)
+  
+  em <- em_list[[i]]
+  
+  oaat_pred = predict(em, newdata = X_oaat, type = predtype)
+  
+  sens = sensvar(oaat_pred = oaat_pred, n=n, d=d)
+  out = sens
+  out
+  
+}
+
+
+oaatSensvarSummaryPlot <- function(oat_sens_mat){
+  
+  # relies on rotate(), fields
+  
+  ynames <- rownames(oat_sens_mat)
+  xnames <- colnames(oat_sens_mat)
+  
+  normsens <- normalize(t(oat_sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  sort_ix <- sort(normsens_mean, decreasing = TRUE, index.return = TRUE)
+  
+  par(mar = c(15,12,5,1), mfrow = c(1,2))
+  
+  layout(matrix(c(1,1,2), ncol = 3, nrow = 1))
+  
+  image(rotate(normsens[sort_ix$ix, ]), axes = FALSE, col = blues)
+  
+  axis(1, at = seq(from = 0, to = 1, length.out = length(ynames)), labels = ynames, las = 3, cex.axis = 1.2)
+  axis(2, at = seq(from = 1, to = 0, length.out = length(xnames)), labels = xnames[sort_ix$ix], las = 1, cex.axis = 1.2)
+  mtext('One-at-a-time sensitivity', side = 3, adj = 0, line = 2, cex = 1)
+  
+  lab_ix <- (1:length(xnames)) - 0.5
+  
+  par(yaxs = 'i', mar = c(15,1,5,5))
+  plot(rev(normsens_mean[sort_ix$ix]), lab_ix, xlab = 'mean oaat variance (normalized)', ylab = '', ylim = c(0,length(xnames)), type = 'n', yaxt = 'n')
+  abline(h = lab_ix, col = 'grey', lty = 'dashed')
+  points( rev(normsens_mean[sort_ix$ix]),lab_ix, col = zissou5[1], pch = 19, cex = 1.5)
+  
+  image.plot(legend.only = TRUE,
+             zlim = c(0,1),
+             col = blues,
+             legend.args = list(text = 'Relative sensitivity', side = 3, line = 1),
+             horizontal = TRUE
+  )
+  
+}
+
+
+
+sensMatSummaryPlot <- function(sens_mat, col = blues, maintext = 'Sensitivity Matrix', xlab = 'sensitivity summary'){
+  # Summary plots of a sensitivity matrix
+  # relies on rotate(), fields
+  
+  ynames <- rownames(sens_mat)
+  xnames <- colnames(sens_mat)
+  
+  normsens <- normalize(t(sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  sort_ix <- sort(normsens_mean, decreasing = TRUE, index.return = TRUE)
+  
+  par(mar = c(15,12,5,1), mfrow = c(1,2))
+  
+  layout(matrix(c(1,1,2), ncol = 3, nrow = 1))
+  
+  image(rotate(normsens[sort_ix$ix, ]), axes = FALSE, col = col)
+  
+  axis(1, at = seq(from = 0, to = 1, length.out = length(ynames)), labels = ynames, las = 3, cex.axis = 1.2)
+  axis(2, at = seq(from = 1, to = 0, length.out = length(xnames)), labels = xnames[sort_ix$ix], las = 1, cex.axis = 1.2)
+  mtext(maintext, side = 3, adj = 0, line = 2, cex = 1)
+  
+  lab_ix <- (1:length(xnames)) - 0.5
+  
+  par(yaxs = 'i', mar = c(15,1,5,5))
+  plot(rev(normsens_mean[sort_ix$ix]), lab_ix, xlab = xlab, ylab = '', ylim = c(0,length(xnames)), type = 'n', yaxt = 'n')
+  abline(h = lab_ix, col = 'grey', lty = 'dashed')
+  points( rev(normsens_mean[sort_ix$ix]),lab_ix, col = zissou5[1], pch = 19, cex = 1.5)
+  
+  image.plot(legend.only = TRUE,
+             zlim = c(0,1),
+             col = col,
+             legend.args = list(text = 'Relative sensitivity', side = 3, line = 1),
+             horizontal = TRUE
+  )
+}
+
+
+bp_convert <- function(fastmodel){
+  # get the FAST summary into an easier format for barplot
+  fast_summ <- print(fastmodel)
+  fast_diff <- fast_summ[ ,2] - fast_summ[ ,1]
+  fast_bp <- t(cbind(fast_summ[ ,1], fast_diff))
+  fast_bp
+}
+
+
+multiFAST<- function(X, Y, fit_list = NULL, n = 1000){
+  # FAST analysis for multiple outputs
+  
+  # Generate a design for the FAST99 analysis
+  X_fast <- fast99(model = NULL, factors = colnames(X), n = n,
+                   q = "qunif", q.arg = list(min = 0, max = 1))
+  
+  if(is.null(fit_list)){
+    fit_list <- createKmFitList(X = X, Y = Y)
+  }
+  
+  else{
+  fit_list <- fit_list
+  }
+  
+  fast_tell_list <- vector(mode = 'list', length = ncol(Y))
+  
+  for(i in 1:ncol(Y)){
+    
+    fit <- fit_list[[i]]
+    # Predict the response at the FAST99 design points using the emulator
+    pred_fast <- predict(fit, newdata = X_fast$X, type = 'UK')
+    
+    # Calculate the sensitivity indices
+    fast_tell <- tell(X_fast, pred_fast$mean)
+    
+    fast_tell_list[[i]] <- fast_tell
+    
+  }
+  
+  return(list(fit_list = fit_list, fast_tell_list = fast_tell_list))
+  
+}
+
+oaatSensvarRank <- function(oat_sens_mat){
+  
+  ynames <- rownames(oat_sens_mat)
+  xnames <- colnames(oat_sens_mat)
+  
+  normsens <- normalize(t(oat_sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
+SensRank <- function(sens_mat){
+  
+  # summarising and ranking parameters in a sensitivity matrix
+  
+  ynames <- rownames(sens_mat)
+  xnames <- colnames(sens_mat)
+  
+  normsens <- normalize(t(sens_mat))
+  normsens_mean <- apply(normsens,1, mean)
+  
+  rank <- rank(-normsens_mean)
+  
+  return(list(mean = normsens_mean, rank = rank))
+  
+}
+
+```
+
+
+
+
+to find the "standard" value in normalized space, we can normalize a vector of "1s" with respect to the original design
+```{r}
+
+X_standard <- matrix(rep(1,d), ncol = d, nrow = 1)
+
+X_standard_norm <- normalize(X_standard, wrt = lhs)
+
+lhs_min <- apply(lhs_wave0_wave01_all, 2, min)
+lhs_max <- apply(lhs_wave0_wave01_all,2, max)
+
+X_level1a_unnorm <- unnormalize(X_level1a, un_mins = lhs_min, un_maxes = lhs_max)
+
+X_level1a_wave01_unnorm <- unnormalize(X_level1a_wave01, un_mins = lhs_min, un_maxes = lhs_max)
+
+```
+
+
+
+# Sensitivity at level1a constraint (f0_io and b_wl_io truncated)
+Define constraint level 1a as those members that run, and have F0_io <0.9 & b_wl_io > 0.15 (normalised).
+
+## Modern value sensitivity
+
+```{r}
+
+oaat_level1a_Y_file <- 'data/oaat_level1a_Y.rdata'
+
+if (file.exists(oaat_level1a_Y_file)) {
+  load(oaat_level1a_Y_file)
+} else {
+  
+oat_var_sensmat_level1a_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1a[, yname]
+  oat <- oaatSensvarKmList(X = X_level1a, em_list = emlist_km_Y_level1a, med = FALSE, hold = X_standard_norm)
+  oat_var_sensmat_level1a_Y[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_level1a_Y, file = oaat_level1a_Y_file)
+}
+
+rownames(oat_var_sensmat_level1a_Y) <- y_names_sum
+colnames(oat_var_sensmat_level1a_Y) <- colnames(X_level1a)
+
+#normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
+
+```
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+#pdf(file = 'figs/oat_var_sensmat_level1a_Y.pdf', width = 7, height = 8)
+oaatSensvarSummaryPlot(oat_var_sensmat_level1a_Y)
+
+#dev.off()
+
+```
+
+## Anomaly (Change 1850 - 2013) sensitivities
+
+```{r}
+
+oaat_level1a_YAnom_file <- 'data/oaat_level1a_YAnom.rdata'
+
+if (file.exists(oaat_level1a_YAnom_file)) {
+  load(oaat_level1a_YAnom_file)
+} else {
+  
+oat_var_sensmat_level1a_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- YAnom_level1a[, yname]
+  oat <- oaatSensvarKmList(X = X_level1a, em_list = emlist_km_YAnom_level1a,  med = FALSE, hold = X_standard_norm)
+  oat_var_sensmat_level1a_YAnom[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_level1a_YAnom, file = oaat_level1a_YAnom_file)
+}
+
+
+rownames(oat_var_sensmat_level1a_YAnom) <- y_names_sum
+colnames(oat_var_sensmat_level1a_YAnom) <- colnames(X_level1a)
+
+# Normalise sensitivities
+#normsens_level1a_YAnom <- normalize(t(oat_var_sensmat_level1a_YAnom))
+
+```
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+#pdf(file = 'figs/oat_var_sensmat_level1a_YAnom.pdf', width = 7, height = 8)
+oaatSensvarSummaryPlot(oat_var_sensmat_level1a_YAnom)
+#dev.off()
+
+```
+
+
+
+## One-at-a-time sensitivity analysis of constraining variables for understanding model response
+"Constraining variables" being those we use to constrain the model (npp, nbp, cSoil and cVeg).
+It's hard to maintain a high vegetation carbon in particular.  
+
+Further idea: What parameter values might you choose to do this, and what might be the trade-offs you have to make?
+
+
+```{r}
+
+Y_const_level1a_scaled_list <- mat2list(Y_const_level1a_scaled)
+fit_list_const_level1a <- mclapply(X = Y_const_level1a_scaled_list, FUN = km, formula = ~., design = X_level1a,
+                                   mc.cores = 4, control = list(trace = FALSE))
+
+```
+
+
+```{r}
+# Check that oatSensVar and the plotting make sense
+
+oaat_sens_cVeg <- oaatSensvarKm(X = X_level1a, y = Y_const_level1a_scaled[,"cVeg_lnd_sum"])
+
+X_oaat_level1a <- oaat_design(X_level1a, n=21, med = FALSE, hold = X_standard_norm)
+
+colnames(X_oaat_level1a) = colnames(X)
+
+y_oaat <- predict.km(fit_list_const_level1a[[4]], newdata = X_oaat_level1a, type = 'UK')
+
+```
+
+
+First, what parameters affect vegetation carbon and how? How sure are we about that?
+
+```{r, fig.width = 8, fig.height = 10}
+
+
+oaatLinePlot(X_oaat = X_oaat_level1a, y_oaat_mean = y_oaat$mean, y_oaat_sd = y_oaat$sd, 
+             n_oaat = 21,nr = 6, nc = 6) 
+
+
+```
+
+
+```{r}
+
+Y_oaat_const_level1a_scaled <- matrix(ncol = ncol(Y_const_level1a_scaled), nrow = nrow(X_oaat_level1a))
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+
+  y_oaat <- predict.km(fit_list_const_level1a[[i]], newdata = X_oaat_level1a, type = 'UK')
+  Y_oaat_const_level1a_scaled[,i] <- y_oaat$mean
+}
+
+```
+
+
+What might be the trade-offs for a high (or accurate) vegetation carbon? are they acceptable? Plot the oaat sensitivity of the other 3 outputs we're calibrating on. 
+
+Plotting these graphs in the original input space (multiplication factors) and providing the standard has the pleasing side effect of showing what you could do to standard inputs to increase or decrease a particular output.
+
+```{r, fig.width=10, fig.height = 10}
+Y_oaat_const_level1a_scaled_norm <- normalize(Y_oaat_const_level1a_scaled)
+
+        oaatLinePlotMulti <- function(X_oaat, Y_oaat, n_oaat, nr, nc, cols, ...){
+  
+          par(mfrow = c(nr,nc), oma = c(0.1,0.1,3,0.1), mar = c(2,2,3,1), las = 1)
+  
+          for(i in 1:ncol(X_oaat)){
+            ix <- seq(from = ((i*n_oaat) - (n_oaat-1)), to =  (i*n_oaat), by = 1)
+    
+            plot(X_oaat[ix,i], Y_oaat[ix,1],
+                 ylim = c(0,1),
+                 xlab = colnames(X_oaat)[i],
+                 type= 'n',
+                 bty = 'n')
+  
+            for(j in 1:ncol(Y_oaat)){
+              lines(X_oaat[ix,i], Y_oaat[ix, j], lty = 'solid', col = cols[j], ...)
+              abline(v = 1, lty = 'dashed', col = 'grey')
+              mtext(colnames(X_oaat)[i], side = 3, line = 0.5)
+  
+            }
+  
+          }
+    
+        }
+
+X_oaat_level1a_unnorm <- unnormalize(X_oaat_level1a, un_mins = lhs_min, un_maxes = lhs_max)        
+#pdf(file = 'figs/Y_oaat_const_level1a_scaled_norm.pdf', width = 10, height = 10)
+oaatLinePlotMulti(X_oaat = X_oaat_level1a_unnorm, Y_oaat = Y_oaat_const_level1a_scaled_norm ,  n_oaat = 21, nr = 6, nc = 6,
+                  lwd = 3, col = cbPal[c(1,2,6,8)])
+  
+reset()
+legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = cbPal[c(1,2,6,8)], lty = 'solid', lwd = 3, horiz = TRUE)
+#dev.off()
+
+```
+
+
+## Update for wave01
+
+
+```{r}
+# Build list of emulators for both waves, standard constraint parameters.
+
+Y_const_level1a_wave01_scaled_list <- mat2list(Y_const_level1a_wave01_scaled)
+fit_list_const_level1a_wave01 <- mclapply(X = Y_const_level1a_wave01_scaled_list, FUN = km, formula = ~., design = X_level1a_wave01,
+                                   mc.cores = 4, control = list(trace = FALSE))
+
+```
+
+```{r}
+
+Y_oaat_const_level1a_wave01_scaled <- matrix(ncol = ncol(Y_const_level1a_wave01_scaled), nrow = nrow(X_oaat_level1a))
+
+for(i in 1:ncol(Y_oaat_const_level1a_wave01_scaled)){
+
+  y_oaat <- predict.km(fit_list_const_level1a_wave01[[i]], newdata = X_oaat_level1a, type = 'UK')
+  Y_oaat_const_level1a_wave01_scaled[,i] <- y_oaat$mean
+}
+
+```
+
+```{r, fig.width=10, fig.height = 10}
+Y_oaat_const_level1a_wave01_scaled_norm <- normalize(Y_oaat_const_level1a_wave01_scaled)
+
+#pdf(file = 'figs/Y_oaat_const_level1a_wave01_scaled_norm.pdf', width = 10, height = 10)
+oaatLinePlotMulti(X_oaat = X_oaat_level1a_unnorm, Y_oaat = Y_oaat_const_level1a_wave01_scaled_norm ,  n_oaat = 21, nr = 6, nc = 6,
+                  lwd = 3, col = cbPal[c(1,2,6,8)])
+  
+reset()
+legend('top', c('nbp', 'npp', 'csoil', 'cveg'), col = cbPal[c(1,2,6,8)], lty = 'solid', lwd = 3, horiz = TRUE)
+#dev.off()
+
+```
+
+
+```{r}
+Y_sum_level1a_wave01_list <- mat2list(Y_sum_level1a_wave01)
+
+emlist_km_Y_level1a_wave01_file <- "data/emlist_km_Y_level1a_wave01_2022-09-21.rdata" 
+
+if (file.exists(emlist_km_Y_level1a_wave01_file)) {
+  load(emlist_km_Y_level1a_wave01_file)
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_Y_level1a_wave01 <- mclapply(X = Y_sum_level1a_wave01_list, FUN = km, formula = ~., design = X_level1a_wave01, mc.cores = 4) 
+  
+  save( emlist_km_Y_level1a_wave01, file = emlist_km_Y_level1a_wave01_file)
+  
+}
+
+
+
+```
+
+```{r}
+
+
+oaat_level1a_wave01_Y_file <- 'data/oaat_level1a_wave01_Y.rdata'
+
+if (file.exists(oaat_level1a_wave01_Y_file)) {
+  load(oaat_level1a_wave01_Y_file)
+} else {
+  
+oat_var_sensmat_level1a_wave01_Y <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1a[, yname]
+  oat <- oaatSensvarKmList(X = X_level1a_wave01, em_list = emlist_km_Y_level1a_wave01, med = FALSE, hold = X_standard_norm)
+  oat_var_sensmat_level1a_wave01_Y[i, ] <- oat
+}
+
+save(y_names_sum, oat_var_sensmat_level1a_wave01_Y, file = oaat_level1a_wave01_Y_file)
+}
+
+rownames(oat_var_sensmat_level1a_wave01_Y) <- y_names_sum
+colnames(oat_var_sensmat_level1a_wave01_Y) <- colnames(X_level1a)
+
+#normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
+
+```
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+#pdf(file = 'figs/oat_var_sensmat_level1a_wave01_Y.pdf', width = 7, height = 8)
+oaatSensvarSummaryPlot(oat_var_sensmat_level1a_wave01_Y)
+
+#dev.off()
+
+```
+
+## Anomaly wave01
+
+```{r}
+YAnom_sum_level1a_wave01_list <- mat2list(YAnom_sum_level1a_wave01)
+
+emlist_km_Y_level1a_wave01_file <- 'data/emlist_km_Y_level1a_wave01_file_2022-09-21.rdata' 
+
+if (file.exists(emlist_km_Y_level1a_wave01_file)) {
+  load(emlist_km_Y_level1a_wave01_file)
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_YAnom_level1a_wave01 <- mclapply(X = YAnom_sum_level1a_wave01_list, FUN = km, formula = ~., design = X_level1a_wave01, mc.cores = 4) 
+  
+  save( emlist_km_YAnom_level1a_wave01, file = emlist_km_Y_level1a_wave01_file)
+  
+}
+
+
+
+```
+
+```{r}
+  
+oat_var_sensmat_level1a_wave01_YAnom <- matrix(NA, nrow = length(y_names_sum), ncol = ncol(X_level1a))
+
+for(i in 1:length(y_names_sum)){
+  
+  yname <- y_names_sum[i]
+  y <- Y_level1a[, yname]
+  oat <- oaatSensvarKmList(X = X_level1a_wave01, em_list = emlist_km_YAnom_level1a_wave01, med = FALSE, hold = X_standard_norm)
+  oat_var_sensmat_level1a_wave01_YAnom[i, ] <- oat
+}
+
+#save(y_names_sum, oat_var_sensmat_level1a_Y, file = "oaat_level1a_Y.rdata")
+#}
+
+rownames(oat_var_sensmat_level1a_wave01_YAnom) <- y_names_sum
+colnames(oat_var_sensmat_level1a_wave01_YAnom) <- colnames(X_level1a)
+
+#normsens_level1a_Y <- normalize(t(oat_var_sensmat_level1a_Y))
+```
+
+
+```{r, fig.width = 7, fig.height = 8}
+
+#pdf(file = 'figs/oat_var_sensmat_level1a_wave01_YAnom.pdf', width = 7, height = 8)
+oaatSensvarSummaryPlot(oat_var_sensmat_level1a_wave01_YAnom)
+
+#dev.off()
+
+```
+
+
+# FAST sensitivity analysis
+We use a FAST99 algorithm by Saltelli et al (2000), from the R package "sensitivity"
+
+```{r}
+# Need to think about how mins and maxes are dealt with - we have a truncated input design
+
+# Generate a design for the FAST99 analysis
+X_fast <- fast99(model = NULL, factors = colnames(X_level1a_wave01), n = 3000,
+                 q = "qunif", q.arg = list(min = 0, max = 1))
+```
+
+
+Create a list of sensitivity analyses, one for each column of the "sum" (modern) output matrix. 
+(This now uses wave01 data)
+```{r}
+
+MF_Y_sum_level1a_file <- 'data/MF_Y_sum_level1a.rdata'
+
+if(file.exists(MF_Y_sum_level1a_file )){
+  
+  load(MF_Y_sum_level1a_file )
+} else 
+{
+
+MF_Y_sum_level1a <- multiFAST(X = X_level1a_wave01, Y = Y_sum_level1a_wave01, fit_list = emlist_km_Y_level1a_wave01, n = 1000)
+
+save(MF_Y_sum_level1a, file = MF_Y_sum_level1a_file )
+}
+
+```
+
+
+Create a sensitivity summary matrix from the list of sensitivity analyses.
+```{r, fig.width = 8, fig.height = 10, echo = TRUE, results = 'hide'}
+
+
+FAST_total_Y_sum_level1a <- matrix(nrow = length(MF_Y_sum_level1a$fast_tell_list), ncol = d)
+
+for(i in 1:length(MF_Y_sum_level1a$fast_tell_list)){
+ 
+  # sum the direct effect and interaction terms to get a total
+  FAST_total_Y_sum_level1a[i, ] <- apply(bp_convert(MF_Y_sum_level1a$fast_tell_list[[i]]),2,sum)
+}
+
+colnames(FAST_total_Y_sum_level1a) <- colnames(X_level1a)
+rownames(FAST_total_Y_sum_level1a) <- colnames(Y_sum_level1a)
+```
+
+Plot the summary matrix
+```{r, fig.width = 8, fig.height = 10, message = FALSE, warning=FALSE}
+#pdf(file = 'figs/FAST_sensmat_Y_level1a_wave01.pdf', width = 7, height = 8)
+sensMatSummaryPlot(FAST_total_Y_sum_level1a)
+#dev.off()
+
+```
+
+
+Now create a list of sensitivity analyses for the anomaly at the end of the run.
+```{r}
+
+MF_YAnom_sum_level1a_file <- 'data/MF_YAnom_sum_level1a.rdata'
+
+if(file.exists(MF_YAnom_sum_level1a_file )){
+  
+  load(MF_YAnom_sum_level1a_file )
+} else 
+{
+
+#MF_Y_sum_level1a <- multiFAST(X = X_level1a_wave01, Y = Y_sum_level1a_wave01, fit_list = emlist_km_Y_level1a_wave01, n = 1000)
+MF_YAnom_sum_level1a <- multiFAST(X = X_level1a_wave01, Y = YAnom_sum_level1a_wave01, fit_list = emlist_km_YAnom_level1a_wave01, n = 1000)
+
+save(MF_YAnom_sum_level1a, file = MF_YAnom_sum_level1a_file )
+}
+
+
+
+```
+
+Create the sensitivity summary matrix for the anomaly
+```{r, include = FALSE}
+
+FAST_total_YAnom_sum_level1a <- matrix(nrow = length(MF_YAnom_sum_level1a$fast_tell_list), ncol = d)
+
+for(i in 1:length(MF_YAnom_sum_level1a$fast_tell_list)){
+ 
+  # sum the direct effect and interaction terms to get a total
+  FAST_total_YAnom_sum_level1a[i, ] <- apply(bp_convert(MF_YAnom_sum_level1a$fast_tell_list[[i]]),2,sum)
+}
+
+colnames(FAST_total_YAnom_sum_level1a) <- colnames(X_level1a)
+rownames(FAST_total_YAnom_sum_level1a) <- colnames(YAnom_sum_level1a)
+
+```
+
+
+Plot the sensitivity summary matrix
+```{r, fig.width = 8, fig.height = 10}
+
+#pdf(file = 'figs/FAST_sensmat_YAnom_level1a_wave01.pdf', width = 7, height = 8)
+sensMatSummaryPlot(FAST_total_YAnom_sum_level1a)
+#dev.off()
+
+```
+
+# Monte Carlo Filtering
+```{r}
+# ---------------------------------------------------------------------------------
+# Monte carlo filtering for sensitivity analysis
+# ---------------------------------------------------------------------------------
+
+# Uniform sample from across parameter space
+# Split the sample into 'behavioural' (NROY) and 'Non behavioural (Ruled Out)
+# Build cdfs of the marginal distributions in each case
+# Perform a KS test to see if the smaples are drawn from different distributions
+# The KS statistic is an indicator of the importance of the parameter in splitting the
+# samples.
+
+# "Not in" function
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+mcf = function(X, nroy_ix){
+
+  ## Monte Carlo Filtering function
+  ## X   ............... Complete sample from input space
+  ## nroy.ix ........... index of cases of X which are NROY (Not Ruled Out Yet), or 'behavioural'.
+
+  ## produces ks statistic for each column of the input matrix X
+  ## A larger ks statistic means that input is more important for
+  ## determining if a sample is NROY or not
+
+  X_nroy = X[nroy_ix, ]
+
+  ref = 1:nrow(X)
+  ro_ix = which(ref %!in% nroy_ix)
+  X_ro = X[ro_ix, ]
+
+  kss = rep(NA, length = ncol(X))
+  for(i in 1:ncol(X)){
+
+    ks = ks.test(X_ro[,i], X_nroy[,i])
+    kss[i] = ks$statistic
+
+  }
+
+  out = kss
+  out
+}
+```
+
+This repeats some code from the constraint analysis in order to do MCF using the observations (constraints) we have.
+
+```{r}
+
+# nbp  npp  csoil  cveg
+Y_lower <- c(-10, 35, 750, 300)
+Y_upper <- c(10, 80, 3000, 800)
+
+# I'm going to set it so that + 4sd aligns approximately with the original limits
+# given by Andy Wiltshire. This gives room for uncertainty from the emulator
+Y_target = Y_upper - (abs(Y_upper - (Y_lower)) / 2 )# abs() to fix the problem with negative numbers
+
+
+# standard deviation is derived from the limits and the central target
+# (this distance is assumed to be 4 standard deviations.
+Y_sd = (Y_upper - Y_target) / 4
+names(Y_sd) = colnames(Y_const_level1a_wave01_scaled)
+
+
+p = ncol(Y_const_level1a_wave01_scaled)
+
+obs_sd_list = as.list(rep(0.01,p))
+disc_list =  as.list(rep(0,p)) 
+disc_sd_list =  as.list(Y_sd)
+thres = 3
+
+mins_aug = apply(X_level1a, 2, FUN = min)
+maxes_aug =apply(X_level1a, 2, FUN = max)
+
+# convert Y_target for ingestion into function
+Y_target = matrix(Y_target, nrow = 1)
+
+```
+
+```{r}
+# First build an emulator list for the Y
+
+emlist_Y_const_level1a_wave01_scaled <- mclapply(X = Y_const_level1a_wave01_scaled_list, FUN = km, formula = ~., 
+                                                 design = X_level1a_wave01, mc.cores = 4,
+                                          control = list(trace = FALSE)) 
+
+```
+
+
+
+```{r}
+# Samples from a uniform distribution across all of input space
+nsamp_unif <- 10000  
+X_unif <- samp_unif(nsamp_unif, mins = (rep(0, d)), maxes = rep(1,d))
+
+Y_unif <- matrix(nrow = nsamp_unif, ncol = ncol(Y_const_level1a_wave01_scaled))
+colnames(Y_unif) <- colnames(Y_const_level1a_wave01_scaled)
+
+# Build an emulator for each output individually
+for(i in 1:ncol(Y_const_level1a_wave01_scaled)){
+  em <- emlist_Y_const_level1a_wave01_scaled[[i]]
+  pred <- predict(em, newdata = X_unif, type = 'UK')
+  Y_unif[,i] <- pred$mean
+}
+
+```
+
+```{r}
+# This uses MCF with the constraints set by AW, rather than with a formal history match.
+
+mcf_nbp = mcf(X_unif, which(Y_unif[,'nbp_lnd_sum'] > 0))
+mcf_npp = mcf(X_unif, which(Y_unif[,'npp_nlim_lnd_sum'] > 35 & Y_unif[,'npp_nlim_lnd_sum'] < 80))
+mcf_cSoil = mcf(X_unif, which(Y_unif[,'cSoil_lnd_sum'] > 750 & Y_unif[,'cSoil_lnd_sum'] < 3000))
+mcf_cVeg <- mcf(X_unif, which(Y_unif[,'cVeg_lnd_sum'] > 300 & Y_unif[,'cVeg_lnd_sum'] < 800))
+
+mcf_all_const <- mcf(X_unif, which(Y_unif[,'cVeg_lnd_sum'] > 300 & Y_unif[,'cVeg_lnd_sum'] < 800 & Y_unif[,'cSoil_lnd_sum'] > 750 & Y_unif[,'cSoil_lnd_sum'] < 3000 & Y_unif[,'npp_nlim_lnd_sum'] > 35 & Y_unif[,'npp_nlim_lnd_sum'] < 80 & Y_unif[,'nbp_lnd_sum'] > 0))
+
+mcf_summary <- matrix(rbind(mcf_nbp, mcf_npp, mcf_cSoil, mcf_cVeg, mcf_all_const), nrow = ncol(Y_const_level1a_wave01_scaled)+1)
+colnames(mcf_summary) <- colnames(X_level1a)
+rownames(mcf_summary) <- c('nbp', 'npp', 'cSoil', 'cVeg', 'all')
+
+```
+
+
+```{r, fig.width = 6, fig.height = 8}
+#pdf(file = 'figs/MCF_sensmat_Yconst_level1a_wave01.pdf', width = 6, height = 8 )
+sensMatSummaryPlot(mcf_summary)
+#dev.off()
+
+```
+
+```{r}
+# using all together is quite similar to using the mean
+plot(1:32, mcf_all_const, ylim = c(0,0.7), pch = 19)
+points(1:32, mcf_npp, col = 'red', pch = 19)
+points(1:32, mcf_cVeg, col = 'green', pch = 19)
+points(1:32, mcf_cSoil, col = 'brown', pch = 19)
+points(1:32, mcf_nbp, col = 'gold', pch = 19)
+
+legend('topleft', legend = c('all', 'npp', 'cVeg', 'cSoil', 'nbp'), 
+       col = c('black','red','green', 'brown', 'gold' ),
+       pch = 19) 
+
+
+```
+
+
+
+```{r}
+
+sensrank_Y_level1a_mcf <- SensRank(mcf_summary[1:4, ])
+
+```
+
+### Ranking sensitivity of the parameters.
+
+The idea here is to summarise the relative importance of the input parameters. The sensitivity measures are normalised
+```{r}
+
+
+
+
+sensrank_Y_level1a_oat <- SensRank(oat_var_sensmat_level1a_wave01_Y)
+sensrank_YAnom_level1a_oat <- SensRank(oat_var_sensmat_level1a_wave01_YAnom)
+
+sensrank_FAST <- SensRank(FAST_total_Y_sum_level1a)
+sensrank_FAST_YAnom <- SensRank(FAST_total_YAnom_sum_level1a)
+
+  
+sens_ranks <- cbind(sensrank_Y_level1a_oat$rank,sensrank_FAST$rank,  sensrank_YAnom_level1a_oat$rank, sensrank_FAST_YAnom$rank, sensrank_Y_level1a_mcf$rank)
+colnames(sens_ranks) <- c('OAT_modern_value', 'FAST_modern_value', 'OAT_anomaly', 'FAST_anomaly', 'MCF_modern_value')
+
+min_rank <- apply(sens_ranks,1, min)
+
+all_ranks <- cbind(sens_ranks, min_rank)
+
+#plot(sens_ranks[,1], sens_ranks[,2], xlab = 'modern value rank', ylab = 'anomaly rank')
+
+
+rank_ix <- sort(min_rank, decreasing = FALSE, index.return = TRUE)
+
+# All ranks is the table of rankings, with min_rank being the highest ranking
+sens_table <- all_ranks[rank_ix$ix, ]
+  
+```
+
+```{r}
+sens_table
+```
+
+```{r}
+
+library(xtable)
+xtable(sens_table, digits = 0)
+```
+
+
+
+```{r}
+knit_exit()
+
+```
+
