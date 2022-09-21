@@ -5,10 +5,22 @@
 ## ----------------------------------------------------------------------
 
 # move the right functions here
-source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
-source('explore-JULES-ES-1p0_PPE_functions.R')
+# Uncomment these once you've worked out which functions are needed
 
+#source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
+#source('explore-JULES-ES-1p0_PPE_functions.R')
 
+anomalizeTS <- function(x, ix = 1:20){x - mean(x[ix]) } 
+
+tsAnomaly <- function(nc, variable, startix = 1:20, endix = 144:164){
+  
+  # A basic function to read a variable and calculate the anomaly at the end of the run
+  dat <- ncvar_get(nc, variable)
+  endMean <- mean(dat[endix])
+  startMean <- mean(dat[startix])
+  out <- endMean - startMean
+  out
+}
 
 
 reset <- function() {
@@ -239,3 +251,26 @@ twoStep_glmnet <- function(X, y, nugget=NULL, nuggetEstim=FALSE, noiseVar=NULL, 
               noiseVar=noiseVar, emulator=m, seed=seed, coefs=m@covariance@range.val,
               trends=m@trend.coef, meanTerms=all.vars(start_form), fit_glmnet_cv=fit_glmnet_cv))
 }
+
+
+
+multiPred <- function(Y, Xpred, fit_list ){
+  
+  pred_mean <- matrix(NA, ncol = ncol(Y), nrow = nrow(Xpred))
+  pred_sd <- matrix(NA, ncol = ncol(Y), nrow = nrow(Xpred))
+  
+  colnames(pred_mean) <- colnames(Y)
+  colnames(pred_sd) <- colnames(Y)
+  
+  for(i in 1:length(fit_list)){
+    
+    pred <- predict.km(object=fit_list[[i]], newdata = Xpred, type = 'UK')
+    pred_mean[, i] <- pred$mean
+    pred_sd[, i] <- pred$sd
+    
+  }
+  
+  return(list(pred_mean = pred_mean, pred_sd = pred_sd))
+  
+}
+

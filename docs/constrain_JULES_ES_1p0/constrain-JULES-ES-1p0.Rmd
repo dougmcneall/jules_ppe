@@ -9,12 +9,12 @@ output:
 ---
 
 
-Code to run analysis of McNeall et al. (2023?) "Constraining the carbon cycle in JULES-ES-1.0
+Code to run analysis and generate figures for McNeall et al. (2023?) "Constraining the carbon cycle in JULES-ES-1.0"
 
 ```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
 # Load helper functions
 
-knitr::opts_chunk$set(fig.path = "paperfigs/", echo = FALSE, message = FALSE, warnings = FALSE)
+knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
 
 
 ```
@@ -23,11 +23,558 @@ knitr::opts_chunk$set(fig.path = "paperfigs/", echo = FALSE, message = FALSE, wa
 
 source("JULES-ES-1p0-common-packages.R")
 source("JULES-ES-1p0-common-functions.R")
+source("JULES-ES-1p0-common-data.R")
 
-source("JULES-ES-1p0-common-load-data.R")
+```
+
+## Failure analysis
+
+```{r failure-pairs, fig.width=12, fig.height=12, fig.path='figs/', dev=c('png', 'pdf')}
+
+
+low_npp_ix <- which(Y[,'npp_nlim_lnd_sum'] < 1e5)
+# code from https://stackoverflow.com/questions/28182872/how-to-use-different-sets-of-data-in-lower-and-upper-panel-of-pairs-function-in
+
+
+#X <- matrix(runif(300), ncol=3)
+#Y <- matrix(c(sort(runif(100, 0, 10)), 
+#              sort(runif(100, 0, 10)), 
+#              sort(runif(100, 0, 10))), ncol=3)
+
+#pdf(file = 'figs/run-failure-pairs.pdf', width = 12, height = 10)
+x1 <- X[low_npp_ix, ]
+x2 <- X_nlevel0
+
+XY <- rbind(x1, x2)
+
+
+pairs(XY,
+      lower.panel=function(x, y, ...) {
+        Xx <- x[seq_len(nrow(x1))] # corresponds to X subset
+        Xy <- y[seq_len(nrow(x1))] # corresponds to X subset
+        #usr <- par("usr"); on.exit(par(usr))
+        #par(usr = c(range(x1[, -ncol(x1)]), range(x1[, -1]))) # set up limits
+        points(Xx, Xy, col = zblue, pch = 19, cex = 0.8)
+       # if(par('mfg')[2] == 1) axis(2) # if left plot, add left axis
+        #if(par('mfg')[1] == ncol(x1)) axis(1) # if bottom plot add bottom axis
+      }, 
+      upper.panel=function(x, y, ...) {
+        Yx <- x[(nrow(x1) + 1):length(x)] # Y subset
+        Yy <- y[(nrow(x1) + 1):length(y)] # Y subset
+        
+        #cntr <- outer(Yx, Yx, FUN='*') # arbitrary function for contour
+       # usr <- par("usr"); on.exit(par(usr))
+        #par(usr = c(range(x2[, -1]), range(x2[, -ncol(x2)]))) # set up limits
+        points(Yx, Yy, col = zred, pch = 19, cex = 0.8)
+        #contour(Yx, Yy, cntr, add=TRUE)
+        #if(par('mfg')[2] == ncol(x2)) axis(4) # if right plot, add right axis
+        #if(par('mfg')[1] == 1) axis(3) # if top plot, add top axis
+      }, 
+      #tick=FALSE, # suppress the default tick marks
+      #line=1,
+      gap = 0,
+      xlim = c(0,1), ylim = c(0,1),
+      labels = 1:d,
+      oma = c(2, 18, 2, 2)) # move the default tick labels off the plot 
+
+reset()
+
+legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.1, bty = 'n')
+legend('topleft', pch = 19, col = c( zred, zblue), legend = c('failed', 'zero carbon cycle'), bty = 'n', inset = 0.02, cex = 1.1 )
+
+#dev.off()
+
+```
+
+# Visualising the ensemble range
+
+It's important to remember that the design of the experiment is multiplication factors of the original parameters. This might be important for the "hold" value in a sensitivity analysis, as the "standard" value and the median value of the ensemble will not be the same.
+
+```{r, fig.width = 6, fig.height = 8}
+
+#pdf(file = 'figs/lhs_range.pdf', width = 6, height = 8)
+par(las = 1, mar = c(5,8,2,1))
+lhs_min <- apply(lhs_wave0_wave01_all, 2, min)
+lhs_max <- apply(lhs_wave0_wave01_all,2, max)
+
+plot(lhs_max, 1:d, type = 'n', xlim = c(0,10), axes = FALSE, xlab = 'multiplying factor', ylab = '')
+
+abline(v = 0, lty = 'dashed', col = 'grey')
+abline(v = 1, lty = 'dashed', col = 'tomato2')
+
+segments(x0 = lhs_min, y0 = 1:d, x1 = lhs_max, y1 = 1:d )
+points(lhs_min, 1:d, pch = 20)
+points(lhs_max, 1:d, pch = 20)
+axis(2, at = 1:d, labels = colnames(lhs))
+axis(1)
+#dev.off()
+
+```
+
+## Wave00/Wave01  Ensemble behaviour in key (constraining) outputs. 
+
+Global mean for the 20 years at the end of the 20th Century. There is still a significant low bias on cVeg output.
+
+```{r, fig.width = 8, fig.height = 8}
+wave00col <- 'skyblue2'
+wave01col <- 'tomato2'
+
+wave00col <- 'dodgerblue2'
+wave01col <- 'firebrick'
+rangecol <- 'grey'
+```
+
+
+```{r, fig.width = 8, fig.height = 8 }
+# Histogram of level 1 constraints
+hcol = 'darkgrey'
+lcol = 'black'
+
+#pdf(file = 'figs/level_2_constraints_hists.pdf', width = 8, height = 8)
+par(mfrow = c(2,2), fg = 'darkgrey', las = 1, oma = c(0.1, 0.1, 4, 0.1))
+
+trunc <- function(x, vec){
+  
+  dat <- x[x < max(vec) & x > min(vec)  ]
+  
+  dat
+  
+}
+
+
+h <- hist(Y_const_level1a_scaled[,'nbp_lnd_sum'], main = 'NBP', xlab = 'GtC/year', col = makeTransparent(wave00col,150))
+hist(trunc(Y_const_wave01_scaled [,'nbp_lnd_sum'], h$breaks) ,
+     col = makeTransparent(wave01col,150) , breaks = h$breaks, add = TRUE)
+
+rug(Y_const_stan_scaled['nbp_lnd_sum'], lwd = 2)
+
+polygon(x = c(0, 100, 100, 0), y = c(0, 0, 1000, 1000),
+        col = makeTransparent(rangecol, 60),
+        border = makeTransparent(rangecol))
+
+h <- hist(Y_const_level1a_scaled[,'npp_nlim_lnd_sum'],col = makeTransparent(wave00col,150), main = 'NPP', xlab = 'GtC/year')
+hist(trunc(Y_const_wave01_scaled [,'npp_nlim_lnd_sum'], h$breaks) , 
+     col = makeTransparent(wave01col) , breaks = h$breaks, add = TRUE)
+
+rug(Y_const_stan_scaled['npp_nlim_lnd_sum'], lwd = 2)
+
+polygon(x = c(35, 80, 80, 35), y = c(0, 0, 1000, 1000),
+        col = makeTransparent(rangecol, 60),
+        border = makeTransparent(rangecol))
+
+
+h <- hist(Y_const_level1a_scaled[,'cSoil_lnd_sum'], col = makeTransparent(wave00col,150), main = 'Soil Carbon', xlab = 'GtC')
+hist(trunc(Y_const_wave01_scaled [,'cSoil_lnd_sum'], h$breaks) , 
+     col = makeTransparent(wave01col,150) , breaks = h$breaks, add = TRUE)
+
+rug(Y_const_stan_scaled['cSoil_lnd_sum'], lwd = 2)
+
+polygon(x = c(750, 3000, 3000, 750), y = c(0, 0, 1000, 1000),
+        col = makeTransparent(rangecol, 60),
+        border = makeTransparent(rangecol))
+
+h <- hist(Y_const_level1a_scaled[,'cVeg_lnd_sum'], col = makeTransparent(wave00col,150), main = 'Vegetation Carbon', xlab = 'GtC')
+hist(trunc(Y_const_wave01_scaled [,'cVeg_lnd_sum'], h$breaks) , 
+   col = makeTransparent(wave01col,150)  , breaks = h$breaks, add = TRUE)
+
+rug(Y_const_stan_scaled['cVeg_lnd_sum'], lwd = 2)
+
+polygon(x = c(300, 800, 800, 300), y = c(0, 0, 1000, 1000),
+        col = makeTransparent(rangecol, 60),
+       border =  makeTransparent(rangecol))
+
+
+
+reset()
+
+legend('top', horiz = TRUE, fill = c(makeTransparent(wave00col, 150), makeTransparent(wave01col, 150), makeTransparent(rangecol, 60)), legend = c('Wave00', 'Wave01', 'AW range'))
+
+#dev.off()
+```
+
+## What proportion of wave01 fall within Andy Wiltshire's constraints?
+
+Just under a third. Points at a significant model discrepency in cVeg
+
+Of the 400 members of the wave01 ensemble, 128 pass Andy Wiltshire's Level 2 constraints.
+
+```{r}
+
+length(level2_ix_wave01)
+length(level2_ix_wave01) / ntrain_wave01
 
 
 ```
 
 
+
+```{r plot-carbon-cycle-timeseries-primary, fig.width = 10, fig.height = 12}
+
+lcol_wave0 <- makeTransparent('dodgerblue2',  120)
+lcol_wave01 <- makeTransparent('firebrick',  120)
+lcol_wave01_level2 <- 'gold'
+stancol = 'black'
+
+linePlotMultiEns <- function(years, ens1, ens2, ens3, col1, col2, col3, ylab, main, ylim = NULL){
+  # Plot wave00 and wave01 timeseries on top of one another
+  
+  nt <- length(years) 
+  if(is.null(ylim)){
+    
+  ylim = range(c(ens1[,1], ens1[,nt], ens2[,1], ens2[ ,nt], ens3[,1], ens3[, nt]))
+  }
+  
+  else ylim <- ylim
+  
+  matplot(years, t(ens1), type = 'l', lty = 'solid',ylim = ylim, col = col1,
+        ylab = ylab, main = main, xlab = '',
+        bty = 'n')
+  matlines(years, t(ens2), col = col2, lty = 'solid')
+    matlines(years, t(ens3), col = col3, lty = 'solid')
+}
+
+#pdf(file = 'figs/carbon-cycle-timeseries-waves-constrained.pdf', width = 10, height = 12)
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
+
+linePlotMultiEns(years = years, ens1 = npp_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = npp_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = npp_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NPP')
+
+lines(years,npp_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 =  nbp_ens_wave00[without_outliers_ix_wave00,], 
+                 ens2 = nbp_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = nbp_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01,col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NBP', ylim = c(-10,10))
+
+lines(years, nbp_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = cSoil_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = cSoil_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = cSoil_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cSoil', ylim = range(c(cSoil_ens_wave00[,1], cSoil_ens_wave00[,164])))
+
+lines(years, cSoil_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = cVeg_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = cVeg_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = cVeg_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cVeg')
+
+lines(years, cVeg_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = lai_lnd_mean_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = lai_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = lai_lnd_mean_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'Lai')
+
+lines(years, lai_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = rh_lnd_sum_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = rh_lnd_sum_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = rh_lnd_sum_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01,  col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'RH')
+
+lines(years, rh_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = fLuc_lnd_sum_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = fLuc_lnd_sum_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = fLuc_lnd_sum_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fLuc')
+
+lines(years, fLuc_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = fHarvest_lnd_sum_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = fHarvest_lnd_sum_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = fHarvest_lnd_sum_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fHarvest')
+
+lines(years, fHarvest_lnd_sum_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = treeFrac_lnd_mean_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = treeFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = treeFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'treefrac'
+                 )
+
+lines(years, treeFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = shrubFrac_lnd_mean_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = shrubFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = shrubFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'shrubfrac'
+)
+
+lines(years, shrubFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = baresoilFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = baresoilFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'baresoilfrac')
+
+lines(years, baresoilFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
+
+linePlotMultiEns(years = years, c3PftFrac_lnd_mean_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = c3PftFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = c3PftFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+lines(years, c3PftFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
+
+linePlotMultiEns(years = years, c4PftFrac_lnd_mean_ens_wave00[without_outliers_ix_wave00,],
+                 ens2 = c4PftFrac_lnd_mean_ens_wave01[without_outliers_ix_wave01,],
+                 ens3 = c4PftFrac_lnd_mean_ens_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+lines(years, c4PftFrac_lnd_mean_stan, col = stancol, lty = 'solid', lwd = 2)
+
+
+reset()
+
+legend('bottomright', legend = c('wave00','wave01','wave01 level2','standard'), lty = 'solid', lwd = 1.5, col = c(lcol_wave0, lcol_wave01, lcol_wave01_level2, stancol), inset = c(0.05, 0.15) )
+
+#dev.off()
+```
+```{r, fig.width = 10, fig.height = 12}
+
+
+#pdf(file = 'figs/carbon-cycle-timeseries-anomaly-waves-constrained.pdf', width = 10, height = 12)
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
+
+linePlotMultiEns(years = years, ens1 = npp_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = npp_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = npp_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NPP')
+
+lines(years,npp_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+linePlotMultiEns(years = years, ens1 =  nbp_ens_anom_wave00[without_outliers_ix_wave00,], 
+                 ens2 = nbp_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = nbp_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01,col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'NBP', ylim = c(-10,10))
+
+lines(years, nbp_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = cSoil_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = cSoil_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = cSoil_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cSoil', ylim = range(c(cSoil_ens_anom_wave00[,1], cSoil_ens_anom_wave00[,164])))
+
+lines(years, cSoil_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = cVeg_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = cVeg_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = cVeg_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'cVeg')
+
+lines(years, cVeg_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = lai_lnd_mean_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = lai_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = lai_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'Lai')
+
+lines(years, lai_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = rh_lnd_sum_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = rh_lnd_sum_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = rh_lnd_sum_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01,  col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'RH')
+
+lines(years, rh_lnd_sum_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = fLuc_lnd_sum_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = fLuc_lnd_sum_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = fLuc_lnd_sum_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fLuc')
+
+lines(years, fLuc_lnd_sum_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+ 
+linePlotMultiEns(years = years, ens1 = fHarvest_lnd_sum_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = fHarvest_lnd_sum_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = fHarvest_lnd_sum_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = 'GtC', main = 'fHarvest')
+
+lines(years, fHarvest_lnd_sum_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = treeFrac_lnd_mean_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = treeFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = treeFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'treefrac'
+                 )
+
+lines(years, treeFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = shrubFrac_lnd_mean_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = shrubFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = shrubFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'shrubfrac'
+)
+
+lines(years, shrubFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+linePlotMultiEns(years = years, ens1 = baresoilFrac_lnd_mean_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = baresoilFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = baresoilFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'baresoilfrac')
+
+lines(years, baresoilFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+
+linePlotMultiEns(years = years, c3PftFrac_lnd_mean_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = c3PftFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = c3PftFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+lines(years, c3PftFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+
+linePlotMultiEns(years = years, c4PftFrac_lnd_mean_ens_anom_wave00[without_outliers_ix_wave00,],
+                 ens2 = c4PftFrac_lnd_mean_ens_anom_wave01[without_outliers_ix_wave01,],
+                 ens3 = c4PftFrac_lnd_mean_ens_anom_wave01[level2a_ix_wave01, ],
+                 col1 = lcol_wave0, col2 = lcol_wave01, col3 = lcol_wave01_level2,
+                 ylab = '%', main = 'c3PftFrac')
+
+lines(years, c4PftFrac_lnd_mean_stan_anom, col = stancol, lty = 'solid', lwd = 2)
+
+reset()
+
+legend('bottomright', legend = c('wave00','wave01','wave01 level2','standard'), lty = 'solid', lwd = 1.5, col = c(lcol_wave0, lcol_wave01, lcol_wave01_level2, stancol), inset = c(0.05, 0.15) )
+
+
+#dev.off()
+
+``` 
+
+
+## Constraining to level 2 with the emulator
+
+
+
+```{r}
+nunif <- 50000
+X_unif <- samp_unif(nunif, mins = rep(0,32), maxes = rep(1, 32))
+colnames(X_unif) <- colnames(X)
+```
+
+
+
+```{r}
+
+# Can this go in common data? Would be needed for checking emulator fits
+# Create fit lists for the combined data wave00 level 1a and wave01
+Y_const_level1a_wave01_scaled_list <- mat2list(Y_const_level1a_wave01_scaled)
+
+fit_list_const_level1a_wave01 <- mclapply(X = Y_const_level1a_wave01_scaled_list , FUN = km, formula = ~., design = X_level1a_wave01,
+                                   mc.cores = 4, control = list(trace = FALSE))
+
+
+```
+
+
+```{r}
+
+Y_const_level1a_wave01_scaled_pred <- multiPred(Y = Y_const_level1a_wave01_scaled, Xpred = X_unif, fit_list = fit_list_const_level1a_wave01)
+
+```
+
+
+
+```{r}
+
+
+level2_ix_em_unif_wave00_wave01 <- which(Y_const_level1a_wave01_scaled_pred$pred_mean[,'nbp_lnd_sum'] > 0 &
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'npp_nlim_lnd_sum'] > 35 & 
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'npp_nlim_lnd_sum'] < 80 &
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'cSoil_lnd_sum'] > 750 &
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'cSoil_lnd_sum'] < 3000 &
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'cVeg_lnd_sum'] > 300 & 
+                                           Y_const_level1a_wave01_scaled_pred$pred_mean[,'cVeg_lnd_sum'] < 800
+)
+
+
+(length(level2_ix_em_unif_wave00_wave01) / nunif) * 100
+
+```
+
+```{r}
+
+
+
+```
+
+
+```{r}
+X_stan_norm <- normalize(matrix(rep(1, 32), nrow = 1), wrt = lhs)
+
+colnames(X_unif) <- 1:32
+
+```
+
+
+```{r,fig.width = 12, fig.height = 12, warning = FALSE}
+
+#pdf(file = 'figs/pairs_level2_ix_em_unif_wave00_wave01.pdf', width = 12, height = 12)
+
+par(oma = c(0,0,0,3), bg = 'white')
+
+panel_hist_local <- function(x, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+pairs(rbind(X_unif[level2_ix_em_unif_wave00_wave01, ], X_stan_norm),
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up_truth,
+      diag.panel = panel_hist_local,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc_col = rb
+      )
+
+
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = rb,
+           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+           legend.shrink = 0.6,
+           horizontal = TRUE
+)
+
+legend('left', legend = paste(1:32, colnames(lhs)), cex = 1, bty = 'n')
+
+#dev.off()
+```
 
