@@ -455,10 +455,6 @@ c4PftFrac_lnd_mean_ens_anom_wave01 <- anomalizeTSmatrix(c4PftFrac_lnd_mean_ens_w
 
 #total_land_carbon_anom_wave01 <- anomalizeTSmatrix(total_land_carbon_ens_wave01, 1:20)
 
-
-
-
-
 ```
 
 ```{r}

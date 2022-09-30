@@ -20,6 +20,14 @@ br = rev(rb)
 blues = brewer.pal(9, 'Blues')
 cbPal <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
+wave00col <- 'skyblue2'
+wave01col <- 'tomato2'
+
+#wave00col <- 'dodgerblue2'
+#wave01col <- 'firebrick'
+#rangecol <- 'grey'
+
+
 zissou5 <- wes_palette('Zissou1', 5, type = c('discrete', 'continuous'))
 zblue <- makeTransparent(as.character(zissou5)[1], 150)
 zred <- makeTransparent(as.character(zissou5)[5], 150)
@@ -437,6 +445,39 @@ if (file.exists(ensemble_wave01_anom_file )) {
 }
 
 
+# the "select" wave01 ensemble, to tie in with constraints later
+ens_select_wave01_mv_file <- "data/ens_select_wave01_mv_file_2022-09-26.rdata"
+
+if (file.exists(ens_select_wave01_mv_file)) {
+  load(ens_select_wave01_mv_file)
+} else {
+  
+  ens_select_wave01_mv <- makeJulesEnsembleModernValue(ensloc = ensloc_wave01, 
+                                                varlist = y_names_select,
+                                                nstart = nstart,
+                                                nend = nend, 
+                                                ix = 144:164) 
+  
+  save(ens_select_wave01_mv, file = ens_select_wave01_mv_file)
+}
+
+ens_select_wave01_mv_anom_file <- "data/ens_select_wave01_mv_anom_file_2022-09-26.rdata"
+
+if (file.exists(ens_select_wave01_mv_anom_file)) {
+  load(ens_select_wave01_mv_anom_file )
+} else {
+  
+  ens_select_wave01_mv_anom <- makeJulesEnsembleAnomaly(ensloc = ensloc_wave01, 
+                                              varlist = y_names_select,
+                                              nstart = nstart,
+                                              nend = nend, 
+                                              ix = 144:164) 
+  
+  save(ens_select_wave01_mv_anom, file = ens_select_wave01_mv_anom_file )
+}
+
+
+
 # Load input matrices and bind with wave00 inputs
 lhs_wave01 <- read.table( 'data/lhs_example.txt', header = TRUE)
 
@@ -623,4 +664,5 @@ Y_const_level1a_wave01_scaled <- rbind(Y_const_level1a_scaled, Y_const_wave01_sc
 Y_sum_level1a_wave01 <- rbind(Y_sum_level1a, ens_wave01_mv$datmat[without_outliers_ix_wave01, ])
 
 YAnom_sum_level1a_wave01 <- rbind(YAnom_sum_level1a, ens_wave01_anom$datmat[without_outliers_ix_wave01, ])
+
 

@@ -268,30 +268,7 @@ SensRank <- function(sens_mat){
 
 ```
 
-# Visualising the ensemble range
 
-It's important to remember that the design of the experiment is multiplication factors of the original parameters. This might be important for the "hold" value in a sensitivity analysis, as the "standard" value and the median value of the ensemble will not be the same.
-
-```{r, fig.width = 6, fig.height = 8}
-
-#pdf(file = 'figs/lhs_range.pdf', width = 6, height = 8)
-par(las = 1, mar = c(5,8,2,1))
-lhs_min <- apply(lhs_wave0_wave01_all, 2, min)
-lhs_max <- apply(lhs_wave0_wave01_all,2, max)
-
-plot(lhs_max, 1:d, type = 'n', xlim = c(0,10), axes = FALSE, xlab = 'multiplying factor', ylab = '')
-
-abline(v = 0, lty = 'dashed', col = 'grey')
-abline(v = 1, lty = 'dashed', col = 'tomato2')
-
-segments(x0 = lhs_min, y0 = 1:d, x1 = lhs_max, y1 = 1:d )
-points(lhs_min, 1:d, pch = 20)
-points(lhs_max, 1:d, pch = 20)
-axis(2, at = 1:d, labels = colnames(lhs))
-axis(1)
-#dev.off()
-
-```
 
 
 to find the "standard" value in normalized space, we can normalize a vector of "1s" with respect to the original design

@@ -1,0 +1,989 @@
+---
+title: "Testing the emulators for JULES-ES-1.0"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    toc_depth: 2
+    number_sections: yes
+---
+
+
+Code to run analysis and generate figures for McNeall et al. (2023?) "Constraining the carbon cycle in JULES-ES-1.0".  
+This analysis tests the quality of the gaussian process emulators used to interpolate both waves of JULES runs. These figures can be found in appendix C of the paper. 
+
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
+# Load helper functions
+
+knitr::opts_chunk$set(fig.path = "figs/", echo = FALSE, message = FALSE, warnings = FALSE)
+
+
+```
+
+```{r}
+
+source("JULES-ES-1p0-common-packages.R")
+source("JULES-ES-1p0-common-functions.R")
+source("JULES-ES-1p0-common-data.R")
+
+```
+
+
+```{r}
+
+Y_select_wave00_level1a <- Y_level1a[, y_names_select]
+Y_select_wave00_level1a_list <- mat2list(Y_select_wave00_level1a)
+
+emlist_km_Y_select_level1a_file <- "data/emlist_km_Y_select_level1a_2022-09-23.rdata"
+
+if (file.exists(emlist_km_Y_select_level1a_file)) {
+  load(emlist_km_Y_select_level1a_file)
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_Y_select_level1a <- mclapply(X = Y_select_wave00_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+  
+  save(emlist_km_Y_select_level1a, file = emlist_km_Y_select_level1a_file)
+}
+
+```
+
+
+```{r}
+
+loolist_km_Y_select_level1a <- mclapply(X = emlist_km_Y_select_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+loostats_km_Y_select_level1a <- lapply(emlist_km_Y_select_level1a, FUN = kmLooStats)
+```
+
+```{r, fig.height = 12, fig.width = 12}
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a_all)){
+  
+  y <- emlist_km_Y_select_level1a[[i]]@y
+  loo <- loolist_km_Y_select_level1a[[i]]
+  
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave00col, 50))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_select_wave00_level1a)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_select_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+```
+
+
+```{r}
+
+loolist_km_YAnom_select_level1a <- mclapply(X = emlist_km_YAnom_select_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+loostats_km_YAnom_select_level1a <- lapply(emlist_km_YAnom_select_level1a, FUN = kmLooStats)
+```
+
+
+```{r}
+
+YAnom_select_wave00_level1a <- YAnom_level1a[, y_names_select]
+YAnom_select_wave00_level1a_list <- mat2list(YAnom_select_wave00_level1a)
+
+emlist_km_YAnom_select_level1a_file <- "data/emlist_km_YAnom_select_level1a_2022-09-23.rdata"
+
+if (file.exists(emlist_km_YAnom_select_level1a_file)) {
+  load(emlist_km_YAnom_select_level1a_file)
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_YAnom_select_level1a <- mclapply(X = YAnom_select_wave00_level1a_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+  
+  save(emlist_km_YAnom_select_level1a, file = emlist_km_YAnom_select_level1a_file)
+}
+
+
+```
+
+
+
+# Entire data set
+
+This binds together level1a constrained data from wave01 with the training set from wave01.
+
+```{r}
+
+Y_select_wave00_level1a_wave01 <- rbind(Y_select_wave00_level1a, ens_select_wave01_mv$datmat[without_outliers_ix_wave01, ])
+YAnom_select_wave00_level1a_wave01 <- rbind(YAnom_select_wave00_level1a, ens_select_wave01_mv_anom$datmat[without_outliers_ix_wave01, ])
+
+```
+
+
+```{r}
+
+Y_select_wave00_level1a_wave01_list <- mat2list(Y_select_wave00_level1a_wave01)
+
+emlist_km_Y_select_wave00_level1a_wave01_file <- "data/emlist_km_Y_select_wave00_level1a_wave01_2022-09-23.rdata"
+
+if (file.exists(emlist_km_Y_select_wave00_level1a_wave01_file)) {
+  load(emlist_km_Y_select_wave00_level1a_wave01_file)
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_Y_select_wave00_level1a_wave01 <- mclapply(X = Y_select_wave00_level1a_wave01_list, FUN = km, formula = ~., design = X_level1a_wave01, mc.cores = 4) 
+  
+  save(emlist_km_Y_select_wave00_level1a_wave01, file = emlist_km_Y_select_wave00_level1a_wave01_file)
+}
+
+```
+
+
+
+```{r}
+
+loolist_km_Y_select_wave00_level1a_wave01 <- mclapply(X = emlist_km_Y_select_wave00_level1a_wave01, 
+                                                      FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+loostats_km_Y_select_wave00_level1a_wave01 <- lapply(emlist_km_Y_select_wave00_level1a_wave01, FUN = kmLooStats)
+
+```
+
+
+
+```{r, fig.height = 12, fig.width = 12}
+
+
+wave00colvec <- rep(wave00col, nrow(Y_select_wave00_level1a))
+wave01colvec <- rep(wave01col, nrow(ens_select_wave01_mv$datmat[without_outliers_ix_wave01, ]))
+
+wave00_wave01_colvec <- c(wave00colvec, wave01colvec)
+
+#pdf(file = 'figs/kmloostats_Y_wave00_level1a_wave01.pdf', width = 12, height = 12)
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a_all)){
+  
+  y <- emlist_km_Y_select_wave00_level1a_wave01[[i]]@y
+  loo <- loolist_km_Y_select_wave00_level1a_wave01[[i]]
+  
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00_wave01_colvec, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave00_wave01_colvec, 30))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_select_wave00_level1a)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_select_wave00_level1a_wave01[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('wave00 Level 1a and wave01 ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+#dev.off()
+
+```
+
+
+## Entire anomaly ensemble (select outputs)
+```{r}
+
+YAnom_select_wave00_level1a_wave01_list <- mat2list(YAnom_select_wave00_level1a_wave01)
+
+emlist_km_YAnom_select_wave00_level1a_wave01_file <- "data/emlist_km_YAnom_select_wave00_level1a_wave01_2022-09-23.rdata"
+
+if (file.exists(emlist_km_YAnom_select_wave00_level1a_wave01_file)) {
+  load(emlist_km_YAnom_select_wave00_level1a_wave01_file)
+} else {
+  
+  # Here, the list is a list version of the matrix Y_
+  emlist_km_YAnom_select_wave00_level1a_wave01 <- mclapply(X = YAnom_select_wave00_level1a_wave01_list, FUN = km, formula = ~., design = X_level1a_wave01, mc.cores = 4) 
+  
+  save(emlist_km_YAnom_select_wave00_level1a_wave01, file = emlist_km_YAnom_select_wave00_level1a_wave01_file)
+}
+
+```
+
+
+
+```{r}
+
+loolist_km_YAnom_select_wave00_level1a_wave01 <- mclapply(X = emlist_km_YAnom_select_wave00_level1a_wave01, 
+                                                      FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+loostats_km_YAnom_select_wave00_level1a_wave01 <- lapply(emlist_km_YAnom_select_wave00_level1a_wave01, FUN = kmLooStats)
+
+```
+
+
+
+```{r, fig.height = 12, fig.width = 12}
+
+
+#pdf(file = 'figs/kmloostats_YAnom_wave00_level1a_wave01.pdf', width = 12, height = 12)
+par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_YAnom_select_wave00_level1a_wave01)){
+  
+  y <- emlist_km_YAnom_select_wave00_level1a_wave01[[i]]@y
+  loo <- loolist_km_YAnom_select_wave00_level1a_wave01[[i]]
+  
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00_wave01_colvec, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave00_wave01_colvec, 30))
+  abline(0,1)
+  legend('topleft', legend = colnames(YAnom_select_wave00_level1a)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_YAnom_select_wave00_level1a_wave01[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('wave00 Level 1a and wave01 ensemble anomaly', side = 3, line = 0, outer = TRUE, cex = 2)
+
+#dev.off()
+
+```
+
+## PMAE summary of level 1 and entire ensemble
+```{r, fig.width = 5, fig.height = 10}
+
+pdf(file = 'figs/PMAE_comparison.pdf', width = 5, height = 10)
+
+Y_select_level1a_pmae <- sapply(loostats_km_Y_select_level1a, function(x) x$pmae)
+YAnom_select_level1a_pmae <- sapply(loostats_km_YAnom_select_level1a, function(x) x$pmae)
+
+
+Y_select_wave00_level1a_wave01_pmae <- sapply(loostats_km_Y_select_wave00_level1a_wave01, function(x) x$pmae)
+YAnom_select_wave00_level1a_wave01_pmae <- sapply(loostats_km_YAnom_select_wave00_level1a_wave01, function(x) x$pmae)
+
+
+par(mfrow = c(2,1), las = 1)
+plot(Y_select_level1a_pmae, Y_select_wave00_level1a_wave01_pmae, main = 'Modern Value', xlab = 'Wave00 trained PMAE (%)', ylab = 'Wave00 + Wave01 trained PMAE (%)', xlim = c(3,9), ylim = c(3,9), pch = 19)
+text(Y_select_level1a_pmae, Y_select_wave00_level1a_wave01_pmae,
+     labels = colnames(Y_select_level1a_wave01), pos = 3, cex = 0.6, col = 'darkgrey')
+
+abline(0,1)
+
+plot(YAnom_select_level1a_pmae, YAnom_select_wave00_level1a_wave01_pmae, 
+     xlab = 'Wave00 trained PMAE (%)', ylab = 'Wave00 + Wave01 trained PMAE (%)', main = 'Modern Value Anomaly',
+      xlim = c(3,9), ylim = c(3,9), pch = 19)
+abline(0,1)
+
+text(YAnom_select_level1a_pmae, YAnom_select_wave00_level1a_wave01_pmae, labels = colnames(YAnom_select_level1a_wave01),
+     pos = 3,cex = 0.6, col = 'darkgrey'
+     )
+
+dev.off()
+```
+
+
+
+
+```{r }
+## Emulator fit list of level 1a ensemble
+
+#fit_list_const_level1a <- createKmFitList(X = X_level1a, Y = Y_const_level1a_scaled)
+
+Y_const_level1a_scaled_list <- mat2list(Y_const_level1a_scaled)
+
+fit_list_const_level1a <- mclapply(X = Y_const_level1a_scaled_list, FUN = km, formula = ~., design = X_level1a,
+                                   mc.cores = 4, control = list(trace = FALSE))
+
+
+```
+
+```{r }
+
+Y_const_level1a_wave01_scaled_list <- mat2list(Y_const_level1a_wave01_scaled)
+
+fit_list_const_level1a_wave01 <- mclapply(X = Y_const_level1a_wave01_scaled_list , FUN = km, formula = ~., design = X_level1a_wave01,
+                                   mc.cores = 4, control = list(trace = FALSE))
+
+
+```
+
+## Leave-one-out analyses of emulator prediction accuracy
+
+```{r}
+
+loolist_km_Y_level1a <- mclapply(X = fit_list_const_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+loolist_km_Y_level1a_wave01 <- mclapply(X = fit_list_const_level1a_wave01, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+```
+
+
+```{r, eval = FALSE}
+
+loostats_km_Y_level1a <- lapply(fit_list_const_level1a, FUN = kmLooStats)
+loostats_km_Y_level1a_wave01 <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStats)
+
+```
+
+
+
+```{r, fig.width = 12, fig.height = 6}
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_const_level1a_scaled[, i]
+  loo <- loolist_km_Y_level1a[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave00col, 50))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+#dev.off()
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_const_level1a_wave01_scaled[, i]
+  loo <- loolist_km_Y_level1a_wave01[[i]]
+  ylim <- range(c(loo$mean - (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave01col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave01col, 100))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a_wave01[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+```
+# So further constraining to level 2 can be associated back to the top level.
+```{r}
+level2_ix <- which(Y_const_level1a_scaled[,'nbp_lnd_sum'] > 0 &
+                    Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] > 35 &  Y_const_level1a_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_level1a_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_level1a_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_scaled[,'cVeg_lnd_sum'] < 800
+                  
+  )
+
+level2_ix_level1a_wave01 <- which(Y_const_level1a_wave01_scaled[,'nbp_lnd_sum'] > 0 &
+                    Y_const_level1a_wave01_scaled[,'npp_nlim_lnd_sum'] > 35 & Y_const_level1a_wave01_scaled[,'npp_nlim_lnd_sum'] < 80 &
+                    Y_const_level1a_wave01_scaled[,'cSoil_lnd_sum'] > 750 & Y_const_level1a_wave01_scaled[,'cSoil_lnd_sum'] < 3000 &
+                  Y_const_level1a_wave01_scaled[,'cVeg_lnd_sum'] > 300 & Y_const_level1a_wave01_scaled[,'cVeg_lnd_sum'] < 800
+                  )
+
+```
+
+## Emulator accuracy of members from wave 00 and wave 01 that pass level 2 (AW's) constraints
+
+We see that the error stats for some of the outputs from wave01 are worse, but there are many more ensemble members that lie within the constraints for wave 01.
+
+"pmae" is "proportional mean absolue error", which is the mean absolute error expressed as a percentage of the original (minimally constrained) ensemble range in that output. 
+
+```{r, fig.width = 12, fig.height = 6}
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_const_level1a_scaled[level2_ix, i]
+  loo <- loolist_km_Y_level1a[[i]]
+  ylim <- range(c(loo$mean[level2_ix] - (2*loo$sd[level2_ix]), loo$mean[level2_ix] + (2*loo$sd[level2_ix])) )
+  plot(y, loo$mean[level2_ix], xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean[level2_ix] - (2*loo$sd[level2_ix])  , x1 = y , y1 = loo$mean[level2_ix] + (2*loo$sd[level2_ix]), col = makeTransparent(wave00col, 100))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+
+
+#dev.off()
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+for(i in 1:length(loolist_km_Y_level1a)){
+  
+  y <- Y_const_level1a_wave01_scaled[level2_ix_level1a_wave01, i]
+  loo <- loolist_km_Y_level1a_wave01[[i]]
+  ylim <- range(c(loo$mean[level2_ix_level1a_wave01] - (2*loo$sd[level2_ix_level1a_wave01]), loo$mean[level2_ix_level1a_wave01] + (2*loo$sd[level2_ix_level1a_wave01])) )
+  plot(y, loo$mean[level2_ix_level1a_wave01], xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave01col, 100),
+       pch = 19)
+  segments(x0 = y, y0 = loo$mean[level2_ix_level1a_wave01] - (2*loo$sd[level2_ix_level1a_wave01])  , x1 = y , y1 = loo$mean[level2_ix_level1a_wave01] + (2*loo$sd[level2_ix_level1a_wave01]), col = makeTransparent(wave01col, 50))
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a_wave01[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 2 constrained ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+```
+
+Good news is, the emulators are more accurate for wave01.
+
+```{r}
+
+
+kmLooStatsSubset <- function (km, ix, type = "UK") 
+{
+  # Calculate summary statistics for a subset of the members of a km fit list
+    loo <- leaveOneOut.km(km, type = type, trend.reestim = TRUE)
+    preddiff <- loo$mean[ix] - km@y[ix]
+    mae <- mean(abs(preddiff))
+    rmse <- sqrt(mean(preddiff^2))
+    maxerr <- max(preddiff)
+    absdiff <- abs(diff(range(km@y)))
+    pmae <- (mae/absdiff) * 100
+    return(list(loo = loo, mae = mae, pmae = pmae, maxerr = maxerr))
+}
+
+
+```
+
+
+```{r}
+
+loolist_km_Y_level1a_level2 <- rapply(loolist_km_Y_level1a, f = function(x) x[level2_ix], how = "list")
+
+loolist_km_Y_level1a_wave01_level2 <- rapply(loolist_km_Y_level1a_wave01, f = function(x) x[level2_ix], how = "list")
+
+
+```
+
+```{r, fig.width = 12, fig.height = 12}
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(2,2), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a_level2)){
+  
+  y <- Y_const_level1a_scaled[level2_ix, i]
+  
+  loo <- loolist_km_Y_level1a_level2[[i]]
+  ylim <- range(c(loo$mean- (2*loo$sd), loo$mean + (2*loo$sd)) )
+  plot(y, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave00col, 250),
+       pch = 19)
+  arrows(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave00col, 150) ,  angle = 90, code = 3, length = 0.03)
+  
+  y1 <- Y_const_level1a_wave01_scaled[level2_ix, i]
+  loo <- loolist_km_Y_level1a_wave01_level2[[i]]
+  
+    points(y1, loo$mean, xlab = '', ylab = '', main = '' , ylim = ylim, col = makeTransparent(wave01col, 250),
+       pch = 19)
+  arrows(x0 = y, y0 = loo$mean - (2*loo$sd)  , x1 = y , y1 = loo$mean + (2*loo$sd), col = makeTransparent(wave01col, 250),  angle = 90, code = 3, length = 0.03)
+  
+  
+  abline(0,1)
+  legend('topleft', legend = colnames(Y_const_level1a_scaled)[i], bty = 'n', text.font = 2  )
+  legend('bottomright',legend = paste('pmae =',round(loostats_km_Y_level1a[[i]]$pmae,2),'%') , bty = 'n', text.font = 2)
+
+}
+
+mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
+mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
+mtext('Level 2 wave 00 ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+reset()
+legend('topleft', pch = 19, legend = c('wave00', 'wave01'), col = c(wave00col, wave01col ), horiz = TRUE)
+
+
+```
+
+These leave-one-out prediction accuracy plots rank the ensemble members from largest underprediction to largest overprediction using the wave00 predictions. A perfect prediction would appear on the horizontal "zero" line.
+
+Many of the wave01 predictions are closer to the horizontal line, and therefore more accurate predictions. 
+
+None of the predictions are outside the uncertainty bounds, which suggests they are overconservative (should be smaller).
+
+
+```{r, fig.width = 10, fig.height = 10}
+
+#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+par(mfrow = c(4,1), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
+for(i in 1:length(loolist_km_Y_level1a_level2)){
+  
+  y <- Y_const_level1a_scaled[level2_ix, i]
+
+  loo_00 <- loolist_km_Y_level1a_level2[[i]]
+  loo_01 <- loolist_km_Y_level1a_wave01_level2[[i]]
+  
+  preddiff_wave00 <- y - loo_00$mean
+  preddiff_wave01 <- y - loo_01$mean
+  
+    # rank by the original wave 00 predictions
+  loo_rank_ix <- sort(preddiff_wave00 , index.return = TRUE)
+  
+   ylim <- range(c(preddiff_wave00[loo_rank_ix$ix] - (2*loo_00$sd[loo_rank_ix$ix]),
+                   preddiff_wave00[loo_rank_ix$ix] + (2*loo_00$sd[loo_rank_ix$ix]),
+                   preddiff_wave01[loo_rank_ix$ix] - (2*loo_01$sd[loo_rank_ix$ix]),
+                   preddiff_wave01[loo_rank_ix$ix] + (2*loo_01$sd[loo_rank_ix$ix])
+                   )
+                 )
+   
+   plot(preddiff_wave00[loo_rank_ix$ix], xlab = '', ylab = '', main = '' , col = makeTransparent(wave00col, 255),
+        pch = 19, ylim = ylim)
+   
+   abline(h = 0)
+   
+  arrows(x0 = 1:length(y), y0 = preddiff_wave00[loo_rank_ix$ix] - (2*loo_00$sd[loo_rank_ix$ix])  , x1 = 1:length(y) , y1 = preddiff_wave00[loo_rank_ix$ix] + (2*loo_00$sd[loo_rank_ix$ix]), col = makeTransparent(wave00col, 150),  angle = 90, code = 3, length = 0.03)
+   
+  points(preddiff_wave01[loo_rank_ix$ix], xlab = '', ylab = '', main = '' , col = makeTransparent(wave01col, 255),
+        pch = 19)
+  
+    arrows(x0 = 1:length(y), y0 = preddiff_wave01[loo_rank_ix$ix] - (2*loo_01$sd[loo_rank_ix$ix])  , x1 = 1:length(y) , y1 = preddiff_wave01[loo_rank_ix$ix] + (2*loo_01$sd[loo_rank_ix$ix]), col = makeTransparent(wave01col, 150), angle = 90, code = 3, length = 0.03)
+   
+   mtext(colnames(Y_const_level1a_scaled)[i], side = 3, adj = 0, line = 1)
+  
+
+}
+
+
+ reset()
+ legend('topleft', pch = 19, legend = c('wave00', 'wave01'), col = c(wave00col, wave01col ), horiz = TRUE)
+
+```
+```{r}
+
+loostats_km_Y_level1a_sub <- lapply(fit_list_const_level1a, FUN = kmLooStatsSubset, ix = level2_ix)
+loostats_km_Y_level1a_wave01_sub <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStatsSubset, ix = level2_ix)
+
+```
+
+Looking at the proportional mean absolute error (pmae), expressed in percent, we can see that it doesn't improve much for the whole ensemble, but *does* improve significantly for the subset of ensemble members that fall within AW's constraints from the first ensemble (marked "_sub").
+
+```{r, echo = TRUE}
+
+pmae_wave00 <- lapply(loostats_km_Y_level1a, FUN = function(x) x$pmae )
+pmae_wave01 <- lapply(loostats_km_Y_level1a_wave01, FUN = function(x) x$pmae )
+
+pmae_wave00_sub <- lapply(loostats_km_Y_level1a_sub, FUN = function(x) x$pmae )
+pmae_wave01_sub <- lapply(loostats_km_Y_level1a_wave01_sub, FUN = function(x) x$pmae )
+
+pmae_table <- cbind(pmae_wave00, pmae_wave01, pmae_wave00_sub, pmae_wave01_sub)
+
+print(pmae_table)
+
+```
+
+## Subset analysis
+
+```{r}
+
+withinConstraints <- function(X, Xrange){
+  # return the index of a matrix that conforms to constraints.  
+  
+  # X         ........  Matrix to be tested
+  # Xrange    ........ Range matrix. Each column has min value in row 1 and max value in row 2
+   
+  
+  kept_list <-vector(mode = 'list', length = ncol(X))
+  
+  for(i in 1:ncol(X)){
+
+    kept_ix <- which(X[ ,i] > Xrange[1, i] & X[ ,i] < Xrange[2, i])
+    
+    kept_list[[i]] <- kept_ix
+  }
+  
+  out <- kept_list[[1]]
+  # run along the list and just keep the intersection
+  # with each iteration
+  for(i in 1:length(kept_list)){
+    
+    out <- intersect(out, kept_list[[i]])
+  }
+  
+  out
+  
+}
+
+```
+
+
+```{r}
+# Simple version of the level1a constraints (matrix)
+AW_const <- matrix(c(0, 1e12, 35, 80, 750, 3000, 300, 800), byrow = FALSE, nrow = 2)
+```
+
+## How well do we predict the constrained members?
+
+```{r}
+# Identify all of the members which fall under a "level 2" constraint.
+level2_ix <- withinConstraints(Y_const_level1a_scaled, AW_const)
+
+# Build an emulator for the scaled output
+
+Y_const_level1a_scaled_list <- mat2list(Y_const_level1a_scaled)
+
+emlist_km_Y_const_level1a_scaled <- mclapply(X = Y_const_level1a_scaled_list, FUN = km, formula = ~., design = X_level1a, mc.cores = 4) 
+
+```
+
+```{r}
+
+loolist_km_Y_const_level1a_scaled  <- mclapply(X = emlist_km_Y_const_level1a_scaled, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+
+```
+
+
+```{r}
+# Would the prediction be in the constrained?
+
+
+pred_km_Y_const_level1a_scaled <- matrix(ncol = ncol(Y_const_level1a_scaled), nrow = nrow(Y_const_level1a_scaled))
+colnames(pred_km_Y_const_level1a_scaled) <- colnames(Y_const_level1a_scaled)
+
+
+for(i in 1:ncol(Y_const_level1a_scaled)){
+  
+  pred <- loolist_km_Y_const_level1a_scaled[[i]]$mean
+  pred_km_Y_const_level1a_scaled[, i] <- pred
+  
+}
+
+pred_level2_ix <- withinConstraints(pred_km_Y_const_level1a_scaled, AW_const)
+
+```
+
+Plotting the predictions, with a special focus on the constrained members. 
+The message is, to do better on predicting the members, we need to do better with the cVeg emulator. Many of its members are way too low, and this is dragging down the predictions. Some are false positives though.
+Could we plot Loo error vs the parameters?
+
+```{r, fig.width = 10, fig.height = 10}
+
+# True positive is things in both observed and predicted.
+
+tp_ix <- intersect(level2_ix, pred_level2_ix)
+
+# False positive is things in predicted but not in observed.
+fp_ix <- setdiff(pred_level2_ix, level2_ix)
+
+# False negative is things in observed but not predicted
+fn_ix <- setdiff(level2_ix, pred_level2_ix)
+
+# true negative is things not in observed or predicted
+
+tn_ix <- setdiff(1:nrow(Y_const_level1a_scaled), union(level2_ix, pred_level2_ix))
+
+#should be 362
+#length(c(tp_ix, fp_ix, fn_ix, tn_ix))
+
+clines_lower <- c(0, 35, 750, 300)
+clines_upper <- c(NA, 80, 3000, 800)
+
+# correctly predicted in constrained group = red
+colvec <- rep('black', nrow(Y_const_level1a_scaled))
+pchvec <- rep(21, nrow(Y_const_level1a_scaled))
+
+colvec[tp_ix] <- 'blue'
+pchvec[tp_ix] <- 19
+
+colvec[fp_ix] <- 'red'
+pchvec[fp_ix] <- 19
+
+colvec[fn_ix] <- 'gold'
+pchvec[fn_ix] <- 19
+
+colvec[tn_ix] <- 'darkgrey'
+pchvec[tn_ix] <- 21
+  
+
+#pdf(width = 10, height = 10, file = 'figs/Y_const_loo.pdf')
+par(mfrow = c(2,2), oma = c(0.1,0.1,4,0.1))
+for(i in 1:4){
+plot(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], type = 'n', las = 1, main = colnames(Y_const_level1a_scaled)[i],
+     xlab = 'model', ylab = 'emulator')
+  
+abline(0,1)
+abline(v = clines_lower[i], col = 'darkgrey')
+abline(v = clines_upper[i], col = 'darkgrey', lty = 'dashed')
+
+abline(h = clines_lower[i], col = 'darkgrey')
+abline(h = clines_upper[i], col = 'darkgrey', lty = 'dashed')
+
+points(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], col = colvec, pch = pchvec)
+
+}
+
+reset()
+
+legend('top', legend = c('True positive', 'False Positive', 'False Negative', 'True Negative', 'lower bound', 'upper bound'), pch = c(19,19, 19, 21, NA, NA), col = c('blue', 'red', 'gold', 'darkgrey', 'darkgrey', 'darkgrey'), lty = c(NA,NA,NA,NA, 'solid', 'dashed'), horiz = TRUE)
+
+#dev.off()
+
+```
+
+
+
+```{r}
+library(verification)
+
+
+model <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+
+model[level2_ix] <- TRUE
+emulator[pred_level2_ix] <- TRUE
+
+ver <- verify(obs = model, pred = emulator, frcst.type = 'binary')
+
+# ETS runs from -1/3 to 1, with 0 showing no skill, so we have some skill. Could be better.
+ver$ETS
+ver$HSS
+
+```
+
+## A better emulator for cVeg
+It's clear from other experiments that a major barrier to a good prediction of a constrained is a better emulator for cVeg.
+
+Some experiments to create a better emulator
+
+```{r}
+# more multistarts
+
+
+y <- Y_const_level1a_scaled[, 'cVeg_lnd_sum']
+# change the output
+
+# This breaks
+#m2 <- km(~.^2, design=X_level1a, response=y, multistart = 4)
+
+
+```
+
+
+
+```{r}
+require(foreach)
+
+# below an example for a computer with 2 cores, but also work with 1 core
+
+nCores <- 4
+require(doParallel)
+cl <-  makeCluster(nCores) 
+registerDoParallel(cl)
+
+# kriging model 1, with 4 starting points 
+m_stan <- km(~., design=X_level1a, response = y, multistart=4)
+m_logy <- km(~., design=X_level1a, response = log(y), multistart=4)
+m_sqrty <- km(~., design=X_level1a, response = sqrt(y), multistart=4)
+
+
+stopCluster(cl)
+
+
+```
+
+```{r}
+loo_m_stan <- leaveOneOut.km(m_stan, type = 'UK', trend.reestim = TRUE)
+
+loo_m_logy <- leaveOneOut.km(m_logy, type = 'UK', trend.reestim = TRUE)
+
+loo_m_sqrty <- leaveOneOut.km(m_sqrty, type = 'UK', trend.reestim = TRUE)
+
+
+```
+
+How good are the leave-one-out predictions of the transformed data?
+
+It appears the square root transformation outperforms the standard - but mostly at low values (which we don't think are realistic).
+
+```{r}
+
+plot(y, loo_m_stan$mean,col = makeTransparent('black', 150), pch = 19)
+points(y, exp(loo_m_logy$mean), col = makeTransparent('red', 150), pch = 19)
+points(y, (loo_m_sqrty$mean)^2, col = makeTransparent('blue', 150), pch = 19)
+abline(0,1)
+abline(h = c(300, 800))
+abline(v = c(300, 800))
+
+
+errSummary <- function(obs, pred){
+  
+    err <- pred - obs
+    mae <- mean(abs(err))
+    rmse <- sqrt(mean(err^2))
+    maxerr <- max(err)
+    absdiff <- abs(diff(range(obs)))
+    pmae <- (mae/absdiff) * 100
+    return(list(mae = mae, pmae = pmae, maxerr = maxerr))
+}
+
+
+errSummary(y, loo_m_stan$mean)
+
+errSummary(y, exp(loo_m_logy$mean))
+
+errSummary(y, (loo_m_sqrty$mean)^2)
+
+
+```
+
+
+```{r}
+# Make a new matrix of predictions, and find which enemble members would pass the constraint.
+
+pred_km_Y_const_level1a_scaled_cVeg_sqrty <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_sqrty[, 'cVeg_lnd_sum'] <- (loo_m_sqrty$mean)^2
+
+pred_level2_sqrty_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_sqrty, AW_const)
+
+emulator_sqrty <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_sqrty[pred_level2_sqrty_ix] <- TRUE
+ver_sqrty<- verify(obs = model, pred = emulator_sqrty, frcst.type = 'binary')
+```
+
+
+```{r}
+# Make a new matrix of predictions, and find which enemble members would pass the constraint.
+
+pred_km_Y_const_level1a_scaled_cVeg_logy <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_logy[, 'cVeg_lnd_sum'] <- exp(loo_m_logy$mean)
+
+pred_level2_logy_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_logy, AW_const)
+
+
+emulator_logy <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_logy[pred_level2_logy_ix] <- TRUE
+ver_logy <- verify(obs = model, pred = emulator_logy, frcst.type = 'binary')
+# ETS runs from -1/3 to 1, with 0 showing no skill, so we have some skill. Could be better.
+```
+
+
+```{r}
+ver$ETS
+ver$HSS
+
+ver_sqrty$ETS
+ver_sqrty$HSS
+
+
+ver_logy$ETS
+ver_logy$HSS
+
+```
+
+
+```{r}
+ver$tab
+
+ver_logy$tab
+
+ver_sqrty$tab
+
+
+```
+
+
+```{r}
+
+nCores <- 4
+require(doParallel)
+cl <-  makeCluster(nCores) 
+registerDoParallel(cl)
+
+# kriging model 1, with 4 starting points 
+m_stan_gauss <- km(~., design=X_level1a, response = y, multistart=4, covtype = 'gauss' )
+loo_m_stan_gauss <- leaveOneOut.km(m_stan_gauss , type = 'UK', trend.reestim = TRUE)
+plot(y, loo_m_stan_gauss$mean)
+
+
+m_stan_gen <- km(~., design=X_level1a, response = y, optim.method = 'gen' )
+loo_m_stan_gen <- leaveOneOut.km(m_stan_gen, type = 'UK', trend.reestim = TRUE)
+plot(y, loo_m_stan_gen$mean)
+
+
+m_stan_gauss_gen <- km(~., design=X_level1a, response = y, optim.method = 'gen' )
+loo_m_stan_gauss_gen <- leaveOneOut.km(m_stan_gauss_gen, type = 'UK', trend.reestim = TRUE)
+plot(y, loo_m_stan_gauss_gen$mean)
+
+
+m_logy_gauss_gen <- km(~., design=X_level1a, response = log(y), covtype = 'gauss', optim.method = 'gen')
+loo_m_logy_gauss_gen <- leaveOneOut.km(m_logy_gauss_gen, trend.reestim = TRUE, type = 'UK')
+plot(y, exp(loo_m_logy_gauss_gen$mean))
+
+
+m_sqrt_gauss_gen <- km(~., design=X_level1a, response = sqrt(y), covtype = 'gauss', optim.method = 'gen')
+loo_m_sqrt_gauss_gen <- leaveOneOut.km(m_sqrt_gauss_gen, trend.reestim = TRUE, type = 'UK')
+plot(y, (loo_m_sqrt_gauss_gen$mean)^2)
+
+
+stopCluster(cl)
+
+
+```
+
+```{r}
+plot(y, loo_m_stan_gauss_gen$mean)
+abline(0,1)
+```
+
+
+```{r}
+plot(y, (loo_m_sqrt_gauss_gen$mean)^2)
+abline(0,1)
+```
+
+
+```{r}
+pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen[, 'cVeg_lnd_sum'] <- exp(loo_m_logy_gauss_gen$mean)
+
+pred_level2_logy_gauss_gen_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen, AW_const)
+
+
+emulator_logy_gauss_gen <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_logy_gauss_gen[pred_level2_logy_gauss_gen_ix] <- TRUE
+ver_logy_gauss_gen <- verify(obs = model, pred = emulator_logy_gauss_gen, frcst.type = 'binary')
+```
+
+
+
+
+
+```{r}
+
+pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen[, 'cVeg_lnd_sum'] <- exp(loo_m_logy_gauss_gen$mean)
+
+pred_level2_logy_gauss_gen_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_logy_gauss_gen, AW_const)
+
+
+emulator_logy_gauss_gen <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_logy_gauss_gen[pred_level2_logy_gauss_gen_ix] <- TRUE
+ver_logy_gauss_gen <- verify(obs = model, pred = emulator_logy_gauss_gen, frcst.type = 'binary')
+
+
+```
+
+
+
+```{r}
+pred_km_Y_const_level1a_scaled_cVeg_stan_gauss_gen <- pred_km_Y_const_level1a_scaled
+pred_km_Y_const_level1a_scaled_cVeg_stan_gauss_gen[, 'cVeg_lnd_sum'] <- (loo_m_stan_gauss_gen$mean)
+
+pred_level2_stan_gauss_gen_ix <- withinConstraints(pred_km_Y_const_level1a_scaled_cVeg_stan_gauss_gen, AW_const)
+
+
+emulator_stan_gauss_gen <- vector(mode = "logical", length = nrow(Y_const_level1a_scaled))
+emulator_stan_gauss_gen[pred_level2_stan_gauss_gen_ix] <- TRUE
+ver_stan_gauss_gen <- verify(obs = model, pred = emulator_stan_gauss_gen, frcst.type = 'binary')
+```
+
+
+
