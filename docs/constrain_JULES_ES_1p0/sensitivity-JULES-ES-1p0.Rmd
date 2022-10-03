@@ -10,6 +10,7 @@ output:
         number_sections: true
 ---
 
+(C) Crown copyright, Met Office
 
 ## Preliminaries
 Load libraries, functions and data.

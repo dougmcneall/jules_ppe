@@ -8,6 +8,7 @@ output:
     number_sections: yes
 ---
 
+(C) Crown copyright, Met Office
 
 Code to run analysis and generate figures for McNeall et al. (2023?) "Constraining the carbon cycle in JULES-ES-1.0".  
 This analysis tests the quality of the gaussian process emulators used to interpolate both waves of JULES runs. These figures can be found in appendix C of the paper. 
@@ -57,9 +58,9 @@ loostats_km_Y_select_level1a <- lapply(emlist_km_Y_select_level1a, FUN = kmLooSt
 ```
 
 ```{r, fig.height = 12, fig.width = 12}
-#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
-for(i in 1:length(loolist_km_Y_level1a_all)){
+for(i in 1:length(loolist_km_Y_select_level1a)){
   
   y <- emlist_km_Y_select_level1a[[i]]@y
   loo <- loolist_km_Y_select_level1a[[i]]
@@ -78,14 +79,13 @@ mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
 mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
 mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
 
+dev.off()
+
+
 ```
 
 
-```{r}
 
-loolist_km_YAnom_select_level1a <- mclapply(X = emlist_km_YAnom_select_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
-loostats_km_YAnom_select_level1a <- lapply(emlist_km_YAnom_select_level1a, FUN = kmLooStats)
-```
 
 
 ```{r}
@@ -108,7 +108,11 @@ if (file.exists(emlist_km_YAnom_select_level1a_file)) {
 
 ```
 
+```{r}
 
+loolist_km_YAnom_select_level1a <- mclapply(X = emlist_km_YAnom_select_level1a, FUN = leaveOneOut.km, type = 'UK', trend.reestim = TRUE)
+loostats_km_YAnom_select_level1a <- lapply(emlist_km_YAnom_select_level1a, FUN = kmLooStats)
+```
 
 # Entire data set
 
@@ -161,9 +165,9 @@ wave01colvec <- rep(wave01col, nrow(ens_select_wave01_mv$datmat[without_outliers
 
 wave00_wave01_colvec <- c(wave00colvec, wave01colvec)
 
-#pdf(file = 'figs/kmloostats_Y_wave00_level1a_wave01.pdf', width = 12, height = 12)
+pdf(file = 'figs/kmloostats_Y_wave00_level1a_wave01.pdf', width = 12, height = 12)
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
-for(i in 1:length(loolist_km_Y_level1a_all)){
+for(i in 1:length(loolist_km_Y_select_wave00_level1a_wave01)){
   
   y <- emlist_km_Y_select_wave00_level1a_wave01[[i]]@y
   loo <- loolist_km_Y_select_wave00_level1a_wave01[[i]]
@@ -182,7 +186,7 @@ mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
 mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
 mtext('wave00 Level 1a and wave01 ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
 
-#dev.off()
+dev.off()
 
 ```
 
@@ -222,7 +226,7 @@ loostats_km_YAnom_select_wave00_level1a_wave01 <- lapply(emlist_km_YAnom_select_
 ```{r, fig.height = 12, fig.width = 12}
 
 
-#pdf(file = 'figs/kmloostats_YAnom_wave00_level1a_wave01.pdf', width = 12, height = 12)
+pdf(file = 'figs/kmloostats_YAnom_wave00_level1a_wave01.pdf', width = 12, height = 12)
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_YAnom_select_wave00_level1a_wave01)){
   
@@ -243,7 +247,7 @@ mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
 mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
 mtext('wave00 Level 1a and wave01 ensemble anomaly', side = 3, line = 0, outer = TRUE, cex = 2)
 
-#dev.off()
+dev.off()
 
 ```
 
@@ -263,7 +267,7 @@ YAnom_select_wave00_level1a_wave01_pmae <- sapply(loostats_km_YAnom_select_wave0
 par(mfrow = c(2,1), las = 1)
 plot(Y_select_level1a_pmae, Y_select_wave00_level1a_wave01_pmae, main = 'Modern Value', xlab = 'Wave00 trained PMAE (%)', ylab = 'Wave00 + Wave01 trained PMAE (%)', xlim = c(3,9), ylim = c(3,9), pch = 19)
 text(Y_select_level1a_pmae, Y_select_wave00_level1a_wave01_pmae,
-     labels = colnames(Y_select_level1a_wave01), pos = 3, cex = 0.6, col = 'darkgrey')
+     labels = colnames(Y_select_wave00_level1a_wave01), pos = 3, cex = 0.6, col = 'darkgrey')
 
 abline(0,1)
 
@@ -272,7 +276,7 @@ plot(YAnom_select_level1a_pmae, YAnom_select_wave00_level1a_wave01_pmae,
       xlim = c(3,9), ylim = c(3,9), pch = 19)
 abline(0,1)
 
-text(YAnom_select_level1a_pmae, YAnom_select_wave00_level1a_wave01_pmae, labels = colnames(YAnom_select_level1a_wave01),
+text(YAnom_select_level1a_pmae, YAnom_select_wave00_level1a_wave01_pmae, labels = colnames(YAnom_select_wave00_level1a_wave01),
      pos = 3,cex = 0.6, col = 'darkgrey'
      )
 
@@ -316,7 +320,7 @@ loolist_km_Y_level1a_wave01 <- mclapply(X = fit_list_const_level1a_wave01, FUN =
 ```
 
 
-```{r, eval = FALSE}
+```{r}
 
 loostats_km_Y_level1a <- lapply(fit_list_const_level1a, FUN = kmLooStats)
 loostats_km_Y_level1a_wave01 <- lapply(fit_list_const_level1a_wave01, FUN = kmLooStats)
@@ -327,7 +331,7 @@ loostats_km_Y_level1a_wave01 <- lapply(fit_list_const_level1a_wave01, FUN = kmLo
 
 ```{r, fig.width = 12, fig.height = 6}
 
-#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_Y_level1a)){
   
@@ -347,9 +351,9 @@ mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
 mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
 mtext('Level 1a ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
 
-#dev.off()
+dev.off()
 
-#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 for(i in 1:length(loolist_km_Y_level1a)){
   
   y <- Y_const_level1a_wave01_scaled[, i]
@@ -394,7 +398,7 @@ We see that the error stats for some of the outputs from wave01 are worse, but t
 
 ```{r, fig.width = 12, fig.height = 6}
 
-#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_Y_level1a)){
   
@@ -412,9 +416,6 @@ for(i in 1:length(loolist_km_Y_level1a)){
 
 
 
-#dev.off()
-
-#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 for(i in 1:length(loolist_km_Y_level1a)){
   
   y <- Y_const_level1a_wave01_scaled[level2_ix_level1a_wave01, i]
@@ -432,6 +433,8 @@ for(i in 1:length(loolist_km_Y_level1a)){
 mtext('Actual', side = 1, line = 1, outer = TRUE, cex = 2 )
 mtext('Predicted', side = 2, line = 0, outer = TRUE, cex = 2) 
 mtext('Level 2 constrained ensemble outputs', side = 3, line = 0, outer = TRUE, cex = 2)
+
+dev.off()
 
 ```
 
@@ -468,7 +471,7 @@ loolist_km_Y_level1a_wave01_level2 <- rapply(loolist_km_Y_level1a_wave01, f = fu
 
 ```{r, fig.width = 12, fig.height = 12}
 
-#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(2,2), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_Y_level1a_level2)){
   
@@ -501,6 +504,8 @@ mtext('Level 2 wave 00 ensemble outputs', side = 3, line = 0, outer = TRUE, cex 
 reset()
 legend('topleft', pch = 19, legend = c('wave00', 'wave01'), col = c(wave00col, wave01col ), horiz = TRUE)
 
+dev.off()
+
 
 ```
 
@@ -513,7 +518,7 @@ None of the predictions are outside the uncertainty bounds, which suggests they 
 
 ```{r, fig.width = 10, fig.height = 10}
 
-#pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
+pdf(file = 'figs/kmloostats_Y_level1a.pdf', width = 12, height = 12)
 par(mfrow = c(4,1), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_Y_level1a_level2)){
   
@@ -555,6 +560,8 @@ for(i in 1:length(loolist_km_Y_level1a_level2)){
 
  reset()
  legend('topleft', pch = 19, legend = c('wave00', 'wave01'), col = c(wave00col, wave01col ), horiz = TRUE)
+ 
+ dev.off()
 
 ```
 ```{r}
@@ -566,7 +573,7 @@ loostats_km_Y_level1a_wave01_sub <- lapply(fit_list_const_level1a_wave01, FUN = 
 
 Looking at the proportional mean absolute error (pmae), expressed in percent, we can see that it doesn't improve much for the whole ensemble, but *does* improve significantly for the subset of ensemble members that fall within AW's constraints from the first ensemble (marked "_sub").
 
-```{r, echo = TRUE}
+```{r}
 
 pmae_wave00 <- lapply(loostats_km_Y_level1a, FUN = function(x) x$pmae )
 pmae_wave01 <- lapply(loostats_km_Y_level1a_wave01, FUN = function(x) x$pmae )
@@ -703,7 +710,7 @@ colvec[tn_ix] <- 'darkgrey'
 pchvec[tn_ix] <- 21
   
 
-#pdf(width = 10, height = 10, file = 'figs/Y_const_loo.pdf')
+pdf(width = 10, height = 10, file = 'figs/Y_const_loo.pdf')
 par(mfrow = c(2,2), oma = c(0.1,0.1,4,0.1))
 for(i in 1:4){
 plot(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], type = 'n', las = 1, main = colnames(Y_const_level1a_scaled)[i],
@@ -724,7 +731,7 @@ reset()
 
 legend('top', legend = c('True positive', 'False Positive', 'False Negative', 'True Negative', 'lower bound', 'upper bound'), pch = c(19,19, 19, 21, NA, NA), col = c('blue', 'red', 'gold', 'darkgrey', 'darkgrey', 'darkgrey'), lty = c(NA,NA,NA,NA, 'solid', 'dashed'), horiz = TRUE)
 
-#dev.off()
+dev.off()
 
 ```
 

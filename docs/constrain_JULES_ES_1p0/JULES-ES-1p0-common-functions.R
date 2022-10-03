@@ -1,14 +1,11 @@
 #JULES-ES-1p0-common-functions.R
 
+## (C) Crown copyright, Met Office
+
 ## ----------------------------------------------------------------------
 ## Helper functions
 ## ----------------------------------------------------------------------
 
-# move the right functions here
-# Uncomment these once you've worked out which functions are needed
-
-#source('~/brazilCSSP/code/brazil_cssp/per_pft.R') # eventually, move the relevant functions
-#source('explore-JULES-ES-1p0_PPE_functions.R')
 
 anomalizeTS <- function(x, ix = 1:20){x - mean(x[ix]) } 
 
