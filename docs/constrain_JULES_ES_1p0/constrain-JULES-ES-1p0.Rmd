@@ -41,7 +41,7 @@ low_npp_ix <- which(Y[,'npp_nlim_lnd_sum'] < 1e5)
 #              sort(runif(100, 0, 10)), 
 #              sort(runif(100, 0, 10))), ncol=3)
 
-#pdf(file = 'figs/run-failure-pairs.pdf', width = 12, height = 10)
+pdf(file = 'figs/run-failure-pairs.pdf', width = 12, height = 10)
 x1 <- X[low_npp_ix, ]
 x2 <- X_nlevel0
 
@@ -82,7 +82,7 @@ reset()
 legend('left', legend = paste(1:d, colnames(lhs)), cex = 1.1, bty = 'n')
 legend('topleft', pch = 19, col = c( zred, zblue), legend = c('failed', 'zero carbon cycle'), bty = 'n', inset = 0.02, cex = 1.1 )
 
-#dev.off()
+dev.off()
 
 ```
 
@@ -92,7 +92,7 @@ It's important to remember that the design of the experiment is multiplication f
 
 ```{r, fig.width = 6, fig.height = 8}
 
-#pdf(file = 'figs/lhs_range.pdf', width = 6, height = 8)
+pdf(file = 'figs/lhs_range.pdf', width = 6, height = 8)
 par(las = 1, mar = c(5,8,2,1))
 lhs_min <- apply(lhs_wave0_wave01_all, 2, min)
 lhs_max <- apply(lhs_wave0_wave01_all,2, max)
@@ -107,7 +107,7 @@ points(lhs_min, 1:d, pch = 20)
 points(lhs_max, 1:d, pch = 20)
 axis(2, at = 1:d, labels = colnames(lhs))
 axis(1)
-#dev.off()
+dev.off()
 
 ```
 
@@ -130,7 +130,7 @@ rangecol <- 'grey'
 hcol = 'darkgrey'
 lcol = 'black'
 
-#pdf(file = 'figs/level_2_constraints_hists.pdf', width = 8, height = 8)
+pdf(file = 'figs/level_2_constraints_hists.pdf', width = 8, height = 8)
 par(mfrow = c(2,2), fg = 'darkgrey', las = 1, oma = c(0.1, 0.1, 4, 0.1))
 
 trunc <- function(x, vec){
@@ -189,7 +189,7 @@ reset()
 
 legend('top', horiz = TRUE, fill = c(makeTransparent(wave00col, 150), makeTransparent(wave01col, 150), makeTransparent(rangecol, 60)), legend = c('Wave00', 'Wave01', 'AW range'))
 
-#dev.off()
+dev.off()
 ```
 
 ## What proportion of wave01 fall within Andy Wiltshire's constraints?
@@ -233,7 +233,7 @@ linePlotMultiEns <- function(years, ens1, ens2, ens3, col1, col2, col3, ylab, ma
     matlines(years, t(ens3), col = col3, lty = 'solid')
 }
 
-#pdf(file = 'figs/carbon-cycle-timeseries-waves-constrained.pdf', width = 10, height = 12)
+pdf(file = 'figs/carbon-cycle-timeseries-waves-constrained.pdf', width = 10, height = 12)
 par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
 
 linePlotMultiEns(years = years, ens1 = npp_ens_wave00[without_outliers_ix_wave00,],
@@ -349,12 +349,12 @@ reset()
 
 legend('bottomright', legend = c('wave00','wave01','wave01 level2','standard'), lty = 'solid', lwd = 1.5, col = c(lcol_wave0, lcol_wave01, lcol_wave01_level2, stancol), inset = c(0.05, 0.15) )
 
-#dev.off()
+dev.off()
 ```
 ```{r, fig.width = 10, fig.height = 12}
 
 
-#pdf(file = 'figs/carbon-cycle-timeseries-anomaly-waves-constrained.pdf', width = 10, height = 12)
+pdf(file = 'figs/carbon-cycle-timeseries-anomaly-waves-constrained.pdf', width = 10, height = 12)
 par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
 
 linePlotMultiEns(years = years, ens1 = npp_ens_anom_wave00[without_outliers_ix_wave00,],
@@ -469,7 +469,7 @@ reset()
 legend('bottomright', legend = c('wave00','wave01','wave01 level2','standard'), lty = 'solid', lwd = 1.5, col = c(lcol_wave0, lcol_wave01, lcol_wave01_level2, stancol), inset = c(0.05, 0.15) )
 
 
-#dev.off()
+dev.off()
 
 ``` 
 
@@ -541,7 +541,7 @@ colnames(X_unif) <- 1:32
 
 ```{r,fig.width = 12, fig.height = 12, warning = FALSE}
 
-#pdf(file = 'figs/pairs_level2_ix_em_unif_wave00_wave01.pdf', width = 12, height = 12)
+pdf(file = 'figs/pairs_level2_ix_em_unif_wave00_wave01.pdf', width = 12, height = 12)
 
 par(oma = c(0,0,0,3), bg = 'white')
 
@@ -575,6 +575,6 @@ image.plot(legend.only = TRUE,
 
 legend('left', legend = paste(1:32, colnames(lhs)), cex = 1, bty = 'n')
 
-#dev.off()
+dev.off()
 ```
 

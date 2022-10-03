@@ -11,6 +11,7 @@ output:
 (C) Crown copyright, Met Office
 
 Code to run analysis and generate figures for McNeall et al. (2023?) "Constraining the carbon cycle in JULES-ES-1.0".  
+
 This analysis tests the quality of the gaussian process emulators used to interpolate both waves of JULES runs. These figures can be found in appendix C of the paper. 
 
 
