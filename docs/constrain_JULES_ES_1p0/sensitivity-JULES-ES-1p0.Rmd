@@ -918,7 +918,7 @@ xtable(sens_table, digits = 0)
 
 
 ```{r}
-knit_exit()
+#knit_exit()
 
 ```
 
