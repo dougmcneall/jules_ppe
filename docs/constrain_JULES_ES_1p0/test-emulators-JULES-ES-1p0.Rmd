@@ -166,7 +166,8 @@ wave01colvec <- rep(wave01col, nrow(ens_select_wave01_mv$datmat[without_outliers
 
 wave00_wave01_colvec <- c(wave00colvec, wave01colvec)
 
-pdf(file = 'figs/kmloostats_Y_wave00_level1a_wave01.pdf', width = 12, height = 12)
+pdf(file = 'figs/figA01.pdf', width = 12, height = 12)
+#pdf(file = 'figs/kmloostats_Y_wave00_level1a_wave01.pdf', width = 12, height = 12)
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_Y_select_wave00_level1a_wave01)){
   
@@ -227,7 +228,8 @@ loostats_km_YAnom_select_wave00_level1a_wave01 <- lapply(emlist_km_YAnom_select_
 ```{r, fig.height = 12, fig.width = 12}
 
 
-pdf(file = 'figs/kmloostats_YAnom_wave00_level1a_wave01.pdf', width = 12, height = 12)
+pdf(file = 'figs/figA02.pdf', width = 12, height = 12)
+#pdf(file = 'figs/kmloostats_YAnom_wave00_level1a_wave01.pdf', width = 12, height = 12)
 par(mfrow = c(4,4), mar = c(3,4,2,2), oma = c(4,4,4,0.1))
 for(i in 1:length(loolist_km_YAnom_select_wave00_level1a_wave01)){
   
@@ -255,7 +257,9 @@ dev.off()
 ## PMAE summary of level 1 and entire ensemble
 ```{r, fig.width = 5, fig.height = 10}
 
-pdf(file = 'figs/PMAE_comparison.pdf', width = 5, height = 10)
+pdf(file = 'figs/figA03.pdf', width = 5, height = 10)
+#pdf(file = 'figs/PMAE_comparison.pdf', width = 5, height = 10)
+
 
 Y_select_level1a_pmae <- sapply(loostats_km_Y_select_level1a, function(x) x$pmae)
 YAnom_select_level1a_pmae <- sapply(loostats_km_YAnom_select_level1a, function(x) x$pmae)
@@ -711,7 +715,8 @@ colvec[tn_ix] <- 'darkgrey'
 pchvec[tn_ix] <- 21
   
 
-pdf(width = 10, height = 10, file = 'figs/Y_const_loo.pdf')
+pdf(width = 10, height = 10, file = 'figs/figA04.pdf')
+#pdf(width = 10, height = 10, file = 'figs/Y_const_loo.pdf')
 par(mfrow = c(2,2), oma = c(0.1,0.1,4,0.1))
 for(i in 1:4){
 plot(Y_const_level1a_scaled[ ,i], pred_km_Y_const_level1a_scaled[ ,i], type = 'n', las = 1, main = colnames(Y_const_level1a_scaled)[i],

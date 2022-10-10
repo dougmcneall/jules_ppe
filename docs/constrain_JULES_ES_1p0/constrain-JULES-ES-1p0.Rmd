@@ -9,7 +9,7 @@ output:
 ---
 
 
-Code to run analysis and generate figures for McNeall et al. (2023?) "Constraining the carbon cycle in JULES-ES-1.0"
+Code to run analysis and generate figures for McNeall et al. (2022) "Constraining the carbon cycle in JULES-ES-1.0"
 
 ```{r, echo = FALSE, message = FALSE, warning=FALSE, results = 'hide'}
 # Load helper functions
@@ -41,7 +41,8 @@ low_npp_ix <- which(Y[,'npp_nlim_lnd_sum'] < 1e5)
 #              sort(runif(100, 0, 10)), 
 #              sort(runif(100, 0, 10))), ncol=3)
 
-pdf(file = 'figs/run-failure-pairs.pdf', width = 12, height = 10)
+pdf(file = 'figs/fig02.pdf', width = 12, height = 10)
+#pdf(file = 'figs/run-failure-pairs.pdf', width = 12, height = 10)
 x1 <- X[low_npp_ix, ]
 x2 <- X_nlevel0
 
@@ -92,7 +93,8 @@ It's important to remember that the design of the experiment is multiplication f
 
 ```{r, fig.width = 6, fig.height = 8}
 
-pdf(file = 'figs/lhs_range.pdf', width = 6, height = 8)
+#pdf(file = 'figs/lhs_range.pdf', width = 6, height = 8)
+pdf(file = 'figs/fig01.pdf', width = 6, height = 8)
 par(las = 1, mar = c(5,8,2,1))
 lhs_min <- apply(lhs_wave0_wave01_all, 2, min)
 lhs_max <- apply(lhs_wave0_wave01_all,2, max)
@@ -130,7 +132,8 @@ rangecol <- 'grey'
 hcol = 'darkgrey'
 lcol = 'black'
 
-pdf(file = 'figs/level_2_constraints_hists.pdf', width = 8, height = 8)
+pdf(file = 'figs/fig05.pdf', width = 8, height = 8)
+#pdf(file = 'figs/level_2_constraints_hists.pdf', width = 8, height = 8)
 par(mfrow = c(2,2), fg = 'darkgrey', las = 1, oma = c(0.1, 0.1, 4, 0.1))
 
 trunc <- function(x, vec){
@@ -233,7 +236,8 @@ linePlotMultiEns <- function(years, ens1, ens2, ens3, col1, col2, col3, ylab, ma
     matlines(years, t(ens3), col = col3, lty = 'solid')
 }
 
-pdf(file = 'figs/carbon-cycle-timeseries-waves-constrained.pdf', width = 10, height = 12)
+pdf(file = 'figs/fig03.pdf', width = 10, height = 12)
+#pdf(file = 'figs/carbon-cycle-timeseries-waves-constrained.pdf', width = 10, height = 12)
 par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
 
 linePlotMultiEns(years = years, ens1 = npp_ens_wave00[without_outliers_ix_wave00,],
@@ -353,8 +357,8 @@ dev.off()
 ```
 ```{r, fig.width = 10, fig.height = 12}
 
-
-pdf(file = 'figs/carbon-cycle-timeseries-anomaly-waves-constrained.pdf', width = 10, height = 12)
+pdf(file = 'figs/fig04.pdf', width = 10, height = 12)
+#pdf(file = 'figs/carbon-cycle-timeseries-anomaly-waves-constrained.pdf', width = 10, height = 12)
 par(mfrow= c(3,5), las = 1, mar = c(4,4,1,0))
 
 linePlotMultiEns(years = years, ens1 = npp_ens_anom_wave00[without_outliers_ix_wave00,],
@@ -524,12 +528,6 @@ level2_ix_em_unif_wave00_wave01 <- which(Y_const_level1a_wave01_scaled_pred$pred
 
 ```
 
-```{r}
-
-
-
-```
-
 
 ```{r}
 X_stan_norm <- normalize(matrix(rep(1, 32), nrow = 1), wrt = lhs)
@@ -541,7 +539,8 @@ colnames(X_unif) <- 1:32
 
 ```{r,fig.width = 12, fig.height = 12, warning = FALSE}
 
-pdf(file = 'figs/pairs_level2_ix_em_unif_wave00_wave01.pdf', width = 12, height = 12)
+pdf(file = 'figs/fig06.pdf', width = 12, height = 12)
+#pdf(file = 'figs/pairs_level2_ix_em_unif_wave00_wave01.pdf', width = 12, height = 12)
 
 par(oma = c(0,0,0,3), bg = 'white')
 
