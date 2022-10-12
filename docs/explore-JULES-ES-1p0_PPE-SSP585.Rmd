@@ -743,4 +743,107 @@ legend('bottomright', legend = c('wave01 level2', 'wave01 level3'),  fill= c(hco
 
 ```
 
+## Adding cumulative NBP as a constraint
+
+```{r}
+test <- matrix(1:9, nrow = 3, byrow = TRUE)
+test
+
+t(apply(test, 1, FUN = cumsum))
+```
+
+```{r}
+
+cnbp_ens_ssp585_S3 <-  t(apply(nbp_ens_ssp585_S3, 1, FUN = cumsum))
+
+```
+
+
+```{r}
+
+# Modern value 
+# ix_mv <- which(sspyears %in% 1996:2015)
+# 
+# yvec_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3','baresoilFrac_lnd_mean_ens_ssp585_S3')
+# 
+# # Matrix of constraint output modern values (1996 - 2015)
+# Y_const_ssp585_mv <- matrix(data = NA, nrow = nrow(npp_ens_ssp585_S3), ncol = length(yvec_constraints))
+# colnames(Y_const_ssp585_mv) <- yvec_constraints
+# 
+# for(i in 1:length(yvec_constraints)){
+#   
+#   Y_trunc <- get(yvec_constraints[i])[, ix_mv]
+#   Y_trunc_mean <- apply(Y_trunc, 1, mean, na.rm = TRUE)
+#   Y_const_ssp585_mv[,i] <- Y_trunc_mean
+# }
+
+```
+
+
+```{r}
+# Calculate Modern value CNBP
+
+ix_2014 <- which(sspyears == 2014)
+
+cnbp_ens_ssp585_S3_mv <- cnbp_ens_ssp585_S3[, ix_2014]
+
+breaks <- seq(from = -100, to = 350, by = 25)
+hist(cnbp_ens_ssp585_S3_mv, main = "cumulative NBP since 1850 at 2014", col = hcol_wave01,
+     xlab = 'Cumulative NBP since 1850 (GtC)', breaks = breaks)
+hist(cnbp_ens_ssp585_S3_mv[ix_kept_AW], add = TRUE, col = hcol_wave01_level2, breaks = breaks)
+hist(cnbp_ens_ssp585_S3_mv[ix_kept_AWBS], add = TRUE, col = hcol_wave01_level3, breaks = breaks)
+     
+reset()
+
+legend('topright', legend = c('wave01',  'wave01 level2', 'wave01 level3'),  fill= c(hcol_wave01,hcol_wave01_level2, hcol_wave01_level3), inset = c(0.2, 0.2) )
+
+```
+
+
+```{r}
+const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
+const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
+
+Y_unif <- Y_const_ssp585_mv
+ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
+
+```
+
+
+```{r}
+
+const_mins_level4 <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100, -40)
+const_maxes_level4 <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100, 40)
+
+Y_unif <- cbind(Y_const_ssp585_mv, cnbp_ens_ssp585_S3_mv)
+level4_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3', 'baresoilFrac_lnd_mean_ens_ssp585_S3', 'cnbp_ens_ssp585_S3_mv')
+ix_kept_level4 <- eval(parse(text = createConstraintString(yvec=level4_constraints, mins = const_mins_level4, maxes = const_maxes_level4)))
+
+```
+
+
+```{r, fig.width = 7, fig.height = 10}
+
+matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = makeTransparent(hcol_wave01, 100),
+        ylab = 'GtC', main = 'Cumulative NBP', xlab = '',
+        bty = 'n', lwd = 2)
+
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AW, ]), lty = 'solid', col = makeTransparent(hcol_wave01_level2, 200), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AWBS, ]),lty = 'solid', col = makeTransparent(hcol_wave01_level3, 200), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level4, ]),lty = 'solid', col = makeTransparent('black', 200), lwd = 2)
+
+reset()
+
+legend('bottomleft', legend = c('wave01',  'wave01 level2', 'wave01 level3', 'wave01 level4'),  col = c(hcol_wave01,hcol_wave01_level2, hcol_wave01_level3, 'black'), inset = c(0.2, 0.2), lty = 'solid' )
+
+```
+
+
+```{r}
+(length(ix_kept_AW) / 500) * 100
+(length(ix_kept_AWBS) /500) * 100
+(length(ix_kept_level4) / 500) * 100 
+```
+
+
 
