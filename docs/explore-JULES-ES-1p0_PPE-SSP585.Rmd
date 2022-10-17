@@ -204,8 +204,8 @@ if (file.exists("ensemble_timeseries_ssp_2022-08-09.rdata")) {
 
 ```{r, include=FALSE}
 
-# npp_stan_ssp585_S3<- getStandardMember(ensloc = ensloc_wave00, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
-# nbp_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "nbp_lnd_sum") / (1e12/ysec)
+ npp_stan_ssp585_S3<- getStandardMemberSSP(ensloc = ensloc_ssp585_S3, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+ nbp_stan_ssp585_S3 <- getStandardMemberSSP(ensloc = ensloc_ssp585_S3, variable = "nbp_lnd_sum") / (1e12/ysec)
 # cSoil_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "cSoil_lnd_sum") / 1e12
 # cVeg_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "cVeg_lnd_sum") / 1e12
 # lai_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "lai_lnd_mean")
@@ -934,15 +934,172 @@ legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
 ```
 
 ```{r}
+const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
+const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
 
-
-
-
+Y_unif <- Y_const_ssp585_mv
+ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
 
 ```
 
 
-Histograms of inputs compared to original ranges.
+```{r}
+
+treeFrac_cci_min <- (global_frac_cci['broadleaf trees'] + global_frac_cci['needleleaf trees']) * 100 * 0.5
+treeFrac_cci_max <- (global_frac_cci['broadleaf trees'] + global_frac_cci['needleleaf trees']) * 100 * 2
+
+const_mins_level5 <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100, -50, treeFrac_cci_min)
+const_maxes_level5 <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100, 50, treeFrac_cci_max )
+
+
+treeFrac_lnd_mean_ens_ssp585_S3_trunc <- treeFrac_lnd_mean_ens_ssp585_S3[, ix_mv]
+treeFrac_lnd_mean_ens_ssp585_S3_mv <- apply(treeFrac_lnd_mean_ens_ssp585_S3_trunc, 1, mean, na.rm = TRUE)
+  
+
+Y_unif <- cbind(Y_const_ssp585_mv, cnbp_ens_ssp585_S3_mv, treeFrac_lnd_mean_ens_ssp585_S3_mv)
+level5_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3', 'baresoilFrac_lnd_mean_ens_ssp585_S3', 'cnbp_ens_ssp585_S3_mv', 'treeFrac_lnd_mean_ens_ssp585_S3_mv')
+ix_kept_level5 <- eval(parse(text = createConstraintString(yvec=level5_constraints, mins = const_mins_level5, maxes = const_maxes_level5)))
+
+# hack here, need to sort createConstraintsString
+Y_mv5 <- Y_unif
+
+```
+
+
+
+```{r, fig.width = 12, fig.height = 12}
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
+
+for(i in 1:length(yvec_ssp585)){
+
+linePlotMultiEns(years = sspyears, ens1 = get(yvec_ssp585[i]),
+                 ens2 = get(yvec_ssp585[i])[ix_kept_level5, ],
+                 col1 = lcol_wave01, col2 = 'green',
+                 ylab = select_units[i], main = yvec_ssp585[i])
+                 
+}
+
+reset()
+
+legend('bottomright', legend = c('wave01', 'wave01 level5'), lty = 'solid', lwd = 2, col = c(lcol_wave01, 'green'), inset = c(0.05, 0.15) )
+
+
+
+```
+```{r, fig.width = 7, fig.height = 10}
+
+matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = makeTransparent(hcol_wave01, 250),
+        ylab = 'GtC', main = 'Cumulative NBP', xlab = '',
+        bty = 'n', lwd = 2)
+
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AW, ]), lty = 'solid', col = makeTransparent(hcol_wave01_level2, 250), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AWBS, ]),lty = 'solid', col = makeTransparent(hcol_wave01_level3, 250), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level4, ]),lty = 'solid', col = makeTransparent('black', 250), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level5, ]),lty = 'solid', col = makeTransparent('green', 250), lwd = 2)
+lines(sspyears, cnbp_ens_ssp585_S3[501, ],lty = 'solid', col = makeTransparent('blue', 250), lwd = 2)
+
+reset()
+
+legend('bottomleft', legend = c('wave01',  'wave01 level2', 'wave01 level3', 'wave01 level4', 'wave01 level5', 'Standard'),  col = c(hcol_wave01,hcol_wave01_level2, hcol_wave01_level3, 'black', 'green', 'blue'), inset = c(0.2, 0.2), lty = 'solid' , lwd = 2)
+
+```
+
+
+## rank the level5 members by their 2100 values
+
+```{r}
+
+cnbp_ens_ssp585_S3[501, ncol(cnbp_ens_ssp585_S3)]
+# Standard member cnbp is 139.5
+
+cnbp_ens_ssp585_eoc_level5 <- cnbp_ens_ssp585_S3[ ix_kept_level5, ncol(cnbp_ens_ssp585_S3) ]
+
+
+level5_sort <- sort(cnbp_ens_ssp585_eoc_level5, index.return = TRUE)
+
+ix_test_set <- ix_kept_level5[c(head(level5_sort$ix,1), 19 ,31, tail(level5_sort$ix,1))]
+
+cnbp_ens_ssp585_S3[ix_test_set, ncol(cnbp_ens_ssp585_S3) ]
+
+# max is 250
+# min is -175
+# standard is 139.5
+# could choose - 6 or 3.3 as something close to zero
+
+
+```
+
+```{r, fig.width = 7, fig.height = 10}
+
+matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = makeTransparent(hcol_wave01, 250),
+        ylab = 'GtC', main = 'Cumulative NBP', xlab = '',
+        bty = 'n', lwd = 2)
+
+#matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AW, ]), lty = 'solid', col = makeTransparent(hcol_wave01_level2, 250), lwd = 2)
+#matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AWBS, ]),lty = 'solid', col = makeTransparent(hcol_wave01_level3, 250), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level5, ]),lty = 'solid', col = makeTransparent('green', 90), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_test_set, ]),lty = 'solid', col = makeTransparent('skyblue2', 255), lwd = 2)
+lines(sspyears, cnbp_ens_ssp585_S3[501, ],lty = 'solid', col = makeTransparent('blue', 250), lwd = 2)
+
+reset()
+
+legend('bottomleft', legend = c('wave01',  'wave01 level2', 'wave01 level3', 'wave01 level4', 'wave01 level5', 'Standard'),  col = c(hcol_wave01,hcol_wave01_level2, hcol_wave01_level3, 'black', 'green', 'blue'), inset = c(0.2, 0.2), lty = 'solid' , lwd = 2)
+
+```
+```{r, fig.width = 12, fig.height = 12}
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
+
+for(i in 1:length(yvec_ssp585)){
+
+linePlotMultiEns(years = sspyears, ens1 = get(yvec_ssp585[i]),
+                 ens2 = get(yvec_ssp585[i])[ix_test_set, ],
+                 col1 = lcol_wave01, col2 = 'skyblue2',
+                 ylab = select_units[i], main = yvec_ssp585[i])
+                 
+}
+
+reset()
+
+legend('bottomright', legend = c('wave01', 'wave01 selected'), lty = 'solid', lwd = 2, col = c(lcol_wave01, 'skyblue2'), inset = c(0.05, 0.15) )
+
+
+
+```
+## Level 5 input space, with selected members
+
+```{r, fig.height = 12, fig.width= 12 }
+colnames(X_wave01_standard) <- 1:32
+
+pcol <- rep(makeTransparent('black', 250), length(ix_kept_level5))
+pcol[c(head(level5_sort$ix,1), 19 ,31, tail(level5_sort$ix,1))] <- 'skyblue2'
+pcol[31] <- 'blue'
+
+pairs(X_wave01_standard[ix_kept_level5,],
+      col = pcol,
+      xlim = c(0,1), ylim = c(0,1),
+      pch = 19,
+      gap = 0, 
+      lower.panel = NULL
+)
+
+reset()
+legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
+
+
+```
+# Indices in the design of the test set
+
+```{r}
+
+#ix_test_set
+nens <- 499:999
+
+print(paste0('param-perturb-P0', nens[ix_test_set],'.conf'))
+nens[ix_test_set]
+
+```
 
 
 ```{r}
