@@ -819,8 +819,12 @@ Y_unif <- cbind(Y_const_ssp585_mv, cnbp_ens_ssp585_S3_mv)
 level4_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3', 'baresoilFrac_lnd_mean_ens_ssp585_S3', 'cnbp_ens_ssp585_S3_mv')
 ix_kept_level4 <- eval(parse(text = createConstraintString(yvec=level4_constraints, mins = const_mins_level4, maxes = const_maxes_level4)))
 
+# hack here, need to sort createConstraintsString
+Y_mv <- Y_unif
+
 ```
 
+### Cumulative NBP in the level 4 constrained ensemble
 
 ```{r, fig.width = 7, fig.height = 10}
 
@@ -845,5 +849,118 @@ legend('bottomleft', legend = c('wave01',  'wave01 level2', 'wave01 level3', 'wa
 (length(ix_kept_level4) / 500) * 100 
 ```
 
+### The carbon cycle in level 4 constrained ensemble 
 
+```{r, fig.width = 12, fig.height = 12}
+
+par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
+
+for(i in 1:length(yvec_ssp585)){
+
+linePlotMultiEns(years = sspyears, ens1 = get(yvec_ssp585[i]),
+                 ens2 = get(yvec_ssp585[i])[ix_kept_level4, ],
+                 col1 = lcol_wave01, col2 = 'black',
+                 ylab = select_units[i], main = yvec_ssp585[i])
+                 
+}
+
+reset()
+
+legend('bottomright', legend = c('wave01', 'wave01 level4'), lty = 'solid', lwd = 2, col = c(lcol_wave01, 'black'), inset = c(0.05, 0.15) )
+
+
+
+
+
+```
+
+```{r}
+
+# Load up the data
+lhs_i = read.table('data/lhs_u-ao732.txt', header = TRUE)
+lhs_ii = read.table('data/lhs_u-ao732a.txt', header = TRUE)
+
+toplevel_ix = 1:499
+
+
+# I *think* the last ensemble member (501) is the standard set of parameters
+ntrain_wave01 <- 500
+
+# Load input matrices and bind with wave00 inputs
+lhs_wave01 <- read.table( 'data/lhs_example.txt', header = TRUE)
+
+lhs_wave01_standard <- rbind(lhs_wave01, c(rep(1, ncol(lhs_wave01))))
+
+X_wave01_standard = normalize(lhs_wave01_standard, wrt = rbind(lhs_i, lhs_ii, lhs_wave01))
+colnames(X_wave01_standard) = colnames(lhs_wave01)
+
+#standard member at the end
+#lhs_all <- rbind(lhs_i, lhs_ii, lhs_wave01, c(rep(1, ncol(lhs_i))))
+
+# Match the 400 outputs we're using in the training data
+#X_wave01_train <- X_wave01[1:ntrain_wave01, ]
+
+```
+
+## the impact of constraints on input space 
+
+First, the entire wave01 ensemble. Hard boundaries taken out early are visible here
+
+```{r, fig.width = 12, fig.height = 12}
+
+
+pairs(X_wave01_standard, gap = 0, lower.panel = NULL, cex = 0.6, col = makeTransparent('black', 100), xlim = c(0,1), ylim = c(0,1))
+
+```
+### Level 4 constrained input space
+
+JULES standard member in red.
+
+```{r, fig.height = 12, fig.width= 12 }
+colnames(X_wave01_standard) <- 1:32
+pairs(X_wave01_standard[ix_kept_level4,],
+      col = c(rep(makeTransparent('black', 150), length(ix_kept_level4)-1), 'red'),
+      cex = c(rep(0.8, length(ix_kept_level4)-1), 1),
+      pch = c(rep(21, length(ix_kept_level4)-1), 19),
+      xlim = c(0,1), ylim = c(0,1),
+      gap = 0, 
+      lower.panel = NULL
+)
+
+reset()
+legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
+
+
+```
+
+```{r}
+
+
+
+
+
+```
+
+
+Histograms of inputs compared to original ranges.
+
+
+```{r}
+
+# X_stan_norm <- normalize(matrix(rep(1, 32), nrow = 1), wrt = lhs)
+# 
+# colnames(X_unif) <- 1:32
+# 
+# X_standard <- matrix(rep(1,d), ncol = d, nrow = 1)
+# 
+# X_standard_norm <- normalize(X_standard, wrt = lhs)
+# 
+# lhs_min <- apply(lhs_wave0_wave01_all, 2, min)
+# lhs_max <- apply(lhs_wave0_wave01_all,2, max)
+# 
+# X_level1a_unnorm <- unnormalize(X_level1a, un_mins = lhs_min, un_maxes = lhs_max)
+# 
+# X_level1a_wave01_unnorm <- unnormalize(X_level1a_wave01, un_mins = lhs_min, un_maxes = lhs_max)
+
+```
 
