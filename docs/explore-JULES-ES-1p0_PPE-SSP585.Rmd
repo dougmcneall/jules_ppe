@@ -801,11 +801,11 @@ legend('topright', legend = c('wave01',  'wave01 level2', 'wave01 level3'),  fil
 
 
 ```{r}
-const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
-const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
+#const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
+#const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
 
-Y_unif <- Y_const_ssp585_mv
-ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
+#Y_unif <- Y_const_ssp585_mv
+#ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
 
 ```
 
@@ -933,6 +933,8 @@ legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
 
 ```
 
+## Level 5 constraint
+
 ```{r}
 const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
 const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
@@ -1029,6 +1031,8 @@ cnbp_ens_ssp585_S3[ix_test_set, ncol(cnbp_ens_ssp585_S3) ]
 
 
 ```
+## Level 5 CNPB, with selected test set members
+Level 5 in green, test set in sky blue. Standard in dark blue
 
 ```{r, fig.width = 7, fig.height = 10}
 
@@ -1089,7 +1093,7 @@ legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
 
 
 ```
-# Indices in the design of the test set
+## Indices in the design of the test set
 
 ```{r}
 
