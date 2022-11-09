@@ -761,7 +761,7 @@ cnbp_ens_ssp585_S3 <-  t(apply(nbp_ens_ssp585_S3, 1, FUN = cumsum))
 
 ```{r}
 
-# Modern value 
+# Modern value  n
 # ix_mv <- which(sspyears %in% 1996:2015)
 # 
 # yvec_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3','baresoilFrac_lnd_mean_ens_ssp585_S3')
@@ -812,8 +812,15 @@ legend('topright', legend = c('wave01',  'wave01 level2', 'wave01 level3'),  fil
 
 ```{r}
 
-const_mins_level4 <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100, -40)
-const_maxes_level4 <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100, 40)
+# Setting the max modern value of cumulative NBP from 40 (Andy's original suggestion) to 70 means that cnbp is no longer really
+# a constraint on end-of-century values. It does constrain up to about 2050, but not beyond that (compared to the previous constraint)
+
+modern_cnbp_min <- -50
+modern_cnbp_max <- 110
+
+
+const_mins_level4 <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100, modern_cnbp_min)
+const_maxes_level4 <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100, modern_cnbp_max)
 
 Y_unif <- cbind(Y_const_ssp585_mv, cnbp_ens_ssp585_S3_mv)
 level4_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3', 'baresoilFrac_lnd_mean_ens_ssp585_S3', 'cnbp_ens_ssp585_S3_mv')
@@ -950,8 +957,8 @@ ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, 
 treeFrac_cci_min <- (global_frac_cci['broadleaf trees'] + global_frac_cci['needleleaf trees']) * 100 * 0.5
 treeFrac_cci_max <- (global_frac_cci['broadleaf trees'] + global_frac_cci['needleleaf trees']) * 100 * 2
 
-const_mins_level5 <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100, -50, treeFrac_cci_min)
-const_maxes_level5 <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100, 50, treeFrac_cci_max )
+const_mins_level5 <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100, modern_cnbp_min, treeFrac_cci_min)
+const_maxes_level5 <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100, modern_cnbp_max, treeFrac_cci_max )
 
 
 treeFrac_lnd_mean_ens_ssp585_S3_trunc <- treeFrac_lnd_mean_ens_ssp585_S3[, ix_mv]
@@ -1020,7 +1027,8 @@ cnbp_ens_ssp585_eoc_level5 <- cnbp_ens_ssp585_S3[ ix_kept_level5, ncol(cnbp_ens_
 
 level5_sort <- sort(cnbp_ens_ssp585_eoc_level5, index.return = TRUE)
 
-ix_test_set <- ix_kept_level5[c(head(level5_sort$ix,1), 19 ,31, tail(level5_sort$ix,1))]
+# chooses highest, second highest and lowest
+ix_test_set <- ix_kept_level5[c(head(level5_sort$ix,1) , tail(level5_sort$ix,2))]
 
 cnbp_ens_ssp585_S3[ix_test_set, ncol(cnbp_ens_ssp585_S3) ]
 
@@ -1032,7 +1040,11 @@ cnbp_ens_ssp585_S3[ix_test_set, ncol(cnbp_ens_ssp585_S3) ]
 
 ```
 ## Level 5 CNPB, with selected test set members
-Level 5 in green, test set in sky blue. Standard in dark blue
+Level5 has constraints on:
+
+NBP, NPP, cVeg, cSoil, baresoilfrac, cumulativeNBP and treefrac.
+
+Level 5 in green, selected test set in sky blue. Standard in dark blue.
 
 ```{r, fig.width = 7, fig.height = 10}
 
@@ -1048,7 +1060,7 @@ lines(sspyears, cnbp_ens_ssp585_S3[501, ],lty = 'solid', col = makeTransparent('
 
 reset()
 
-legend('bottomleft', legend = c('wave01',  'wave01 level2', 'wave01 level3', 'wave01 level4', 'wave01 level5', 'Standard'),  col = c(hcol_wave01,hcol_wave01_level2, hcol_wave01_level3, 'black', 'green', 'blue'), inset = c(0.2, 0.2), lty = 'solid' , lwd = 2)
+legend('bottomleft', legend = c('wave01', 'wave01 level5', 'Test set', 'Standard'),  col = c(hcol_wave01, 'green', 'skyblue2', 'blue'), inset = c(0.2, 0.2), lty = 'solid' , lwd = 2)
 
 ```
 ```{r, fig.width = 12, fig.height = 12}
