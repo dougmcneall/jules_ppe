@@ -206,23 +206,23 @@ if (file.exists("ensemble_timeseries_ssp_2022-08-09.rdata")) {
 
  npp_stan_ssp585_S3<- getStandardMemberSSP(ensloc = ensloc_ssp585_S3, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
  nbp_stan_ssp585_S3 <- getStandardMemberSSP(ensloc = ensloc_ssp585_S3, variable = "nbp_lnd_sum") / (1e12/ysec)
-# cSoil_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "cSoil_lnd_sum") / 1e12
-# cVeg_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "cVeg_lnd_sum") / 1e12
-# lai_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "lai_lnd_mean")
-# 
-# 
-# # fluxes
-# rh_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "rh_lnd_sum") / (1e12/ysec)
-# fLuc_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "fLuc_lnd_sum") / (1e12/ysec)
-# fHarvest_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "fHarvest_lnd_sum") / (1e12/ysec)
-# 
-# 
-# # fractions
-# treeFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "treeFrac_lnd_mean")
-# shrubFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "shrubFrac_lnd_mean")
-# baresoilFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "baresoilFrac_lnd_mean")
-# c3PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "c3PftFrac_lnd_mean")
-# c4PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_wave00, variable = "c4PftFrac_lnd_mean")
+#  cSoil_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "cSoil_lnd_sum") / 1e12
+#  cVeg_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "cVeg_lnd_sum") / 1e12
+#  lai_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "lai_lnd_mean")
+# # 
+# # 
+# # # fluxes
+#  rh_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "rh_lnd_sum") / (1e12/ysec)
+#  fLuc_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "fLuc_lnd_sum") / (1e12/ysec)
+#  fHarvest_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "fHarvest_lnd_sum") / (1e12/ysec)
+# # 
+# # 
+# # # fractions
+#  treeFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "treeFrac_lnd_mean")
+#  shrubFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "shrubFrac_lnd_mean")
+#  baresoilFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "baresoilFrac_lnd_mean")
+#  c3PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "c3PftFrac_lnd_mean")
+#  c4PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "c4PftFrac_lnd_mean")
 
 
 
@@ -428,15 +428,12 @@ createConstraintString <- function(yvec, mins, maxes){
 }
 
 
-AW_mins <- c(35, 0, 750, 300)
-AW_maxes <- c(80, 10000, 3000, 800)
+level2_mins <- c(35, 0, 750, 300)
+level2_maxes <- c(80, 10000, 3000, 800)
 
 Y_unif <- Y_const_ssp585_mv
-ix_kept_AW <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = AW_mins, maxes = AW_maxes)))
+ix_kept_level2 <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = level2_mins, maxes = level2_maxes)))
 
-
-
-#eval(parse(text = paste0()))
 
 inputConstraintSize <- function(Y_unif, yvec, mins, maxes){
   # Calculate the indices of Y_unif that are within the bounds set by mins and maxes
@@ -457,7 +454,7 @@ inputConstraintSize <- function(Y_unif, yvec, mins, maxes){
 ```{r, fig.width = 10, fig.height = 12}
 lcol_wave01 <- makeTransparent('firebrick',  80)
 lcol_wave01_level2 <- makeTransparent('gold',  80)
-stancol = 'black'
+stancol = 'blue'
 
 linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = NULL){
   # Plot wave00 and wave01 timeseries on top of one another
@@ -486,7 +483,7 @@ par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
 for(i in 1:length(yvec_ssp585)){
 
 linePlotMultiEns(years = sspyears, ens1 = get(yvec_ssp585[i]),
-                 ens2 = get(yvec_ssp585[i])[ix_kept_AW, ],
+                 ens2 = get(yvec_ssp585[i])[ix_kept_level2, ],
                  col1 = lcol_wave01, col2 = lcol_wave01_level2,
                  ylab = select_units[i], main = yvec_ssp585[i])
                  
@@ -510,7 +507,7 @@ par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
 for(i in 1:length(yvec_ssp585)){
 
 linePlotMultiEns(years = sspyears, ens1 = get(yvec_anom_ssp585[i]),
-                 ens2 = get(yvec_anom_ssp585[i])[ix_kept_AW, ],
+                 ens2 = get(yvec_anom_ssp585[i])[ix_kept_level2, ],
                  col1 = lcol_wave01, col2 = lcol_wave01_level2,
                  ylab = select_units[i], main = yvec_ssp585[i])
                  
@@ -568,7 +565,7 @@ const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
 const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
 
 Y_unif <- Y_const_ssp585_mv
-ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
+ix_kept_level3 <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
 
 ```
 
@@ -577,7 +574,7 @@ ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, 
 lcol_wave01 <- makeTransparent('tomato2',  120)
 lcol_wave01_level2 <- makeTransparent('gold',  120)
 lcol_wave01_level3<- makeTransparent('cadetblue',  200)
-stancol = 'black'
+stancol = 'blue'
 
 
 ```
@@ -589,9 +586,10 @@ par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
 for(i in 1:length(yvec_ssp585)){
 
 linePlotMultiEns(years = sspyears, ens1 = get(yvec_ssp585[i]),
-                 ens2 = get(yvec_ssp585[i])[ix_kept_AWBS, ],
+                 ens2 = get(yvec_ssp585[i])[ix_kept_level3, ],
                  col1 = lcol_wave01, col2 = lcol_wave01_level3,
                  ylab = select_units[i], main = yvec_ssp585[i])
+  lines(sspyears, get(yvec_ssp585[i])[501,], col = stancol)
                  
 }
 
@@ -607,9 +605,10 @@ par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
 for(i in 1:length(yvec_ssp585)){
 
 linePlotMultiEns(years = sspyears, ens1 = get(yvec_anom_ssp585[i]),
-                 ens2 = get(yvec_anom_ssp585[i])[ix_kept_AWBS, ],
+                 ens2 = get(yvec_anom_ssp585[i])[ix_kept_level3, ],
                  col1 = lcol_wave01, col2 = lcol_wave01_level3,
                  ylab = select_units[i], main = y_names_select_ssp585[i])
+  lines(sspyears, get(yvec_anom_ssp585[i])[501,], col = stancol)
                  
 }
 
@@ -652,8 +651,8 @@ for(i in 1:length(yvec_ssp585)){
   
   h1 <- hist(Y_ssp585_eoc[,i], main = y_names_select_ssp585[i], xlab = select_units[i], col = hcol_wave01, ylim = c(0,225))
   
-  hist(Y_ssp585_eoc[ix_kept_AW,i], col = hcol_wave01_level2, add = TRUE, breaks = h1$breaks)
-  hist(Y_ssp585_eoc[ix_kept_AWBS,i], col = hcol_wave01_level3, add = TRUE, breaks = h1$breaks)
+  hist(Y_ssp585_eoc[ix_kept_level2,i], col = hcol_wave01_level2, add = TRUE, breaks = h1$breaks)
+  hist(Y_ssp585_eoc[ix_kept_level3,i], col = hcol_wave01_level3, add = TRUE, breaks = h1$breaks)
 }
 
 reset()
@@ -668,8 +667,8 @@ par(mfrow = c(3,5), fg = 'grey')
 
 for(i in 1:length(yvec_ssp585)){
   
-  h1 <- hist(Y_ssp585_eoc[ix_kept_AW,i], main = y_names_select_ssp585[i], xlab = select_units[i], col = hcol_wave01_level2, ylim = c(0,80))
-  hist(Y_ssp585_eoc[ix_kept_AWBS,i], col = hcol_wave01_level3, add = TRUE, breaks = h1$breaks)
+  h1 <- hist(Y_ssp585_eoc[ix_kept_level2,i], main = y_names_select_ssp585[i], xlab = select_units[i], col = hcol_wave01_level2, ylim = c(0,80))
+  hist(Y_ssp585_eoc[ix_kept_level3, i], col = hcol_wave01_level3, add = TRUE, breaks = h1$breaks)
 }
 
 reset()
@@ -709,8 +708,8 @@ for(i in 1:length(yvec_anom_ssp585)){
   
   h1 <- hist(Y_ssp585_anom_eoc[,i], main = y_names_select_ssp585[i], xlab = select_units[i], col = hcol_wave01, ylim = c(0,225))
   
-  hist(Y_ssp585_anom_eoc[ix_kept_AW,i], col = hcol_wave01_level2, add = TRUE, breaks = h1$breaks)
-  hist(Y_ssp585_anom_eoc[ix_kept_AWBS,i], col = hcol_wave01_level3, add = TRUE, breaks = h1$breaks)
+  hist(Y_ssp585_anom_eoc[ix_kept_level2,i], col = hcol_wave01_level2, add = TRUE, breaks = h1$breaks)
+  hist(Y_ssp585_anom_eoc[ix_kept_level3,i], col = hcol_wave01_level3, add = TRUE, breaks = h1$breaks)
   
   abline(v = 0)
 }
@@ -731,8 +730,8 @@ par(mfrow = c(3,5), fg = 'grey')
 
 for(i in 1:length(yvec_anom_ssp585)){
   
- h1 <-  hist(Y_ssp585_anom_eoc[ix_kept_AW,i],  main = y_names_select_ssp585[i], xlab = select_units[i],col = hcol_wave01_level2, ylim = c(0,80))
-  hist(Y_ssp585_anom_eoc[ix_kept_AWBS,i], col = hcol_wave01_level3, add = TRUE, breaks = h1$breaks)
+ h1 <-  hist(Y_ssp585_anom_eoc[ix_kept_level2,i],  main = y_names_select_ssp585[i], xlab = select_units[i],col = hcol_wave01_level2, ylim = c(0,80))
+  hist(Y_ssp585_anom_eoc[ix_kept_level3,i], col = hcol_wave01_level3, add = TRUE, breaks = h1$breaks)
   
   abline(v = 0)
 }
@@ -790,8 +789,8 @@ cnbp_ens_ssp585_S3_mv <- cnbp_ens_ssp585_S3[, ix_2014]
 breaks <- seq(from = -100, to = 350, by = 25)
 hist(cnbp_ens_ssp585_S3_mv, main = "cumulative NBP since 1850 at 2014", col = hcol_wave01,
      xlab = 'Cumulative NBP since 1850 (GtC)', breaks = breaks)
-hist(cnbp_ens_ssp585_S3_mv[ix_kept_AW], add = TRUE, col = hcol_wave01_level2, breaks = breaks)
-hist(cnbp_ens_ssp585_S3_mv[ix_kept_AWBS], add = TRUE, col = hcol_wave01_level3, breaks = breaks)
+hist(cnbp_ens_ssp585_S3_mv[ix_kept_level2], add = TRUE, col = hcol_wave01_level2, breaks = breaks)
+hist(cnbp_ens_ssp585_S3_mv[ix_kept_level3], add = TRUE, col = hcol_wave01_level3, breaks = breaks)
      
 reset()
 
@@ -815,8 +814,8 @@ legend('topright', legend = c('wave01',  'wave01 level2', 'wave01 level3'),  fil
 # Setting the max modern value of cumulative NBP from 40 (Andy's original suggestion) to 70 means that cnbp is no longer really
 # a constraint on end-of-century values. It does constrain up to about 2050, but not beyond that (compared to the previous constraint)
 
-modern_cnbp_min <- -50
-modern_cnbp_max <- 110
+modern_cnbp_min <- -70
+modern_cnbp_max <- 70
 
 
 const_mins_level4 <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100, modern_cnbp_min)
@@ -839,8 +838,8 @@ matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = makeTr
         ylab = 'GtC', main = 'Cumulative NBP', xlab = '',
         bty = 'n', lwd = 2)
 
-matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AW, ]), lty = 'solid', col = makeTransparent(hcol_wave01_level2, 200), lwd = 2)
-matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AWBS, ]),lty = 'solid', col = makeTransparent(hcol_wave01_level3, 200), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level2, ]), lty = 'solid', col = makeTransparent(hcol_wave01_level2, 200), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level3, ]),lty = 'solid', col = makeTransparent(hcol_wave01_level3, 200), lwd = 2)
 matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level4, ]),lty = 'solid', col = makeTransparent('black', 200), lwd = 2)
 
 reset()
@@ -851,8 +850,8 @@ legend('bottomleft', legend = c('wave01',  'wave01 level2', 'wave01 level3', 'wa
 
 
 ```{r}
-(length(ix_kept_AW) / 500) * 100
-(length(ix_kept_AWBS) /500) * 100
+(length(ix_kept_level2) / 500) * 100
+(length(ix_kept_level3) /500) * 100
 (length(ix_kept_level4) / 500) * 100 
 ```
 
@@ -868,12 +867,13 @@ linePlotMultiEns(years = sspyears, ens1 = get(yvec_ssp585[i]),
                  ens2 = get(yvec_ssp585[i])[ix_kept_level4, ],
                  col1 = lcol_wave01, col2 = 'black',
                  ylab = select_units[i], main = yvec_ssp585[i])
+  lines(sspyears, get(yvec_ssp585[i])[501,], col = stancol)
                  
 }
 
 reset()
 
-legend('bottomright', legend = c('wave01', 'wave01 level4'), lty = 'solid', lwd = 2, col = c(lcol_wave01, 'black'), inset = c(0.05, 0.15) )
+legend('bottomright', legend = c('wave01', 'wave01 level4', 'standard'), lty = 'solid', lwd = 2, col = c(lcol_wave01, 'black', stancol), inset = c(0.05, 0.15) )
 
 
 
@@ -943,11 +943,11 @@ legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
 ## Level 5 constraint
 
 ```{r}
-const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
-const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
+#const_mins <- c(35, 0, 750, 300, frac_cci_min['bare soil']*100)
+#const_maxes <- c(80, 10000, 3000, 800, frac_cci_max['bare soil']*100)
 
-Y_unif <- Y_const_ssp585_mv
-ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
+#Y_unif <- Y_const_ssp585_mv
+#ix_kept_AWBS <- eval(parse(text = createConstraintString(yvec=yvec_constraints, mins = const_mins, maxes = const_maxes)))
 
 ```
 
@@ -978,14 +978,18 @@ Y_mv5 <- Y_unif
 
 ```{r, fig.width = 12, fig.height = 12}
 
+lcol_wave01_level5 <- 'green'
+
 par(mfrow= c(3,5), las = 1, mar = c(4,4,1,1))
 
 for(i in 1:length(yvec_ssp585)){
 
 linePlotMultiEns(years = sspyears, ens1 = get(yvec_ssp585[i]),
                  ens2 = get(yvec_ssp585[i])[ix_kept_level5, ],
-                 col1 = lcol_wave01, col2 = 'green',
+                 col1 = lcol_wave01, col2 = lcol_wave01_level5,
                  ylab = select_units[i], main = yvec_ssp585[i])
+  
+  lines(sspyears, get(yvec_ssp585[i])[501,], col = stancol)
                  
 }
 
@@ -1002,8 +1006,8 @@ matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = makeTr
         ylab = 'GtC', main = 'Cumulative NBP', xlab = '',
         bty = 'n', lwd = 2)
 
-matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AW, ]), lty = 'solid', col = makeTransparent(hcol_wave01_level2, 250), lwd = 2)
-matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AWBS, ]),lty = 'solid', col = makeTransparent(hcol_wave01_level3, 250), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level2, ]), lty = 'solid', col = makeTransparent(hcol_wave01_level2, 250), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level3, ]),lty = 'solid', col = makeTransparent(hcol_wave01_level3, 250), lwd = 2)
 matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level4, ]),lty = 'solid', col = makeTransparent('black', 250), lwd = 2)
 matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level5, ]),lty = 'solid', col = makeTransparent('green', 250), lwd = 2)
 lines(sspyears, cnbp_ens_ssp585_S3[501, ],lty = 'solid', col = makeTransparent('blue', 250), lwd = 2)
@@ -1028,14 +1032,9 @@ cnbp_ens_ssp585_eoc_level5 <- cnbp_ens_ssp585_S3[ ix_kept_level5, ncol(cnbp_ens_
 level5_sort <- sort(cnbp_ens_ssp585_eoc_level5, index.return = TRUE)
 
 # chooses highest, second highest and lowest
-ix_test_set <- ix_kept_level5[c(head(level5_sort$ix,1) , tail(level5_sort$ix,2))]
+ix_test_set <- ix_kept_level5[c(head(level5_sort$ix,1) ,28, tail(level5_sort$ix,1))]
 
 cnbp_ens_ssp585_S3[ix_test_set, ncol(cnbp_ens_ssp585_S3) ]
-
-# max is 250
-# min is -175
-# standard is 139.5
-# could choose - 6 or 3.3 as something close to zero
 
 
 ```
@@ -1048,19 +1047,21 @@ Level 5 in green, selected test set in sky blue. Standard in dark blue.
 
 ```{r, fig.width = 7, fig.height = 10}
 
+lcol_testset <- 'skyblue2'
+
 matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = makeTransparent(hcol_wave01, 250),
         ylab = 'GtC', main = 'Cumulative NBP', xlab = '',
         bty = 'n', lwd = 2)
 
 #matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AW, ]), lty = 'solid', col = makeTransparent(hcol_wave01_level2, 250), lwd = 2)
 #matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_AWBS, ]),lty = 'solid', col = makeTransparent(hcol_wave01_level3, 250), lwd = 2)
-matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level5, ]),lty = 'solid', col = makeTransparent('green', 90), lwd = 2)
-matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_test_set, ]),lty = 'solid', col = makeTransparent('skyblue2', 255), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_level5, ]),lty = 'solid', col = makeTransparent(lcol_wave01_level5, 100), lwd = 2)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_test_set, ]),lty = 'solid', col = makeTransparent(lcol_testset, 255), lwd = 2)
 lines(sspyears, cnbp_ens_ssp585_S3[501, ],lty = 'solid', col = makeTransparent('blue', 250), lwd = 2)
 
 reset()
 
-legend('bottomleft', legend = c('wave01', 'wave01 level5', 'Test set', 'Standard'),  col = c(hcol_wave01, 'green', 'skyblue2', 'blue'), inset = c(0.2, 0.2), lty = 'solid' , lwd = 2)
+legend('bottomleft', legend = c('wave01', 'wave01 level5', 'Test set', 'Standard'),  col = c(hcol_wave01, lcol_wave01_level5, lcol_testset, stancol), inset = c(0.2, 0.2), lty = 'solid' , lwd = 2)
 
 ```
 ```{r, fig.width = 12, fig.height = 12}
@@ -1071,14 +1072,15 @@ for(i in 1:length(yvec_ssp585)){
 
 linePlotMultiEns(years = sspyears, ens1 = get(yvec_ssp585[i]),
                  ens2 = get(yvec_ssp585[i])[ix_test_set, ],
-                 col1 = lcol_wave01, col2 = 'skyblue2',
+                 col1 = lcol_wave01, col2 = lcol_testset,
                  ylab = select_units[i], main = yvec_ssp585[i])
+  lines(sspyears, get(yvec_ssp585[i])[501,], col = stancol)
                  
 }
 
 reset()
 
-legend('bottomright', legend = c('wave01', 'wave01 selected'), lty = 'solid', lwd = 2, col = c(lcol_wave01, 'skyblue2'), inset = c(0.05, 0.15) )
+legend('bottomright', legend = c('wave01', 'wave01 selected'), lty = 'solid', lwd = 2, col = c(lcol_wave01, lcol_testset), inset = c(0.05, 0.15) )
 
 
 
@@ -1114,6 +1116,8 @@ nens <- 499:999
 
 print(paste0('param-perturb-P0', nens[ix_test_set],'.conf'))
 nens[ix_test_set]
+
+cbind(paste0('param-perturb-P0', nens[ix_test_set],'.conf'), cnbp_ens_ssp585_S3_mv[ix_test_set], cnbp_ens_ssp585_S3[ix_test_set, ncol(cnbp_ens_ssp585_S3) ])
 
 ```
 
