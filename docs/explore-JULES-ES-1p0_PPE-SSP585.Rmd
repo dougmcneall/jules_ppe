@@ -1,6 +1,10 @@
 ---
 title: "Analysis of JULES1p0 ensemble SSP585"
 output:
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
   html_notebook:
     toc: yes
     toc_float: yes
@@ -1121,6 +1125,24 @@ cbind(paste0('param-perturb-P0', nens[ix_test_set],'.conf'), cnbp_ens_ssp585_S3_
 
 ```
 
+
+
+```{r}
+
+#ix_test_set
+#nens <- 499:999
+
+print(paste0('param-perturb-P0', nens[ix_kept_level5],'.conf'))
+nens[ix_kept_level5]
+
+level5_cnbp <- cbind(paste0('param-perturb-P0', nens[ix_kept_level5],'.conf'), cnbp_ens_ssp585_S3_mv[ix_kept_level5], cnbp_ens_ssp585_S3[ix_kept_level5, ncol(cnbp_ens_ssp585_S3)] )
+
+colnames(level5_cnbp) <- c('RUNID', 'CNBP_1995-2014', 'CNBP_2100')
+
+print(level5_cnbp)
+write.csv(level5_cnbp, file = 'data/level5_cnbp.csv', quote = FALSE, row.names = FALSE)
+
+```
 
 ```{r}
 
