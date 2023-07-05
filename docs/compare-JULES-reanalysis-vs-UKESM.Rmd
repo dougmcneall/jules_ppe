@@ -1,0 +1,189 @@
+---
+title: "Compare the carbon cycle hen JULES driven by reanalysis and UKESM"
+output: html_notebook
+---
+
+Compare historic JULES when run driven by reanalysis and when driven by UKESM.
+
+Things to check:
+
+I think the 500 members of S3 are wave01 inputs. That would make sense of the 500 members plus 501st member being the standard.
+
+```{r}
+
+# running in /net/home/h01/hadda/jules_ppe/docs
+#global_mean_timeseries_wave00_file <- "constrain_JULES_ES_1p0/data/global_mean_timeseries_wave00_2022-09-13.rdata"
+
+#load(global_mean_timeseries_wave00_file)
+
+
+source("JULES-ES-1p0-common-packages.R")
+source("JULES-ES-1p0-common-functions.R")
+```
+
+```{r}
+historical_carbon_budget <- read_excel('Global_Carbon_Budget_2020v1.0.xlsx', sheet = "Historical Budget", skip = 15, n_max = 270)
+match_years_ix <- which(historical_carbon_budget$Year %in% 1850:2013)
+
+land_sink_net <- historical_carbon_budget$`land sink` - historical_carbon_budget$`land-use change emissions`
+
+match_years <- historical_carbon_budget$Year[match_years_ix]
+cumulative_net_land_sink <- cumsum(land_sink_net[match_years_ix])
+
+
+par(las = 1)
+plot(match_years, cumulative_net_land_sink,
+     type = 'l', main = "Cumulative Net Land Sink", xlab = "", ylab = "GtC",
+     ylim = c(-80, 20))
+
+```
+
+
+
+```{r}
+
+
+global_mean_timeseries_stan_file <- "constrain_JULES_ES_1p0/data/global_mean_timeseries_stan_2022-09-13.rdata"
+
+load(global_mean_timeseries_stan_file)
+
+```
+
+
+Modern value wave 01
+```{r}
+#ensemble_wave01_file <- "constrain_JULES_ES_1p0/data/ensemble_wave01_2022-04-08.rdata"
+  
+#load(ensemble_wave01_file)
+
+
+```
+
+Full timeseries wave01
+```{r}
+
+ensemble_wave01_ts_file <-  "constrain_JULES_ES_1p0/data/ensemble_timeseries_wave01_2022-09-14.rdata"
+
+load(ensemble_wave01_ts_file)
+
+
+```
+
+
+# S3 (wave01 locations)
+```{r}
+
+load("ensemble_timeseries_ssp_2022-08-09.rdata")
+
+```
+
+```{r}
+
+plot(npp_ens_wave01[,1],npp_ens_ssp585_S3[1:400,1] )
+abline(0,1)
+
+
+```
+
+```{r}
+
+
+plot(npp_ens_wave01[,164],npp_ens_ssp585_S3[1:400,164] )
+abline(0,1)
+
+```
+
+
+
+```{r, fig.width = 7, fig.height = 9}
+
+# Plot cumulative NBP
+
+cnbp_ens_wave01 <- t(apply(nbp_ens_wave01, 1, FUN = cumsum))
+cnbp_ens_ssp585 <- t(apply(nbp_ens_ssp585_S3, 1, FUN = cumsum))
+
+cnbp_stan_wave01 <- cumsum(nbp_stan)
+cnbp_stan_ssp585 <- cnbp_ens_ssp585[501, ]
+
+wave01_years <- 1850:2013
+ssp585_years <- 1850:2100
+
+par(las = 1)
+matplot(wave01_years, t(cnbp_ens_wave01), type = 'l', lty = 'solid', col = makeTransparent('tomato3', 120), xlab = '',
+        bty = 'n', 
+        ylab = 'Cumulative NBP (GtC)', 
+        ylim = c(-100,300), lwd = 2)
+
+ matlines(ssp585_years, t(cnbp_ens_ssp585) , col = makeTransparent('skyblue3', 120), lty = 'solid', lwd = 2)
+
+lines(wave01_years, cnbp_stan_wave01, col = 'red', lty = 'dashed', lwd = 2)
+lines(ssp585_years, cnbp_stan_ssp585, col = 'blue', lty = 'dashed', lwd = 2)
+lines(match_years, cumulative_net_land_sink, col = 'black', lty = 'dashed', lwd = 2)
+legend('topleft', 
+       legend = c('Observation-forced', 'Model-forced', 'Standard member'),
+       col = c(makeTransparent('tomato3', 120), makeTransparent('skyblue3', 120), 'darkgrey'), 
+       lty = c('solid', 'solid', 'dashed' ),
+       lwd = 2)
+
+
+```
+
+
+Cumulative NBP driven by UKESM is significantly lower than driven by reanalysis.
+```{r, fig.width = 7, fig.height = 7}
+
+
+plot(cnbp_ens_wave01[1:400, 164], cnbp_ens_ssp585[1:400, 164],
+     xlim = c(-100, 300), ylim = c(-100, 300),
+     main = "Cumulative NBP 1850-2014",
+     xlab = "Observations-forced",
+    ylab = "Model-forced")
+abline(0,1)
+
+
+
+```
+On average, CNBP is 25 GtC higher in obs forced runs than model forced runs
+```{r, fig.width = 7, fig.height = 7}
+
+
+cnbp_ens_wave01_outliers_ix <-  which(cnbp_ens_wave01[1:400, 164] < -1000 | cnbp_ens_wave01[1:400, 164] > 1000)
+cnbp_ens_ssp585_outliers_ix <- which(cnbp_ens_ssp585[1:400, 164] < -1000 | cnbp_ens_ssp585[1:400, 164] > 1000) # none
+
+
+
+cnbp_wave01 <- cnbp_ens_wave01[(1:400)[-cnbp_ens_wave01_outliers_ix], 164]
+cnbp_ssp585 <- cnbp_ens_ssp585[(1:400)[-cnbp_ens_wave01_outliers_ix], 164]
+
+fit <- lm(cnbp_wave01 ~ cnbp_ssp585)
+
+# coef(fit)[2] *100
+# ssp585 is 77% of reanalysis driven cnbp
+
+plot(cnbp_ssp585,cnbp_wave01,
+          main = "Cumulative NBP 1850-2014",
+     ylab = "Observations-forced",
+    xlab = "Model-forced")
+abline(0,1)
+abline(coef(fit), col = 'red')
+legend('topleft', legend = c('x=y', 'fit'), lty = c('solid', 'solid'), col = c('black', 'red'))
+
+
+
+
+```
+```{r}
+
+
+hist(cnbp_wave01 - cnbp_ssp585, main = "Obs forced - model forced CNBP")
+
+mdcnbp <- mean(cnbp_wave01 - cnbp_ssp585)
+
+text(100, 100, paste0('Mean difference = ',round(mdcnbp,1)))
+abline(v = mdcnbp, col = 'grey', lty = 'dashed')
+
+
+
+```
+
+
