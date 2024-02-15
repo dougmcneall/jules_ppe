@@ -4,5 +4,6 @@
 *.rdata
 .Rhistory
 constraint.RData
+*.nc
 
 
