@@ -1,0 +1,1063 @@
+---
+title: "calibrated-projection-v1"
+author: "Doug McNeall"
+date: "2/15/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Calibrated projection v1
+
+Calibrated projection of the global land surface carbon sink/source in JULES-ES-1.0.
+
+A proof-of-concept analysis, bringing together code from previous JULES projects.
+
+The plan is to create land surface historical and future trajectories that can't be ruled out by comparison of the model with observations. 
+
+## Plan
+
+*  We have a PPE of model-forced trajectories of the land surface. Initial runs were 500 historical members (wave00), followed by a further run of 500 historical members in places where we couldn't rule out the runs by comparison with observations (wave01). 
+
+* This latter ensemble (wave01) was run through the 21st century, using a model forced with SSP585 emissions.
+
+* For comparison, we have reanalysis-forced historical runs of the initial 500 member ensemble, which have significant behavioural differences from the model-forced runs (/net/home/h01/hadda/jules_ppe/docs/compare-JULES-reanalysis-vs-UKESM.Rmd). 
+
+* We have code comparing model runs to data, for example in PFTs and bare soil (/net/home/h01/hadda/jules_ppe/docs/wave01-JULES-ES-1p0.Rmd)
+
+* We have a Gaussian process emulator of trajectories of the global mean land surface properties (/home/h01/hadda/student-projects/hd-emulator/docs/emulate-jules-all-timeseries.Rmd)
+
+## Preliminaries
+```{r}
+source("JULES-ES-1p0-common-packages.R")
+source("JULES-ES-1p0-common-functions.R")
+
+
+```
+
+```{r}
+
+linePlotMultiEns <- function(years, ens1, ens2, col1, col2, ylab, main, ylim = NULL){
+  # Plot wave00 and wave01 timeseries on top of one another
+  
+  nt <- length(years) 
+  if(is.null(ylim)){
+    
+  #ylim = range(c(ens1[,1], ens1[,nt], ens2[,1], ens2[ ,nt]))
+  ylim = range(c(ens1,ens2))
+  }
+  
+  else ylim <- ylim
+  
+  matplot(years, t(ens1), type = 'l', lty = 'solid',ylim = ylim, col = col1,
+        ylab = ylab, main = main, xlab = '',
+        bty = 'n', lwd = 1.5)
+  matlines(years, t(ens2), col = col2, lty = 'solid', lwd = 1.5)
+}
+
+
+makeTimeseriesEnsembleSSP <- function(ensloc, variable, nstart, nend, cn = 1850:2100){
+  
+  ysec <- 31536000
+  
+  nens <- (nend - nstart) + 1
+  # nens is number of ensemble members
+  # nts length of timeseries
+  # cn is colnames()
+  datmat <- matrix(NA, nrow = nens, ncol = length(cn))
+  colnames(datmat) <- cn
+  
+  enslist <- paste("P", formatC(nstart:nend, width=4, flag="0"), sep="")
+  
+  for(i in 1:nens){
+    
+    ensmember <- enslist[i]
+    
+    fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+    
+    try(nc <- nc_open(paste0(fn)))
+    #try(localtime <- ncvar_get(nc, 'time'))
+    
+    # This part compensates for the fact that sometimes years are missing
+    #try(localyear <- floor(2100 + (localtime / ysec)))
+    #try(ix <- which(cn%in%localyear))
+    
+    try(dat <- extractTimeseries(nc, variable))
+    
+    try(datmat[i, ] <- dat)
+    nc_close(nc)
+  }
+  datmat
+}
+
+getStandardMemberSSP <- function(ensloc, variable, nts = 251, cn = 1850:2100){
+  
+  datmat <- matrix(NA, nrow = 1, ncol = nts)
+  colnames(datmat) <- cn
+  
+  ensmember <- 'S3'
+  #fn <- paste0(ensloc,ensmember,'/stats/','JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+  fn <- paste0(ensloc,'JULES-ES-1p0_',ensmember,'_Annual_global.nc')
+  
+  try(nc <- nc_open(paste0(fn)))
+  try(dat <- extractTimeseries(nc, variable))
+  
+  datmat[1, ] <- dat
+  nc_close(nc)
+  datmat
+  
+}
+
+```
+
+```{r}
+
+
+ensloc_ssp585_S3 <- '/data/users/hadaw/JULES_ES_PPE/u-cf932/'
+ensloc_ssp585_RAD <- '/data/users/hadaw/JULES_ES_PPE/u-ck647/'
+
+ysec = 60*60*24*365
+sspyears <- 1850:2100
+
+y_names_select_ssp585 <-  c("npp", "nbp", "cSoil", "cVeg",
+                     "lai_lnd_mean",
+                     "rh_lnd_sum" , "fLuc_lnd_sum", "fHarvest_lnd_sum",  
+                     "treeFrac_lnd_mean" , "baresoilFrac_lnd_mean",
+                     "shrubFrac_lnd_mean", "c3PftFrac_lnd_mean",
+                     "c4PftFrac_lnd_mean"   
+)
+
+select_units <- c('GtC/year', 'GtC/year', 'GtC', 'GtC', 'index', 'GtC/year','GtC/year', 'GtC/year', '%', '%', '%', '%', '%')
+names(select_units) <- y_names_select_ssp585
+
+# Histograms of end of century values
+yvec_ssp585 <- paste0(y_names_select_ssp585, "_ens_ssp585_S3")
+
+yvec_anom_ssp585 <- paste0(y_names_select_ssp585, "_ens_anom_ssp585_S3")
+
+```
+
+
+
+```{r}
+if (file.exists("ensemble_timeseries_ssp_2022-08-09.rdata")) {
+  load("ensemble_timeseries_ssp_2022-08-09.rdata")
+} else {
+  
+  # primary carbon cycle outputs
+  npp_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "npp_nlim_lnd_sum", cn = sspyears) / (1e12/ysec)
+  
+  nbp_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "nbp_lnd_sum", cn = sspyears) / (1e12/ysec)
+  
+  cSoil_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "cSoil_lnd_sum", cn = sspyears) / 1e12
+  
+  cVeg_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "cVeg_lnd_sum", cn = sspyears) / 1e12
+  
+  lai_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "lai_lnd_mean", cn = sspyears)
+  
+  # fluxes
+  rh_lnd_sum_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "rh_lnd_sum", cn = sspyears) / (1e12/ysec)
+  
+  fLuc_lnd_sum_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "fLuc_lnd_sum", cn = sspyears) / (1e12/ysec)
+ 
+  fHarvest_lnd_sum_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "fHarvest_lnd_sum", cn = sspyears) / (1e12/ysec)
+  
+  # fractions
+  treeFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "treeFrac_lnd_mean", cn = sspyears)
+
+  shrubFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "shrubFrac_lnd_mean", cn = sspyears)  
+  
+  baresoilFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "baresoilFrac_lnd_mean", cn = sspyears)  
+  
+  c3PftFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "c3PftFrac_lnd_mean", cn = sspyears) 
+  
+  c4PftFrac_lnd_mean_ens_ssp585_S3 <- makeTimeseriesEnsembleSSP(ensloc = ensloc_ssp585_S3,
+                                                 nstart = 499, nend = 999, variable = "c4PftFrac_lnd_mean", cn = sspyears)   
+  
+ # save(npp_ens_ssp585_S3, nbp_ens_ssp585_S3, cSoil_ens_ssp585_S3, cVeg_ens_ssp585_S3, lai_lnd_mean_ens_ssp585_S3, rh_lnd_sum_ens_ssp585_S3, fLuc_lnd_sum_ens_ssp585_S3, fHarvest_lnd_sum_ens_ssp585_S3,
+#       treeFrac_lnd_mean_ens_ssp585_S3, shrubFrac_lnd_mean_ens_ssp585_S3, baresoilFrac_lnd_mean_ens_ssp585_S3,c3PftFrac_lnd_mean_ens_ssp585_S3, c4PftFrac_lnd_mean_ens_ssp585_S3,
+#       file = "ensemble_timeseries_ssp_2022-08-09.rdata" )
+  
+}
+
+
+```
+
+
+```{r, include=FALSE}
+
+ npp_stan_ssp585_S3<- getStandardMemberSSP(ensloc = ensloc_ssp585_S3, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
+ nbp_stan_ssp585_S3 <- getStandardMemberSSP(ensloc = ensloc_ssp585_S3, variable = "nbp_lnd_sum") / (1e12/ysec)
+#  cSoil_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "cSoil_lnd_sum") / 1e12
+#  cVeg_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "cVeg_lnd_sum") / 1e12
+#  lai_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "lai_lnd_mean")
+# # 
+# # 
+# # # fluxes
+#  rh_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "rh_lnd_sum") / (1e12/ysec)
+#  fLuc_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "fLuc_lnd_sum") / (1e12/ysec)
+#  fHarvest_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "fHarvest_lnd_sum") / (1e12/ysec)
+# # 
+# # 
+# # # fractions
+#  treeFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "treeFrac_lnd_mean")
+#  shrubFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "shrubFrac_lnd_mean")
+#  baresoilFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "baresoilFrac_lnd_mean")
+#  c3PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "c3PftFrac_lnd_mean")
+#  c4PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "c4PftFrac_lnd_mean")
+
+
+
+```
+
+
+```{r}
+## ----------------------------------------------------------------------
+## Anomalize ensemble
+## ----------------------------------------------------------------------
+
+npp_ens_anom_ssp585_S3 <- anomalizeTSmatrix(npp_ens_ssp585_S3, 1:20)
+nbp_ens_anom_ssp585_S3 <- anomalizeTSmatrix(nbp_ens_ssp585_S3, 1:20)
+cSoil_ens_anom_ssp585_S3 <- anomalizeTSmatrix(cSoil_ens_ssp585_S3, 1:20)
+cVeg_ens_anom_ssp585_S3 <- anomalizeTSmatrix(cVeg_ens_ssp585_S3, 1:20)
+
+rh_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(rh_lnd_sum_ens_ssp585_S3, 1:20)
+fLuc_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(fLuc_lnd_sum_ens_ssp585_S3, 1:20)
+lai_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(lai_lnd_mean_ens_ssp585_S3, 1:20) 
+
+fHarvest_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(fHarvest_lnd_sum_ens_ssp585_S3, 1:20)
+treeFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(treeFrac_lnd_mean_ens_ssp585_S3, 1:20)
+shrubFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(shrubFrac_lnd_mean_ens_ssp585_S3, 1:20)
+baresoilFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(baresoilFrac_lnd_mean_ens_ssp585_S3, 1:20)
+c3PftFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(c3PftFrac_lnd_mean_ens_ssp585_S3, 1:20)
+c4PftFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(c4PftFrac_lnd_mean_ens_ssp585_S3, 1:20)
+
+#total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
+
+
+```
+
+
+## Include baresoil fraction data
+
+```{r}
+
+load('treefrac/global_frac_cci.RData')
+
+frac_cci <- c(global_frac_cci[1] + global_frac_cci[2], global_frac_cci[3], global_frac_cci[4], global_frac_cci[5], global_frac_cci[8] )
+#frac_mv <- c(standard_modern_value['treeFrac_lnd_mean'], standard_modern_value['c3PftFrac_lnd_mean'], #standard_modern_value['c4PftFrac_lnd_mean'], standard_modern_value['shrubFrac_lnd_mean'], standard_modern_value['baresoilFrac_lnd_mean']  )
+
+
+fraclab = c('Trees', 'C3 grasses', 'C4 grasses', 'Shrubs', 'Bare soil')
+
+
+# Half and double the LC CCI data to get bounds for constraining JULES ES-1.0
+frac_cci_max <- frac_cci * 2 *100
+frac_cci_min <- frac_cci * 0.5 * 100
+
+```
+
+
+## Build a matrix of variables that we will use to constrain the ensemble
+
+Matrix of constraint variables, mean of 1996 to 2015
+```{r}
+
+ix_mv <- which(sspyears %in% 1996:2015)
+
+yvec_constraints <- c('npp_ens_ssp585_S3',
+                      'nbp_ens_ssp585_S3', 
+                      'cSoil_ens_ssp585_S3',
+                      'cVeg_ens_ssp585_S3',
+                      'treeFrac_lnd_mean_ens_ssp585_S3',
+                      'c3PftFrac_lnd_mean_ens_ssp585_S3',
+                      'c4PftFrac_lnd_mean_ens_ssp585_S3' ,
+                      'shrubFrac_lnd_mean_ens_ssp585_S3',
+                      'baresoilFrac_lnd_mean_ens_ssp585_S3'
+                      )
+
+# Matrix of constraint output modern values (1996 - 2015)
+Y_const_ssp585_mv <- matrix(data = NA, nrow = nrow(npp_ens_ssp585_S3), ncol = length(yvec_constraints))
+colnames(Y_const_ssp585_mv) <- yvec_constraints
+
+for(i in 1:length(yvec_constraints)){
+  
+  Y_trunc <- get(yvec_constraints[i])[, ix_mv]
+  Y_trunc_mean <- apply(Y_trunc, 1, mean, na.rm = TRUE)
+  Y_const_ssp585_mv[,i] <- Y_trunc_mean
+}
+
+```
+
+
+```{r}
+
+createConstraintString <- function(yconst, yvec, mins, maxes){
+  # This function constructs a logical expression as a string to be evaluated
+  const_string <- deparse(substitute(yconst))
+  
+  out <- 'which('
+  
+  for(i in 1:length(yvec)){
+    
+    if(i<length(yvec)){
+      
+    subconst <- paste0(const_string,'[,', '"',yvec[i],'"',']', '>', mins[i], '&', const_string,'[,', '"',yvec[i], '"',']' , '<', maxes[i], '&')
+    }
+    
+    else{
+     subconst <-  paste0(const_string,'[,', '"',yvec[i],'"',']', '>', mins[i], '&', const_string,'[,', '"',yvec[i], '"',']' , '<', maxes[i])
+    }
+   out <-  paste0(out, subconst)
+  }
+  
+  out <- paste0(out, ')')
+}
+
+
+#myfunc <- function(v1) {
+#  deparse(substitute(v1))
+#}
+
+#myfunc(foo)
+#[1] "foo"
+
+
+level2_mins <- c(35, 0, 750, 300)
+level2_maxes <- c(80, 10000, 3000, 800)
+
+Y_unif2 <- Y_const_ssp585_mv[,1:4]
+ix_kept_level2 <- eval(parse(text = createConstraintString(yconst = Y_unif2, yvec=yvec_constraints[1:4], mins = level2_mins, maxes = level2_maxes)))
+
+
+inputConstraintSize <- function(yconst, yvec, mins, maxes){
+  # Calculate the indices of Y_unif that are within the bounds set by mins and maxes
+  
+  ix_kept <- eval(parse(text = createConstraintString(yconst = yconst, yvec=yvec, mins = mins, maxes = maxes)))
+  
+  prop_kept <- length(ix_kept) / nrow(Y_unif)
+  
+  return(list(ix_kept = ix_kept, prop_kept = prop_kept))
+  
+}
+  
+```
+
+```{r}
+
+# Load up the data
+lhs_i = read.table('data/lhs_u-ao732.txt', header = TRUE)
+lhs_ii = read.table('data/lhs_u-ao732a.txt', header = TRUE)
+
+toplevel_ix = 1:499
+
+
+# I *think* the last ensemble member (501) is the standard set of parameters
+ntrain_wave01 <- 500
+
+# Load input matrices and bind with wave00 inputs
+lhs_wave01 <- read.table( 'data/lhs_example.txt', header = TRUE)
+
+lhs_wave01_standard <- rbind(lhs_wave01, c(rep(1, ncol(lhs_wave01))))
+
+X_wave01_standard = normalize(lhs_wave01_standard, wrt = rbind(lhs_i, lhs_ii, lhs_wave01))
+colnames(X_wave01_standard) = colnames(lhs_wave01)
+
+#standard member at the end
+#lhs_all <- rbind(lhs_i, lhs_ii, lhs_wave01, c(rep(1, ncol(lhs_i))))
+
+# Match the 400 outputs we're using in the training data
+#X_wave01_train <- X_wave01[1:ntrain_wave01, ]
+
+```
+
+
+```{r, fig.width = 10, fig.height = 6}
+
+# npp, nbp, cSoil, cVeg, treeFrac, c3grassFrac, c4grassFrac, shrubFrac, bareSoilFrac 
+const_mins <- c(35, 0, 750, 300, frac_cci_min)
+const_maxes <- c(80, 10000, 3000, 800, frac_cci_max)
+
+all_consts <- colnames(Y_const_ssp585_mv)
+
+#par(mfrow = c(1, ncol(Y_const_ssp585_mv)))
+
+#for(i in 1:ncol(Y_const_ssp585_mv)){
+  
+#  plot(rep(1,2),  c(const_mins[i], const_maxes[i] ))
+#  points(rep(1, nrow(Y_const_ssp585_mv)), Y_const_ssp585_mv[,i])
+#  
+  
+#}
+
+ix_kept_all <-  eval(parse(text = createConstraintString(yconst = Y_const_ssp585_mv, yvec=all_consts, mins = const_mins, maxes = const_maxes)))
+
+
+#Y_unif <- cbind(Y_const_ssp585_mv, cnbp_ens_ssp585_S3_mv, treeFrac_lnd_mean_ens_ssp585_S3_mv)
+#level5_constraints <- c('npp_ens_ssp585_S3', 'nbp_ens_ssp585_S3', 'cSoil_ens_ssp585_S3', 'cVeg_ens_ssp585_S3', 'baresoilFrac_lnd_mean_ens_ssp585_S3', 'cnbp_ens_ssp585_S3_mv', 'treeFrac_lnd_mean_ens_ssp585_S3_mv')
+#ix_kept_level5 <- eval(parse(text = createConstraintString(yvec=level5_constraints, mins = const_mins_level5, maxes = const_maxes_level5)))
+
+#hack here, need to sort createConstraintsString
+#Y_mv5 <- Y_unif
+
+```
+
+
+## Compare the ensemble with observations/expert-elicited ranges
+
+```{r, fig.width = 12, fig.height = 7}
+
+library(scales)
+
+main_vec <- c('NPP', 'NBP', 'cSoil', 'cVeg', 'trees', 'grassC3', 'grassC4', 'shrubs', 'baresoil')
+par(mfrow = c(1, ncol(Y_const_ssp585_mv)), las = 1, mar = c(6,5,5,3))
+
+ylim_min_vec <- c(0, -1.5, 0, 0, 0, 0, 0, 0, 0)
+ylim_max_vec <- c(150, 3.5, 5000, 2000, 100, 100, 100, 100, 100)
+obs_vec <- c(NA,NA, NA, NA, frac_cci*100)
+
+colvec <- rep( alpha('black',0.1), nrow(Y_const_ssp585_mv))
+colvec[ix_kept_all] <- 'cyan'
+colvec[nrow((Y_const_ssp585_mv))] <- 'green'
+  
+for(i in 1:ncol(Y_const_ssp585_mv)){
+  
+  xpoints <- jitter(rep(i, nrow(Y_const_ssp585_mv)))
+  plot(xpoints, Y_const_ssp585_mv[,i], axes = FALSE ,
+        xlab = '', ylab = '',
+       ylim = c(ylim_min_vec[i], ylim_max_vec[i] ), pch = 21, cex = 1, col = colvec, bg = colvec,
+       main = main_vec[i])
+  points(i, obs_vec[i], bg = 'red', pch = 21, cex = 2, col= 'white')
+  points(xpoints[ix_kept_all], Y_const_ssp585_mv[ix_kept_all,i], pch = 21, col = 'white', bg = 'blue', cex = 1.5)
+  points(xpoints[nrow(Y_const_ssp585_mv)], Y_const_ssp585_mv[nrow(Y_const_ssp585_mv),i], pch = 21, col = 'white', bg = 'orange', cex = 1.5)
+  axis(2)
+  abline(h = const_mins[i], col = 'red', lwd = 3)
+  abline(h =const_maxes[i], col = 'red', lwd = 3)
+  
+}
+
+reset()
+
+legend('bottom', horiz = TRUE, inset = 0.02,
+       legend = c('ensemble member', 'Observation', 'expert range', 'passes all' , 'standard member'),
+       pch = c(19, 19, NA, 19, 19),
+       lty = c(NA, NA, 'solid',NA,  NA),
+       col = c(alpha('black',0.2), 'red','red', 'blue', 'orange')
+)
+
+```
+
+## Pairs plot of the ensemble members that make it through the data challenges
+
+The ensemble members that make it through the data challenge don't all cluster around the standard settings.
+```{r, fig.width = 10, fig.height = 10}
+
+
+pairs(
+  X_wave01_standard[c(ix_kept_all, nrow(Y_const_ssp585_mv)),   ],
+  col = c(rep('blue', length(ix_kept_all)), 'orange'),
+  bg = c(rep(alpha('blue',0.4), length(ix_kept_all)), alpha('orange',0.4)),
+  lower.panel = NULL,
+  labels = 1:ncol(X_wave01_standard),
+  gap = 0,
+  xlim = c(0,1), ylim = c(0,1),
+  pch = 21,
+  xaxt = 'n', yaxt = 'n'
+)
+
+reset()
+legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
+
+legend('bottom', 
+       inset = 0.05,
+       legend = c('passed all', 'standard'),
+       col = c('blue', 'orange' ), pt.bg = c(alpha('blue',0.4), alpha('orange',0.4)),
+       pch = 21,
+       horiz = TRUE )
+
+
+```
+
+
+## Build emulators for the "modern value" constraint variable
+
+```{r}
+# Create fit lists for the combined data
+#Y_frac_level1a_wave01_list <- mat2list(Y_frac_level1a_wave01)
+
+Y_const_ssp585_mv_list <- mat2list(Y_const_ssp585_mv)
+
+fit_list_Y_const_ssp585_mv <- mclapply(X = Y_const_ssp585_mv_list, FUN = km, formula = ~., design = X_wave01_standard,
+                                   mc.cores = 4, control = list(trace = FALSE))
+
+gc()
+```
+
+
+```{r, fig.width = 7, fig.height = 9}
+
+plot(fit_list_Y_const_ssp585_mv[[1]])
+
+
+```
+Create a set of samples from a Uniform input space
+```{r}
+
+X_mins <- apply(X_wave01_standard,2,min)
+X_maxes <- apply(X_wave01_standard,2,max)
+
+X_unif <- samp_unif(30000, mins = X_mins, maxes = X_maxes)
+
+```
+
+Predict at the sampled inputs
+```{r}
+# may be better to split this out, as it causes problems at 50000 samples. 20K seems OKrm(list = ls())
+pred_list_Y_const_ssp585_mv <- mclapply(fit_list_Y_const_ssp585_mv, FUN = predict, newdata = X_unif, type = 'UK',
+                                        mc.cores = 4, control = list(trace = FALSE))
+gc()
+```
+
+```{r}
+Y_pred <- matrix(NA, nrow = nrow(X_unif), ncol = length(pred_list_Y_const_ssp585_mv))
+
+for(i in 1:length(pred_list_Y_const_ssp585_mv)){
+  
+  Y_pred[, i] <- pred_list_Y_const_ssp585_mv[[i]]$mean
+}
+
+colnames(Y_pred) <- colnames(Y_const_ssp585_mv)
+
+```
+
+
+```{r, fig.width = 10, fig.height = 7}
+
+par(mfrow = c(3,3))
+
+for(i in 1:ncol(Y_pred)){
+hist(Y_pred[,i], col = 'grey', main = yvec_constraints[i])
+  rug(Y_const_ssp585_mv[,i])
+abline(v = c(const_mins[i], const_maxes[i]), col = 'red')
+}
+
+```
+
+
+
+```{r}
+Y_pred_9 <- Y_pred[ ,1:9]
+
+ix_kept_pred <-  eval(parse(text = createConstraintString(yconst = Y_pred_9, yvec=all_consts[1:9], mins = const_mins[1:9], maxes = const_maxes[1:9])))
+
+
+```
+
+```{r}
+length(ix_kept_pred)
+
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12, warning = FALSE}
+
+#pairs(X_unif[ix_kept_pred, ],
+#      xlim = c(0,1), ylim = c(0,1),
+#      gap = 0,
+#      pch = 0.3
+#      )
+
+panel.hist <- function(x, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+X_kept <- rbind(X_unif[ix_kept_pred, ], X_wave01_standard)
+colnames(X_kept) <- 1:32
+
+#pdf(file = 'X_treefrac_pairs_density.pdf', width = 10, height = 10)
+pairs(X_kept,
+    #  labels = 1:d,
+      gap = 0, lower.panel = NULL, xlim = c(0,1), ylim = c(0,1),
+      panel = dfunc_up_truth,
+      diag.panel = panel.hist,
+      cex.labels = 1,
+      col.axis = 'white',
+      dfunc_col = rb
+)
+
+reset()
+legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
+
+
+
+```
+# High-dimensional emulation section
+
+```{r}
+# Libraries
+library(DiceKriging)
+library(parallel)
+```
+
+
+```{r}
+# Helper functions
+
+anomalizeTSmatrix = function(x, ix){
+  # Anomalise a timeseries matrix
+  subx = x[ ,ix]
+  sweepstats = apply(subx, 1, FUN=mean)
+  anom = sweep(x, 1, sweepstats, FUN = '-')
+  anom
+}
+
+mat2list <- function(X){
+  
+  # Turns the p columns of a matrix into a p length list,
+  # with each column becoming an element of the list
+  
+  out <- vector(mode = 'list', length = ncol(X))
+  for(i in 1:ncol(X)){
+    out[[i]] <- X[ , i]
+  }
+  out
+}
+
+
+reset <- function() {
+  # Allows annotation of graphs, resets axes
+  par(mfrow=c(1, 1), oma=rep(0, 4), mar=rep(0, 4), new=TRUE)
+  plot(0:1, 0:1, type="n", xlab="", ylab="", axes=FALSE)
+}
+
+makeTransparent<-function(someColor, alpha=100)
+  # Transparent colours for plotting
+{
+  newColor<-col2rgb(someColor)
+  apply(newColor, 2, function(curcoldata){rgb(red=curcoldata[1], green=curcoldata[2],
+                                              blue=curcoldata[3],alpha=alpha, maxColorValue=255)})
+}
+
+
+
+pca_km <- function(X, Y, train_ix, test_ix, npctol = 0.99, scale = FALSE, center = TRUE, ...){
+  # emulate high dimensional output  
+  
+  require(parallel)
+  
+  # Split into training and test samples
+  X_train <- X[train_ix, ]
+  X_test  <- X[test_ix, ]
+  
+  Y_train <- Y[train_ix, ]
+  Y_test  <- Y[test_ix, ]
+  
+  
+  #reduce dimension of the output
+  pca <- prcomp(Y_train, scale = scale, center = center)
+  
+  
+  # choose a number of pcs
+  pca_summary <- summary(pca)
+  
+  # 2 PCs minimum
+  if(pca_summary$importance[3,2] < npctol){
+    
+  npc <- as.numeric(which(pca_summary$importance[3,] > npctol)[1])
+  
+  }
+  
+  else{
+    npc <- 2
+    }
+  
+  
+  scores_train_list <- mat2list(pca$x[, 1:npc])
+  
+  # fitting the emulator is a slow step, so we use parallel computation
+  # Fit an emulator to each principal component in turn
+  fit_list <- mclapply(X = scores_train_list, FUN = km, formula = ~., design = X_train,
+                       mc.cores = 4, control = list(trace = FALSE, maxit = 200))
+  
+  scores_em_test_mean  <- NULL
+  scores_em_test_sd    <- NULL
+  
+  scores_em_train_mean <- NULL
+  scores_em_train_sd   <- NULL
+  
+  for(i in 1:npc){
+    
+    loo <- leaveOneOut.km(fit_list[[i]], type = 'UK', trend.reestim = TRUE)
+    pred_test <- predict(fit_list[[i]], newdata = X_test, type = 'UK')
+    
+    # Predict training data (low dimension representation)
+    scores_em_train_mean <- cbind(scores_em_train_mean, loo$mean)
+    scores_em_train_sd <- cbind(scores_em_train_sd, loo$sd)                            
+    
+    # Predict test data (low dimension representation)                         
+    scores_em_test_mean <- cbind(scores_em_test_mean, pred_test$mean)
+    scores_em_test_sd   <- cbind(scores_em_test_sd, pred_test$sd)
+    
+  }
+  
+  # Project back up to high dimension
+  if(scale){
+    anom_train <- pca$rotation[ ,1:npc] %*% t(scores_em_train_mean[,1:npc])*pca$scale
+    anom_test <- pca$rotation[ ,1:npc] %*% t(scores_em_test_mean[,1:npc])*pca$scale
+    
+    sd_train <- t(pca$rotation[ ,1:npc] %*% t(scores_em_train_sd[,1:npc])*pca$scale)
+    sd_test <- t(pca$rotation[ ,1:npc] %*% t(scores_em_test_sd[,1:npc])*pca$scale)
+  }
+  
+  else{
+    anom_train <- pca$rotation[ ,1:npc] %*% t(scores_em_train_mean[,1:npc])
+    anom_test <- pca$rotation[ ,1:npc] %*% t(scores_em_test_mean[,1:npc])
+    
+    sd_train <- t(pca$rotation[ ,1:npc] %*% t(scores_em_train_sd[,1:npc]))
+    sd_test <- t(pca$rotation[ ,1:npc] %*% t(scores_em_test_sd[,1:npc]))
+    
+  }
+  
+  Ypred_train <- t(anom_train + pca$center)
+  Ypred_test <- t(anom_test + pca$center)
+  
+  Yerr_train <- Y_train - Ypred_train
+  Yerr_test <- Y_test - Ypred_test
+  
+  return(list(X = X,
+              Y = Y,
+              train_ix = train_ix,
+              test_ix = test_ix,
+              X_train = X_train,
+              X_test = X_test,
+              npc = npc,
+              pca = pca,
+              fit_list = fit_list,
+              scores_em_train_mean = scores_em_train_mean,
+              scores_em_train_sd = scores_em_train_sd,
+              scores_em_test_mean = scores_em_test_mean,
+              scores_em_test_sd = scores_em_test_sd,
+              Ypred_train = Ypred_train,
+              Ypred_test = Ypred_test,
+              sd_train = sd_train,
+              sd_test = sd_test,
+              Yerr_train = Yerr_train,
+              Yerr_test = Yerr_test
+  ))
+  
+}
+
+pca_km_errorStats <- function(fit, nround = 2, compare_ix = NULL){
+  # Calculate the error statistics from a pca_km object
+  
+  # fit ........... output object from pca_km
+  # nround ........ decimals to round in output
+  # compare_ix..... indices of the training set to calculate error stats for 
+
+  if(is.null(compare_ix)){
+    
+    compare_ix <-  1:nrow(fit$Yerr_train)
+    
+  }
+  
+  else{ compare_ix <- compare_ix}
+  
+  
+  trainMAE <- round(mean(abs(fit$Yerr_train[compare_ix, ])), nround)
+  
+  testMAE <- round(mean(abs(fit$Yerr_test)), nround)
+  
+  
+  return(list(trainMAE = trainMAE,
+              testMAE = testMAE))
+  
+}
+
+
+pca_km_tsSparkPlot <- function(pca_km_obj, nr, nc, transp, maintext, yrs, obscol = 'black', predcol = 'red', ...){
+  
+  # Timeseries test set prediction sparkline plot (small multiples)
+  
+  par(mfrow = c(nr,nc), mar = c(0.1, 0.1, 0.1, 0.1), oma = c(1,0.1,5,0.1))
+  
+  ylim <- range(
+    (pca_km_obj$Ypred_test + 2*(pca_km_obj$sd_test)),
+    ( pca_km_obj$Ypred_test - 2*(pca_km_obj$sd_test)))
+  
+  for(i in 1:length(pca_km_obj$test_ix)){
+    
+    
+    plot(yrs, (pca_km_obj$Y[test_ix, ])[i, ], ylim = ylim, type = 'n', axes = FALSE)
+    
+    rect(par("usr")[1], par("usr")[3],
+         par("usr")[2], par("usr")[4],
+         col = "grey90", border = "grey90") # Color
+    
+    lines(yrs, (pca_km_obj$Y[test_ix, ])[i, ], col = obscol, lwd = 1.5)
+    
+    lines(yrs, pca_km_obj$Ypred_test[i, ], col = predcol, lwd = 1.5)
+    
+    lines(yrs, pca_km_obj$Ypred_test[i, ] + 2*(pca_km_obj$sd_test[i, ]), col = makeTransparent(predcol,transp))
+    lines(yrs, pca_km_obj$Ypred_test[i, ] - 2*(pca_km_obj$sd_test[i, ]), col = makeTransparent(predcol,transp))
+    
+ 
+    
+  }
+  
+  mtext(maintext, side = 3, outer = TRUE, cex = 1.5, line = 1)
+  reset()
+  legend('topleft', col = c(obscol, predcol, makeTransparent(predcol,transp)),
+         legend = c('observed', 'predicted', '+-2sd'), lty = 'solid', horiz = TRUE, bty = 'n')
+  
+}
+
+
+# A function to identify rows with outlier data (from Google Bard, adapted to update threshold)
+findAnomalies <- function(matrix, iqrThres = 1.5, madThres = 1.5, na.rm = FALSE) {
+  # Check for NA values
+  if (!na.rm) {
+    naRows <- which(apply(matrix, 1, is.na))
+    if (length(naRows) > 0) {
+      return(naRows)
+    }
+  }
+
+  # Check for outliers using IQR method
+  iqr <- IQR(matrix, na.rm = na.rm)
+  q1 <- quantile(matrix, 0.25, na.rm = na.rm)
+  q3 <- quantile(matrix, 0.75, na.rm = na.rm)
+  outlierRows <- which(apply(matrix, 1, function(row) {
+    any(row < q1 - iqrThres * iqr | row > q3 + iqrThres * iqr)
+  }))
+
+  # Check for discontinuities
+  discontinuityRows <- which(apply(matrix, 1, function(row) {
+    any(diff(row) > madThres * mad(row))
+  }))
+
+  # Combine NA, outlier, and discontinuity rows
+  anomalyRows <- union(union(naRows, outlierRows), discontinuityRows)
+
+  # Return index of anomaly rows
+  return(anomalyRows)
+}
+
+
+
+findAnomaliesTSLocal <- function(matrix, iqrThres = 5, madThres = 3, na.rm = FALSE) {
+  # Find outlier runs in an ensemble
+  
+  # Check for NA values
+  if (!na.rm) {
+    naRows <- which(apply(matrix, 1, is.na))
+    if (length(naRows) > 0) {
+      return(naRows)
+    }
+  }
+
+  # find the local (per column) IQR
+  iqr <- apply(matrix, 2, FUN = IQR, na.rm = na.rm)
+  
+  q1 <- apply(matrix,2, FUN = quantile, probs = 0.25)
+  q3 <- apply(matrix,2, FUN = quantile, probs = 0.75)
+  
+  
+  outlierRows <- which(apply(matrix, 1, function(row) {
+    any(row < q1 - iqrThres * iqr | row > q3 + iqrThres * iqr)
+  }))
+
+  # Check for discontinuities
+  discontinuityRows <- which(apply(matrix, 1, function(row) {
+    any(diff(row) > madThres * mad(row))
+  }))
+
+  # Combine NA, outlier, and discontinuity rows
+  anomalyRows <- union(union(naRows, outlierRows), discontinuityRows)
+
+  # Return index of anomaly rows
+  return(anomalyRows)
+}
+
+
+
+```
+
+## Calculate cumulative NBP
+
+```{r, fig.width = 5, fig.height = 7}
+
+cnbp_ens_ssp585_S3 <-  t(apply(nbp_ens_ssp585_S3, 1, FUN = cumsum))
+cnbp_stan_ssp585_S3 <- cumsum(nbp_stan_ssp585_S3)
+
+par(las= 1)
+matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha('black', 0.4),
+        ylab = 'CNBP(GtC)', main = 'cumulative nbp')
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_all, ]), col = 'dodgerblue2', lwd = 2, lty = 'solid')
+matlines(sspyears, cnbp_stan_ssp585_S3, col = 'orange', lwd = 2)
+legend('topleft', legend = c('all ensemble', 'passed', 'standard member'),
+       lwd = 2, col = c('black', 'dodgerblue2', 'orange'))
+
+```
+```{r}
+testprop <- 0.2
+
+nruns <- nrow(cnbp_ens_ssp585_S3)
+ntest <- floor(nruns * testprop)
+ntrain <- (nruns - ntest)
+  
+  
+train_ix <- 1:ntrain
+test_ix  <- (ntrain+1):nruns
+```
+
+
+```{r}
+pc_km_cnbp_combine <- pca_km(X = X_wave01_standard,
+                             cnbp_ens_ssp585_S3,
+                             train_ix = train_ix, 
+                             test_ix = test_ix, 
+                             npctol = 0.99, 
+                             scale = TRUE,
+                             center = TRUE)
+
+```
+
+```{r, fig.width = 10, fig.height = 4}
+par(mfrow = c(1,4), las = 1)
+cnbp_pca_summary <- summary(pc_km_cnbp_combine$pca)
+plot(1:10, cnbp_pca_summary$importance[3,1:10], type = 'b', xlab = 'PCs', ylab = 'Proportion of variance explained')
+abline(h = 0.99, lty = 'dashed')
+
+for(i in 1:3){
+
+plot(sspyears, pc_km_cnbp_combine$pca$rotation[,i], type = 'l', ylab = '', xlab = 'year')
+  
+}
+
+pca_km_errorStats(pc_km_cnbp_combine) 
+
+```
+
+```{r, fig.width = 12, fig.height = 4}
+
+par(mfrow = c(1,5), las = 1)
+for(i in 1:5){
+  
+  rn <- range(c((pc_km_cnbp_combine$scores_em_train_mean[,i] - 2*(pc_km_cnbp_combine$scores_em_train_sd) ),
+                (pc_km_cnbp_combine$scores_em_train_mean[,i] + 2*(pc_km_cnbp_combine$scores_em_train_sd) )
+                ))
+  
+plot(pc_km_cnbp_combine$pca$x[,i], pc_km_cnbp_combine$scores_em_train_mean[,i], main = paste0('PC ',i),
+     xlab = 'observed', ylab = 'predicted', ylim = rn, pty = 'n')
+  
+  segments(pc_km_cnbp_combine$pca$x[,i],   (pc_km_cnbp_combine$scores_em_train_mean[,i] - 2*(pc_km_cnbp_combine$scores_em_train_sd) ),
+           pc_km_cnbp_combine$pca$x[,i],  (pc_km_cnbp_combine$scores_em_train_mean[,i] + 2*(pc_km_cnbp_combine$scores_em_train_sd) ),
+           col = makeTransparent('black', 50)
+           
+           )
+  
+  points(pc_km_cnbp_combine$pca$x[,i], pc_km_cnbp_combine$scores_em_train_mean[,i], pch = 20, col = 'black')
+  
+  abline(0,1)
+}
+
+
+```
+
+```{r, fig.width = 10, fig.height = 10}
+
+pca_km_tsSparkPlot(pc_km_cnbp_combine, nr = 8, nc = 20, yrs = sspyears, maintext = 'CNBP test predictions', transp = 100) 
+
+```
+```{r}
+
+
+pca_km_pred <- function(pca_km_obj, X_new, type = 'UK'){
+  # just assume scale is true for the moment
+  
+    scores_em_pred_mean  <- NULL
+    scores_em_pred_sd    <- NULL
+  
+    for(i in 1:pca_km_obj$npc){
+      
+      pred <- predict(pca_km_obj$fit_list[[i]], newdata = X_new, type = type)
+      
+      scores_em_pred_mean <- cbind(scores_em_pred_mean, pred$mean)
+      scores_em_pred_sd   <- cbind(scores_em_pred_sd, pred$sd)
+      
+    }
+    
+  # Project back up to high dimension
+         anom_pred <- pca_km_obj$pca$rotation[ ,1:pca_km_obj$npc] %*% t(scores_em_pred_mean[,1:pca_km_obj$npc])*pca_km_obj$pca$scale
+         sd_pred <- t(pca_km_obj$pca$rotation[ ,1:pca_km_obj$npc] %*% t(scores_em_pred_sd[,1:pca_km_obj$npc])*pca_km_obj$pca$scale)
+        
+#  else{
+      
+  #  anom_pred <- pca$rotation[ ,1:npc] %*% t(scores_em_pred_mean[,1:npc])
+  #  sd_pred <- t(pca$rotation[ ,1:npc] %*% t(scores_em_pred_sd[,1:npc]))
+ # }
+  
+    Ypred <- t(anom_pred + pca_km_obj$pca$center)
+    
+    return(list(Ypred = Ypred))
+    
+  #Ypred_train <- t(anom_train + pca$center)
+  #Y  pred_test <- t(anom_test + pca$center)
+  
+  #Yerr_train <- Y_train - Ypred_train
+  #Yerr_test <- Y_test - Ypred_test
+  
+}
+
+
+```
+
+
+```{r}
+test <- pca_km_pred(pc_km_cnbp_combine, X_new = X_unif[ix_kept_pred, ])
+
+
+```
+
+
+```{r, fig.width = 5, fig.height = 7}
+
+
+par(las= 1)
+matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha('black', 0.4),
+        ylab = 'GtC', xlab = 'year', main = 'cumulative nbp', lwd =2)
+matlines(sspyears, t(test$Ypred), col = alpha('tomato2', 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_all, ]), col = 'dodgerblue2', lwd = 3, lty = 'solid')
+matlines(sspyears, cnbp_stan_ssp585_S3, col = 'orange', lwd = 2)
+
+
+
+legend('topleft', legend = c('all ensemble', 'ensemble passed', 'standard member', 'projected passed'),
+       lwd = 2, col = c('black', 'dodgerblue2', 'orange', 'tomato2'))
+
+
+
+
+```
+
