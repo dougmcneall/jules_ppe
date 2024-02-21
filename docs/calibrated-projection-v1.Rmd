@@ -114,6 +114,9 @@ getStandardMemberSSP <- function(ensloc, variable, nts = 251, cn = 1850:2100){
 
 ```{r}
 
+cbf_2 <- c("#000000", "#E69F00", "#56B4E9", "#009E73", 
+           "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
 
 ensloc_ssp585_S3 <- '/data/users/hadaw/JULES_ES_PPE/u-cf932/'
 ensloc_ssp585_RAD <- '/data/users/hadaw/JULES_ES_PPE/u-ck647/'
@@ -461,7 +464,7 @@ legend('bottom', horiz = TRUE, inset = 0.02,
 
 ```
 
-## Pairs plot of the ensemble members that make it through the data challenges
+## Pairs plot of the ensemble members that match all observational criteria
 
 The ensemble members that make it through the data challenge don't all cluster around the standard settings.
 ```{r, fig.width = 10, fig.height = 10}
@@ -469,8 +472,8 @@ The ensemble members that make it through the data challenge don't all cluster a
 
 pairs(
   X_wave01_standard[c(ix_kept_all, nrow(Y_const_ssp585_mv)),   ],
-  col = c(rep('blue', length(ix_kept_all)), 'orange'),
-  bg = c(rep(alpha('blue',0.4), length(ix_kept_all)), alpha('orange',0.4)),
+  col = c(rep('blue', length(ix_kept_all)), 'red'),
+  bg = c(rep(alpha('blue',0.4), length(ix_kept_all)), alpha('red',0.4)),
   lower.panel = NULL,
   labels = 1:ncol(X_wave01_standard),
   gap = 0,
@@ -485,7 +488,7 @@ legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
 legend('bottom', 
        inset = 0.05,
        legend = c('passed all', 'standard'),
-       col = c('blue', 'orange' ), pt.bg = c(alpha('blue',0.4), alpha('orange',0.4)),
+       col = c('blue', 'red' ), pt.bg = c(alpha('blue',0.4), alpha('red',0.4)),
        pch = 21,
        horiz = TRUE )
 
@@ -508,12 +511,6 @@ gc()
 ```
 
 
-```{r, fig.width = 7, fig.height = 9}
-
-plot(fit_list_Y_const_ssp585_mv[[1]])
-
-
-```
 Create a set of samples from a Uniform input space
 ```{r}
 
@@ -570,17 +567,12 @@ ix_kept_pred <-  eval(parse(text = createConstraintString(yconst = Y_pred_9, yve
 ```{r}
 length(ix_kept_pred)
 
-
 ```
+
+## Input space of emulated outputs that match all 9 observational criteria
 
 
 ```{r, fig.width = 12, fig.height = 12, warning = FALSE}
-
-#pairs(X_unif[ix_kept_pred, ],
-#      xlim = c(0,1), ylim = c(0,1),
-#      gap = 0,
-#      pch = 0.3
-#      )
 
 panel.hist <- function(x, ...)
 {
@@ -608,6 +600,14 @@ pairs(X_kept,
 
 reset()
 legend('left', legend = paste(1:32, colnames(lhs_i)), cex = 1, bty = 'n')
+
+image.plot(legend.only = TRUE,
+           zlim = c(0,1),
+           col = rb,
+           legend.args = list(text = 'Density of model runs matching the criteria', side = 3, line = 1),
+           legend.shrink = 0.6,
+           horizontal = TRUE
+)
 
 
 
@@ -903,6 +903,26 @@ findAnomaliesTSLocal <- function(matrix, iqrThres = 5, madThres = 3, na.rm = FAL
 
 ```
 
+## Observations of cumulative NBP
+
+```{r}
+historical_carbon_budget <- read_excel('Global_Carbon_Budget_2020v1.0.xlsx', sheet = "Historical Budget", skip = 15, n_max = 270)
+match_years_ix <- which(historical_carbon_budget$Year %in% 1850:2013)
+
+land_sink_net <- historical_carbon_budget$`land sink` - historical_carbon_budget$`land-use change emissions`
+
+match_years <- historical_carbon_budget$Year[match_years_ix]
+cumulative_net_land_sink <- cumsum(land_sink_net[match_years_ix])
+
+
+par(las = 1)
+plot(match_years, cumulative_net_land_sink,
+     type = 'l', main = "Cumulative Net Land Sink", xlab = "", ylab = "GtC",
+     ylim = c(-80, 20))
+
+```
+
+
 ## Calculate cumulative NBP
 
 ```{r, fig.width = 5, fig.height = 7}
@@ -1041,20 +1061,26 @@ test <- pca_km_pred(pc_km_cnbp_combine, X_new = X_unif[ix_kept_pred, ])
 ```
 
 
+
+
+
+
 ```{r, fig.width = 5, fig.height = 7}
 
 
+
 par(las= 1)
-matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha('black', 0.4),
+matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
         ylab = 'GtC', xlab = 'year', main = 'cumulative nbp', lwd =2)
-matlines(sspyears, t(test$Ypred), col = alpha('tomato2', 0.6), lty = 'solid', lwd = 3)
-matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_all, ]), col = 'dodgerblue2', lwd = 3, lty = 'solid')
-matlines(sspyears, cnbp_stan_ssp585_S3, col = 'orange', lwd = 2)
+matlines(sspyears, t(test$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
+matlines(sspyears, cnbp_stan_ssp585_S3,  col  = cbf_2[2], lwd = 3)
+matlines(match_years, cumulative_net_land_sink, col = cbf_2[5], lwd = 3)
 
 
 
-legend('topleft', legend = c('all ensemble', 'ensemble passed', 'standard member', 'projected passed'),
-       lwd = 2, col = c('black', 'dodgerblue2', 'orange', 'tomato2'))
+legend('topleft', legend = c('wave01 ensemble', 'wave01 passed', 'standard member', 'projected passed', 'observations'),
+       lwd = 3, col = c(cbf_2[1], cbf_2[3], cbf_2[2], cbf_2[7],cbf_2[5]))
 
 
 
