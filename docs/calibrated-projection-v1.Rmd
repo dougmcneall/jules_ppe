@@ -200,54 +200,26 @@ if (file.exists("ensemble_timeseries_ssp_2022-08-09.rdata")) {
 
 ```
 
-
-```{r, include=FALSE}
-
- npp_stan_ssp585_S3<- getStandardMemberSSP(ensloc = ensloc_ssp585_S3, variable = "npp_nlim_lnd_sum") / (1e12/ysec)
- nbp_stan_ssp585_S3 <- getStandardMemberSSP(ensloc = ensloc_ssp585_S3, variable = "nbp_lnd_sum") / (1e12/ysec)
-#  cSoil_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "cSoil_lnd_sum") / 1e12
-#  cVeg_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "cVeg_lnd_sum") / 1e12
-#  lai_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "lai_lnd_mean")
-# # 
-# # 
-# # # fluxes
-#  rh_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "rh_lnd_sum") / (1e12/ysec)
-#  fLuc_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "fLuc_lnd_sum") / (1e12/ysec)
-#  fHarvest_lnd_sum_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "fHarvest_lnd_sum") / (1e12/ysec)
-# # 
-# # 
-# # # fractions
-#  treeFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "treeFrac_lnd_mean")
-#  shrubFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "shrubFrac_lnd_mean")
-#  baresoilFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "baresoilFrac_lnd_mean")
-#  c3PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "c3PftFrac_lnd_mean")
-#  c4PftFrac_lnd_mean_stan_ssp585_S3 <- getStandardMember(ensloc = ensloc_ssp585_S3, variable = "c4PftFrac_lnd_mean")
-
-
-
-```
-
-
 ```{r}
 ## ----------------------------------------------------------------------
 ## Anomalize ensemble
 ## ----------------------------------------------------------------------
 
-npp_ens_anom_ssp585_S3 <- anomalizeTSmatrix(npp_ens_ssp585_S3, 1:20)
-nbp_ens_anom_ssp585_S3 <- anomalizeTSmatrix(nbp_ens_ssp585_S3, 1:20)
-cSoil_ens_anom_ssp585_S3 <- anomalizeTSmatrix(cSoil_ens_ssp585_S3, 1:20)
-cVeg_ens_anom_ssp585_S3 <- anomalizeTSmatrix(cVeg_ens_ssp585_S3, 1:20)
-
-rh_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(rh_lnd_sum_ens_ssp585_S3, 1:20)
-fLuc_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(fLuc_lnd_sum_ens_ssp585_S3, 1:20)
-lai_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(lai_lnd_mean_ens_ssp585_S3, 1:20) 
-
-fHarvest_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(fHarvest_lnd_sum_ens_ssp585_S3, 1:20)
-treeFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(treeFrac_lnd_mean_ens_ssp585_S3, 1:20)
-shrubFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(shrubFrac_lnd_mean_ens_ssp585_S3, 1:20)
-baresoilFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(baresoilFrac_lnd_mean_ens_ssp585_S3, 1:20)
-c3PftFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(c3PftFrac_lnd_mean_ens_ssp585_S3, 1:20)
-c4PftFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(c4PftFrac_lnd_mean_ens_ssp585_S3, 1:20)
+# npp_ens_anom_ssp585_S3 <- anomalizeTSmatrix(npp_ens_ssp585_S3, 1:20)
+# nbp_ens_anom_ssp585_S3 <- anomalizeTSmatrix(nbp_ens_ssp585_S3, 1:20)
+# cSoil_ens_anom_ssp585_S3 <- anomalizeTSmatrix(cSoil_ens_ssp585_S3, 1:20)
+# cVeg_ens_anom_ssp585_S3 <- anomalizeTSmatrix(cVeg_ens_ssp585_S3, 1:20)
+# 
+# rh_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(rh_lnd_sum_ens_ssp585_S3, 1:20)
+# fLuc_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(fLuc_lnd_sum_ens_ssp585_S3, 1:20)
+# lai_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(lai_lnd_mean_ens_ssp585_S3, 1:20) 
+# 
+# fHarvest_lnd_sum_ens_anom_ssp585_S3 <- anomalizeTSmatrix(fHarvest_lnd_sum_ens_ssp585_S3, 1:20)
+# treeFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(treeFrac_lnd_mean_ens_ssp585_S3, 1:20)
+# shrubFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(shrubFrac_lnd_mean_ens_ssp585_S3, 1:20)
+# baresoilFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(baresoilFrac_lnd_mean_ens_ssp585_S3, 1:20)
+# c3PftFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(c3PftFrac_lnd_mean_ens_ssp585_S3, 1:20)
+# c4PftFrac_lnd_mean_ens_anom_ssp585_S3 <- anomalizeTSmatrix(c4PftFrac_lnd_mean_ens_ssp585_S3, 1:20)
 
 #total_land_carbon_anom <- anomalizeTSmatrix(total_land_carbon_ens, 1:20)
 
@@ -422,12 +394,13 @@ ix_kept_all <-  eval(parse(text = createConstraintString(yconst = Y_const_ssp585
 
 ## Compare the ensemble with observations/expert-elicited ranges
 
-```{r, fig.width = 12, fig.height = 7}
+```{r, fig.width = 10, fig.height = 6}
 
 library(scales)
 
+#pdf(file = 'figs/ensemble_vs_expert_range_all_constraints.pdf', width = 10, height = 6)
 main_vec <- c('NPP', 'NBP', 'cSoil', 'cVeg', 'trees', 'grassC3', 'grassC4', 'shrubs', 'baresoil')
-par(mfrow = c(1, ncol(Y_const_ssp585_mv)), las = 1, mar = c(6,5,5,3))
+par(mfrow = c(1, ncol(Y_const_ssp585_mv)), las = 1, mar = c(4,3,3,2))
 
 ylim_min_vec <- c(0, -1.5, 0, 0, 0, 0, 0, 0, 0)
 ylim_max_vec <- c(150, 3.5, 5000, 2000, 100, 100, 100, 100, 100)
@@ -459,9 +432,11 @@ legend('bottom', horiz = TRUE, inset = 0.02,
        legend = c('ensemble member', 'Observation', 'expert range', 'passes all' , 'standard member'),
        pch = c(19, 19, NA, 19, 19),
        lty = c(NA, NA, 'solid',NA,  NA),
+       lwd = c(NA, NA, 2,NA,  NA),
        col = c(alpha('black',0.2), 'red','red', 'blue', 'orange')
 )
 
+#dev.off()
 ```
 
 ## Pairs plot of the ensemble members that match all observational criteria
@@ -469,7 +444,7 @@ legend('bottom', horiz = TRUE, inset = 0.02,
 The ensemble members that make it through the data challenge don't all cluster around the standard settings.
 ```{r, fig.width = 10, fig.height = 10}
 
-
+#pdf(file = 'figs/pairs_all_constraints.pdf', width = 10, height = 10)
 pairs(
   X_wave01_standard[c(ix_kept_all, nrow(Y_const_ssp585_mv)),   ],
   col = c(rep('blue', length(ix_kept_all)), 'red'),
@@ -491,7 +466,7 @@ legend('bottom',
        col = c('blue', 'red' ), pt.bg = c(alpha('blue',0.4), alpha('red',0.4)),
        pch = 21,
        horiz = TRUE )
-
+#dev.off()
 
 ```
 
@@ -928,13 +903,14 @@ plot(match_years, cumulative_net_land_sink,
 ```{r, fig.width = 5, fig.height = 7}
 
 cnbp_ens_ssp585_S3 <-  t(apply(nbp_ens_ssp585_S3, 1, FUN = cumsum))
-cnbp_stan_ssp585_S3 <- cumsum(nbp_stan_ssp585_S3)
+cnbp_stan_ssp585_S3 <- cnbp_ens_ssp585_S3[501, ]
 
 par(las= 1)
 matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha('black', 0.4),
-        ylab = 'CNBP(GtC)', main = 'cumulative nbp')
+        ylab = 'GtC', main = 'cumulative nbp', xlab = 'Year')
 matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_all, ]), col = 'dodgerblue2', lwd = 2, lty = 'solid')
 matlines(sspyears, cnbp_stan_ssp585_S3, col = 'orange', lwd = 2)
+matlines(match_years, cumulative_net_land_sink, col = cbf_2[5], lwd = 3)
 legend('topleft', legend = c('all ensemble', 'passed', 'standard member'),
        lwd = 2, col = c('black', 'dodgerblue2', 'orange'))
 
@@ -1055,13 +1031,9 @@ pca_km_pred <- function(pca_km_obj, X_new, type = 'UK'){
 
 
 ```{r}
-test <- pca_km_pred(pc_km_cnbp_combine, X_new = X_unif[ix_kept_pred, ])
-
+cnbp_pred <- pca_km_pred(pc_km_cnbp_combine, X_new = X_unif[ix_kept_pred, ])
 
 ```
-
-
-
 
 
 
@@ -1072,7 +1044,7 @@ test <- pca_km_pred(pc_km_cnbp_combine, X_new = X_unif[ix_kept_pred, ])
 par(las= 1)
 matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
         ylab = 'GtC', xlab = 'year', main = 'cumulative nbp', lwd =2)
-matlines(sspyears, t(test$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(cnbp_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
 matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
 matlines(sspyears, cnbp_stan_ssp585_S3,  col  = cbf_2[2], lwd = 3)
 matlines(match_years, cumulative_net_land_sink, col = cbf_2[5], lwd = 3)
@@ -1086,4 +1058,190 @@ legend('topleft', legend = c('wave01 ensemble', 'wave01 passed', 'standard membe
 
 
 ```
+
+## An interesting thing to do here - look at the difference between straight-emulated CNBP and PC emulated CNBP.
+Do they match at time of observations?
+
+
+## Predict the other variables
+
+```{r}
+pc_km_nbp <- pca_km(X = X_wave01_standard,
+                             nbp_ens_ssp585_S3,
+                             train_ix = train_ix, 
+                             test_ix = test_ix, 
+                             npctol = 0.99, 
+                             scale = TRUE,
+                             center = TRUE)
+
+
+pc_km_npp <- pca_km(X = X_wave01_standard,
+                             npp_ens_ssp585_S3,
+                             train_ix = train_ix, 
+                             test_ix = test_ix, 
+                             npctol = 0.99, 
+                             scale = TRUE,
+                             center = TRUE)
+
+pc_km_csoil <- pca_km(X = X_wave01_standard,
+                             cSoil_ens_ssp585_S3,
+                             train_ix = train_ix, 
+                             test_ix = test_ix, 
+                             npctol = 0.99, 
+                             scale = TRUE,
+                             center = TRUE)
+
+pc_km_cVeg <- pca_km(X = X_wave01_standard,
+                             cVeg_ens_ssp585_S3,
+                             train_ix = train_ix, 
+                             test_ix = test_ix, 
+                             npctol = 0.99, 
+                             scale = TRUE,
+                             center = TRUE)
+
+
+
+```
+
+
+```{r}
+
+nbp_pred <- pca_km_pred(pc_km_nbp, X_new = X_unif[ix_kept_pred, ])
+npp_pred <- pca_km_pred(pc_km_npp, X_new = X_unif[ix_kept_pred, ])
+cSoil_pred <- pca_km_pred(pc_km_csoil, X_new = X_unif[ix_kept_pred, ])
+cVeg_pred <- pca_km_pred(pc_km_cVeg, X_new = X_unif[ix_kept_pred, ])
+```
+
+```{r, fig.width = 12, fig.height = 6}
+
+
+
+par(las= 1, mfrow = c(1,4))
+matplot(sspyears, t(cnbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC', xlab = 'year', main = 'cumulative nbp', lwd =2)
+matlines(sspyears, t(cnbp_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(cnbp_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
+matlines(sspyears, cnbp_stan_ssp585_S3,  col  = cbf_2[2], lwd = 3)
+matlines(match_years, cumulative_net_land_sink, col = cbf_2[5], lwd = 3)
+
+
+
+legend('topleft', legend = c('wave01 ensemble', 'wave01 passed', 'standard member', 'projected passed', 'observations'),
+       lwd = 3, col = c(cbf_2[1], cbf_2[3], cbf_2[2], cbf_2[7],cbf_2[5]))
+
+
+
+matplot(sspyears, t(npp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC', xlab = 'year', main = 'npp', lwd =2)
+matlines(sspyears, t(npp_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(npp_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
+matlines(sspyears, npp_ens_ssp585_S3[501, ],  col  = cbf_2[2], lwd = 3)
+
+
+matplot(sspyears, t(cSoil_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC', xlab = 'year', main = 'cSoil', lwd =2)
+matlines(sspyears, t(cSoil_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(cSoil_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
+matlines(sspyears, cSoil_ens_ssp585_S3[501, ],  col  = cbf_2[2], lwd = 3)
+
+
+matplot(sspyears, t(cVeg_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC', xlab = 'year', main = 'cVeg', lwd =2)
+matlines(sspyears, t(cVeg_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(cVeg_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
+matlines(sspyears, cVeg_ens_ssp585_S3[501, ],  col  = cbf_2[2], lwd = 3)
+
+```
+
+```{r, fig.width = 12, fig.height = 6}
+
+
+
+par(las= 1, mfrow = c(1,4))
+matplot(sspyears, t(nbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC/year', xlab = 'year', main = 'nbp', lwd =2)
+matlines(sspyears, t(nbp_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 2)
+matlines(sspyears, t(nbp_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 2, lty = 'solid')
+matlines(sspyears, nbp_ens_ssp585_S3[501, ],  col  = cbf_2[2], lwd = 2)
+#matlines(sspyears, nbp_stan_ssp585_S3,  col  = cbf_2[2], lwd = 3)
+#matlines(match_years, cumulative_net_land_sink, col = cbf_2[5], lwd = 3)
+
+
+
+legend('topleft', legend = c('wave01 ensemble', 'wave01 passed', 'standard member', 'projected passed', 'observations'),
+       lwd = 3, col = c(cbf_2[1], cbf_2[3], cbf_2[2], cbf_2[7],cbf_2[5]))
+
+
+
+matplot(sspyears, t(npp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC/year', xlab = 'year', main = 'npp', lwd =2)
+matlines(sspyears, t(npp_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(npp_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
+matlines(sspyears, npp_ens_ssp585_S3[501, ],  col  = cbf_2[2], lwd = 3)
+
+
+matplot(sspyears, t(cSoil_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC', xlab = 'year', main = 'cSoil', lwd =2)
+matlines(sspyears, t(cSoil_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(cSoil_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
+matlines(sspyears, cSoil_ens_ssp585_S3[501, ],  col  = cbf_2[2], lwd = 3)
+
+
+matplot(sspyears, t(cVeg_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC', xlab = 'year', main = 'cVeg', lwd =2)
+matlines(sspyears, t(cVeg_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 3)
+matlines(sspyears, t(cVeg_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 3, lty = 'solid')
+matlines(sspyears, cVeg_ens_ssp585_S3[501, ],  col  = cbf_2[2], lwd = 3)
+
+```
+```{r, fig.width = 5, fig.height = 7}
+
+
+
+par(las= 1)
+matplot(sspyears, t(nbp_ens_ssp585_S3), type = 'l', lty = 'solid', col = alpha(cbf_2[1], 0.4),
+        ylab = 'GtC/year', xlab = 'year', main = 'nbp', lwd =2)
+matlines(sspyears, t(nbp_pred$Ypred), col = alpha(cbf_2[7], 0.6), lty = 'solid', lwd = 2)
+matlines(sspyears, t(nbp_ens_ssp585_S3[ix_kept_all, ]), col = cbf_2[3], lwd = 2, lty = 'solid')
+matlines(sspyears, nbp_ens_ssp585_S3[501, ],  col  = cbf_2[2], lwd = 2)
+#matlines(sspyears, nbp_stan_ssp585_S3,  col  = cbf_2[2], lwd = 3)
+#matlines(match_years, cumulative_net_land_sink, col = cbf_2[5], lwd = 3)
+legend('topleft', legend = c('wave01 ensemble', 'wave01 passed', 'standard member', 'projected passed', 'observations'),
+       lwd = 3, col = c(cbf_2[1], cbf_2[3], cbf_2[2], cbf_2[7],cbf_2[5]))
+
+```
+
+```{r}
+# This crashes R
+# for(i in 1:length(yvec_ssp585)){
+# 
+#   ens <- get(yvec_ssp585[i])
+#        
+#   pca_km_obj <- pca_km(X = X_wave01_standard,
+#                              ens,
+#                              train_ix = train_ix, 
+#                              test_ix = test_ix, 
+#                              npctol = 0.99, 
+#                              scale = TRUE,
+#                              center = TRUE)
+# 
+#   assign(paste0('pc_km',y_names_select_ssp585[i]), pca_km_obj)
+#   
+# 
+#   pred <- pca_km_pred(pca_km_obj, X_new = X_unif[ix_kept_pred, ])
+#   
+#   assign(paste0('pred',y_names_select_ssp585[i]), pred)
+# 
+# }
+
+```
+
+
+```{r}
+
+#save(ls(pattern = 'pred'), file = 'pred.Rmd')
+
+```
+
+
 
