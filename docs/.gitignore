@@ -3,6 +3,7 @@ ls -lrt
 /archivedata
 /conf_files_augment_JULES-ES-1p0
 *.rdata
+!ensemble_timeseries_ssp_2022-08-09.rdata
 .Rhistory
 constraint.RData
 
